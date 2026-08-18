@@ -39,6 +39,10 @@ lazy val root = (project in file("."))
 
       // Testing
       "org.assertj" % "assertj-core" % "3.27.3" % Test,
-      "org.mockito" % "mockito-core" % "5.15.2" % Test
+      "org.mockito" % "mockito-core" % "5.15.2" % Test,
+
+      // Docker (Sprint 1 — Docker socket runtime)
+      "com.github.docker-java" % "docker-java-core" % "3.4.0",
+      "com.github.docker-java" % "docker-java-transport-httpclient5" % "3.4.0"
     )
   )

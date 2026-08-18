@@ -14,12 +14,12 @@ public final class SandboxDetailsView extends BaseView<SandboxDetailsViewModel> 
 
   @Override
   protected String pageTitle(SandboxDetailsViewModel model, Messages messages) {
-    return model.getSandbox().getName() + " - Sandbox Details";
+    return model.getSandbox().getCityName() + " - Sandbox Details";
   }
 
   @Override
   protected String pageHeading(SandboxDetailsViewModel model, Messages messages) {
-    return model.getSandbox().getName();
+    return model.getSandbox().getCityName();
   }
 
   @Override
@@ -27,3 +27,4 @@ public final class SandboxDetailsView extends BaseView<SandboxDetailsViewModel> 
     return "sandboxes/SandboxDetailsView";
   }
 }
+

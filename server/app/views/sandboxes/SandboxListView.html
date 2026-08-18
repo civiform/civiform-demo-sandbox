@@ -1,17 +1,94 @@
 <div th:fragment="content" class="grid-container py-8">
+
+  <!-- Page header -->
   <div class="mb-6 flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-gray-900" th:text="${templateGlobals.pageHeading()}">Sandboxes</h1>
-    <a href="/" class="usa-button usa-button--outline">Back to Dashboard</a>
+    <h1 class="text-2xl font-bold text-gray-900">Sandbox Dashboard</h1>
   </div>
-  <div class="cf-card">
-    <ul class="divide-y divide-gray-200">
-      <li th:each="sb : ${model.sandboxes}" class="py-4 flex items-center justify-between">
-        <div>
-          <a th:href="|/sandboxes/${sb.id}|" class="font-bold text-blue-600 hover:underline" th:text="${sb.name}"></a>
-          <p class="text-sm text-gray-500" th:text="'Version: ' + ${sb.civiformVersion} + ' | URL: ' + ${sb.url}"></p>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Create Sandbox form (FE-1) -->
+    <div class="lg:col-span-1">
+      <div class="cf-card">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Create New Sandbox</h2>
+        <form action="/sandboxes" method="POST" class="space-y-4">
+
+          <div>
+            <label for="cityName" class="usa-label">City Name</label>
+            <input
+              id="cityName"
+              name="cityName"
+              type="text"
+              placeholder="e.g. Burlington, VT"
+              required
+              class="usa-input"
+              aria-describedby="cityName-hint"
+            />
+            <span id="cityName-hint" class="usa-hint">Name shown in the demo banner</span>
+          </div>
+
+          <div>
+            <label for="adminEmail" class="usa-label">Your Email</label>
+            <input
+              id="adminEmail"
+              name="adminEmail"
+              type="email"
+              placeholder="you@exygy.com"
+              class="usa-input"
+            />
+          </div>
+
+          <div>
+            <label for="notes" class="usa-label">Notes <span class="font-normal text-gray-400">(optional)</span></label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows="2"
+              placeholder="e.g. Demo for Burlington City Council — Aug 2026"
+              class="usa-textarea"
+            ></textarea>
+          </div>
+
+          <button type="submit" class="usa-button w-full">
+            Create Sandbox →
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Sandbox list (FE-5) -->
+    <div class="lg:col-span-2">
+      <div class="cf-card">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Active Sandboxes</h2>
+
+        <div th:if="${model.sandboxes.isEmpty()}"
+             class="text-center py-8 text-gray-400">
+          <p class="text-4xl mb-3">🏛️</p>
+          <p>No sandboxes yet. Create one to get started.</p>
         </div>
-        <span class="cf-badge-active" th:text="${sb.status}">RUNNING</span>
-      </li>
-    </ul>
+
+        <ul th:if="${!model.sandboxes.isEmpty()}" class="divide-y divide-gray-200">
+          <li th:each="sb : ${model.sandboxes}" class="py-4 flex items-center justify-between">
+            <div>
+              <a th:href="|/sandboxes/${sb.id}|"
+                 class="font-bold text-blue-600 hover:underline"
+                 th:text="${sb.cityName}">Burlington, VT</a>
+              <p class="text-xs text-gray-500 font-mono"
+                 th:text="'PIN: ' + ${sb.pin} + '  |  ' + ${sb.url}"></p>
+              <p class="text-xs text-gray-400" th:text="'Expires: ' + ${sb.expiresAt}"></p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span th:class="${sb.status.name() == 'RUNNING'} ? 'cf-badge-active' :
+                               (${sb.status.name() == 'FAILED'} ? 'cf-badge-error' : 'cf-badge-pending')"
+                    th:text="${sb.status}">
+              </span>
+              <a th:href="|/sandboxes/${sb.id}/access|"
+                 class="text-xs text-blue-500 hover:underline">Share Link</a>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
   </div>
 </div>

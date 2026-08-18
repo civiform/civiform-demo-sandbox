@@ -1,6 +1,7 @@
 package services;
 
 import com.google.common.collect.ImmutableList;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -13,25 +14,35 @@ import javax.inject.Singleton;
 import models.SandboxInstance;
 import models.SandboxStatus;
 
+/**
+ * In-memory {@link SandboxService} for tests and local development without Docker.
+ * Keeps state in a ConcurrentHashMap — resets on server restart.
+ *
+ * <p>Sprint 1: replaced in production by {@link DockerSandboxService} via Guice binding.
+ */
 @Singleton
 public class InMemorySandboxService implements SandboxService {
+
   private final Map<String, SandboxInstance> sandboxes = new ConcurrentHashMap<>();
 
   public InMemorySandboxService() {
-    // Seed initial demo sandbox instance for the shell
+    // Seed one demo sandbox for UI development
     String demoId = "demo-sb-1";
     sandboxes.put(
         demoId,
         SandboxInstance.builder()
             .id(demoId)
-            .name("Civiform Demo Staging")
+            .cityName("Burlington, VT")
             .civiformVersion("v2.22.0")
             .status(SandboxStatus.RUNNING)
-            .url("https://demo-sb-1.civiform.dev")
+            .url("http://localhost:10000")
             .adminEmail("admin@civiform.dev")
-            .notes("Default demo sandbox environment initialized on startup")
+            .notes("Default demo sandbox — seeded on startup")
+            .pin("482917")
+            .hostPort(10000)
+            .schemaName("sandbox_demo_sb_1")
             .createdAt(Instant.now().minus(Duration.ofHours(2)))
-            .expiresAt(Instant.now().plus(Duration.ofHours(22)))
+            .expiresAt(Instant.now().plus(Duration.ofDays(30)))
             .build());
   }
 
@@ -47,20 +58,22 @@ public class InMemorySandboxService implements SandboxService {
 
   @Override
   public CompletionStage<SandboxInstance> createSandbox(
-      String name, String version, String adminEmail, String notes) {
-    String id = "sb-" + UUID.randomUUID().toString().substring(0, 8);
-    SandboxInstance instance =
-        SandboxInstance.builder()
-            .id(id)
-            .name(name)
-            .civiformVersion(version != null && !version.isBlank() ? version : "latest")
-            .status(SandboxStatus.RUNNING)
-            .url("https://" + id + ".civiform.dev")
-            .adminEmail(adminEmail)
-            .notes(notes)
-            .createdAt(Instant.now())
-            .expiresAt(Instant.now().plus(Duration.ofHours(24)))
-            .build();
+      String cityName, String version, String adminEmail, String notes) {
+    String id = "sb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    SandboxInstance instance = SandboxInstance.builder()
+        .id(id)
+        .cityName(cityName)
+        .civiformVersion(version != null && !version.isBlank() ? version : "latest")
+        .status(SandboxStatus.PROVISIONING) // stays PROVISIONING — real impl updates async
+        .url("http://localhost:10001")
+        .adminEmail(adminEmail != null ? adminEmail : "")
+        .notes(notes != null ? notes : "")
+        .pin(String.format("%06d", (int) (Math.random() * 1_000_000)))
+        .hostPort(10001)
+        .schemaName("sandbox_" + id.replace("-", "_"))
+        .createdAt(Instant.now())
+        .expiresAt(Instant.now().plus(Duration.ofDays(30)))
+        .build();
     sandboxes.put(id, instance);
     return CompletableFuture.completedFuture(instance);
   }
@@ -68,5 +81,14 @@ public class InMemorySandboxService implements SandboxService {
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
     return CompletableFuture.completedFuture(sandboxes.remove(id) != null);
+  }
+
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
+    return CompletableFuture.completedFuture(
+        Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
+          // Constant-time comparison
+          return MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
+        }));
   }
 }
