@@ -1,0 +1,3 @@
+-Dsbt.rootdir=true
+-J-Xms512M
+-J-Xmx2G

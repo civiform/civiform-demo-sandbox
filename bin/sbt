@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+source bin/lib.sh
+
+docker::compose_dev exec builder sbt "$@"

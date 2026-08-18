@@ -1,0 +1,8 @@
+app.title=Civiform Sandbox Builder
+app.description=Automated deployment and sandbox orchestrator for Civiform demo environments.
+nav.home=Home
+nav.sandboxes=Sandboxes
+nav.docs=Documentation
+nav.github=GitHub Repo
+footer.civiform=Civiform Open Source Community
+footer.contact=For feedback or support, visit the Civiform repository.

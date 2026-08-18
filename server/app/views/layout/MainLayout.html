@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="${templateGlobals.pageTitle()}">Civiform Sandbox Builder</title>
+    <link rel="icon" th:href="${layoutParams.favicon()}" />
+
+    <!-- Stylesheets -->
+    <link
+      th:each="stylesheet : ${layoutParams.stylesheets()}"
+      th:href="${stylesheet}"
+      rel="stylesheet"
+      type="text/css"
+    />
+
+    <!-- Head Scripts -->
+    <script
+      th:each="script : ${layoutParams.headScripts()}"
+      th:src="${script.src()}"
+      th:type="${script.type()}"
+    ></script>
+  </head>
+  <body class="bg-gray-50 flex flex-col min-h-screen">
+    <!-- USWDS Banner -->
+    <th:block th:insert="~{layout/Banner}"></th:block>
+
+    <!-- Header Navigation -->
+    <th:block th:insert="~{layout/Header}"></th:block>
+
+    <!-- Main Content -->
+    <main id="main-content" class="flex-grow">
+      <th:block th:insert="~{${layoutParams.pageTemplate()} :: content}"></th:block>
+    </main>
+
+    <!-- Footer -->
+    <th:block th:insert="~{layout/Footer}"></th:block>
+
+    <!-- Body Scripts -->
+    <script
+      th:each="script : ${layoutParams.bodyScripts()}"
+      th:src="${script.src()}"
+      th:type="${script.type()}"
+    ></script>
+  </body>
+</html>

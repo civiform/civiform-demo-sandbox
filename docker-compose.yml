@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: example
+      POSTGRES_DB: sandbox_builder
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init_postgres.sql:/docker-entrypoint-initdb.d/init_postgres.sql
+      - postgres_data:/var/lib/postgresql/data
+
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cf-sandbox-builder-dev
+    depends_on:
+      - db
+    stdin_open: true
+    tty: true
+    ports:
+      - "9000:9000"
+      - "5173:5173"
+    environment:
+      - DB_JDBC_URL=jdbc:postgresql://db:5432/sandbox_builder
+      - DB_USER=postgres
+      - DB_PASSWORD=example
+      - APPLICATION_SECRET=cf-sandbox-builder-dev-secret-key-1234567890
+    entrypoint: /bin/bash
+
+volumes:
+  postgres_data:

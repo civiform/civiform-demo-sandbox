@@ -1,0 +1,38 @@
+# Scala / SBT
+target/
+project/project/
+project/target/
+.bsp/
+.metals/
+.bloop/
+
+# Node / Frontend
+node_modules/
+dist/
+app/assets/dist/
+.vite/
+
+# Play Framework
+logs/
+RUNNING_PID
+.settings/
+.classpath
+.project
+
+# Environment & local files
+.env
+.env.local
+*.local.conf
+
+# IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Docker
+.docker/

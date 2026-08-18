@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+source bin/lib.sh
+
+echo "Stopping containers..."
+docker::compose_dev down

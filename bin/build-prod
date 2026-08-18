@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+source bin/lib.sh
+
+echo "Building production container..."
+docker build -t cf-sandbox-builder:latest -f prod.Dockerfile .

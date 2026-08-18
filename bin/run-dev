@@ -1,0 +1,9 @@
+#! /usr/bin/env bash
+
+source bin/lib.sh
+
+echo "Starting Civiform Sandbox Builder development environment..."
+docker::compose_dev up -d --build
+
+echo "Starting Civiform Sandbox Builder at http://localhost:9000 (Ctrl+C to stop)..."
+docker::compose_dev exec builder sbt ~run

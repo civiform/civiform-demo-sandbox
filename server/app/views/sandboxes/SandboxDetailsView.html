@@ -1,0 +1,63 @@
+<div th:fragment="content" class="grid-container py-8">
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900" th:text="${model.sandbox.name}">Sandbox Name</h1>
+      <p class="text-sm text-gray-500" th:text="'ID: ' + ${model.sandbox.id}"></p>
+    </div>
+    <a href="/" class="usa-button usa-button--outline">Back to Dashboard</a>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="cf-card">
+      <h2 class="text-lg font-bold text-gray-900 mb-4">Environment Information</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Civiform Version</dt>
+          <dd class="text-sm text-gray-900 font-medium" th:text="${model.sandbox.civiformVersion}"></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Status</dt>
+          <dd class="mt-1">
+            <span class="cf-badge-active" th:text="${model.sandbox.status}"></span>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Access URL</dt>
+          <dd class="text-sm">
+            <a th:href="${model.sandbox.url}" target="_blank" class="text-blue-600 hover:underline" th:text="${model.sandbox.url}"></a>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Admin Contact</dt>
+          <dd class="text-sm text-gray-900" th:text="${model.sandbox.adminEmail}"></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="cf-card">
+      <h2 class="text-lg font-bold text-gray-900 mb-4">Lifecycle &amp; Notes</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Created</dt>
+          <dd class="text-sm text-gray-900" th:text="${model.sandbox.createdAt}"></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Expires</dt>
+          <dd class="text-sm text-gray-900" th:text="${model.sandbox.expiresAt}"></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">Notes</dt>
+          <dd class="text-sm text-gray-700" th:text="${#strings.isEmpty(model.sandbox.notes) ? 'None provided' : model.sandbox.notes}"></dd>
+        </div>
+      </dl>
+
+      <div class="mt-6 pt-4 border-t border-gray-200">
+        <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST">
+          <button type="submit" class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded">
+            Destroy Sandbox
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

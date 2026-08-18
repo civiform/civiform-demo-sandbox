@@ -1,0 +1,21 @@
+@use 'uswds-core' as *;
+
+.spacing-0 > * + * {
+  @include u-margin-top(0);
+}
+
+.spacing-1 > * + * {
+  @include u-margin-top(1);
+}
+
+.spacing-2 > * + * {
+  @include u-margin-top(2);
+}
+
+.spacing-3 > * + * {
+  @include u-margin-top(3);
+}
+
+.spacing-4 > * + * {
+  @include u-margin-top(4);
+}

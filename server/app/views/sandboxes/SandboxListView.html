@@ -1,0 +1,17 @@
+<div th:fragment="content" class="grid-container py-8">
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900" th:text="${templateGlobals.pageHeading()}">Sandboxes</h1>
+    <a href="/" class="usa-button usa-button--outline">Back to Dashboard</a>
+  </div>
+  <div class="cf-card">
+    <ul class="divide-y divide-gray-200">
+      <li th:each="sb : ${model.sandboxes}" class="py-4 flex items-center justify-between">
+        <div>
+          <a th:href="|/sandboxes/${sb.id}|" class="font-bold text-blue-600 hover:underline" th:text="${sb.name}"></a>
+          <p class="text-sm text-gray-500" th:text="'Version: ' + ${sb.civiformVersion} + ' | URL: ' + ${sb.url}"></p>
+        </div>
+        <span class="cf-badge-active" th:text="${sb.status}">RUNNING</span>
+      </li>
+    </ul>
+  </div>
+</div>

@@ -1,0 +1,15 @@
+services:
+  builder:
+    volumes:
+      - ./server:/usr/src/server
+      - /usr/src/server/target
+      - /usr/src/server/project/target
+      - /usr/src/server/node_modules
+      - sbt_cache:/root/.cache
+      - sbt_root:/root/.sbt
+      - ivy_cache:/root/.ivy2
+
+volumes:
+  sbt_cache:
+  sbt_root:
+  ivy_cache:

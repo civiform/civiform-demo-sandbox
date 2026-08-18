@@ -1,0 +1,25 @@
+{
+  "name": "cf-sandbox-builder",
+  "version": "0.0.1",
+  "description": "Civiform Sandbox Builder - Web application to deploy and manage demo/sandbox instances of Civiform.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build --base=/assets/dist/",
+    "build:watch": "vite build --base=/assets/dist/ --watch",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "autoprefixer": "^10.4.20",
+    "htmx.org": "^2.0.4",
+    "postcss": "^8.4.49",
+    "sass": "^1.81.0",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.1",
+    "vite-plugin-static-copy": "^2.2.0"
+  },
+  "dependencies": {
+    "@uswds/uswds": "^3.11.0"
+  }
+}

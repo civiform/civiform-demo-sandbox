@@ -1,0 +1,120 @@
+<div th:fragment="content" class="grid-container py-8">
+  <!-- Page Header -->
+  <div class="mb-8 border-b border-gray-200 pb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight" th:text="${templateGlobals.pageHeading()}">Civiform Sandbox Builder</h1>
+      <p class="mt-2 text-base text-gray-600">Deploy, test, and manage temporary Civiform demo instances on-demand.</p>
+    </div>
+    <div>
+      <a href="#create-modal" class="usa-button bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-3 rounded shadow-sm inline-flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <span>Deploy Sandbox</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="cf-card border-l-4 border-l-blue-600">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Sandboxes</div>
+      <div class="mt-2 text-3xl font-bold text-gray-900" th:text="${model.runningSandboxes}">1</div>
+      <div class="mt-1 text-sm text-gray-600">Currently running instances</div>
+    </div>
+    <div class="cf-card border-l-4 border-l-green-600">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Sandboxes</div>
+      <div class="mt-2 text-3xl font-bold text-gray-900" th:text="${model.totalSandboxes}">1</div>
+      <div class="mt-1 text-sm text-gray-600">Registered demo environments</div>
+    </div>
+    <div class="cf-card border-l-4 border-l-purple-600">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Builder Version</div>
+      <div class="mt-2 text-3xl font-bold text-gray-900" th:text="${model.appVersion}">v0.1.0</div>
+      <div class="mt-1 text-sm text-gray-600">Scaffold empty shell</div>
+    </div>
+  </div>
+
+  <!-- Active Sandboxes Table -->
+  <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
+    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+      <h2 class="text-lg font-bold text-gray-900">Sandbox Instances</h2>
+      <span class="text-sm text-gray-500" th:text="${model.totalSandboxes} + ' total'"></span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="usa-table usa-table--borderless w-full">
+        <thead>
+          <tr class="bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            <th scope="col" class="py-3 px-6">Name / ID</th>
+            <th scope="col" class="py-3 px-6">Version</th>
+            <th scope="col" class="py-3 px-6">Status</th>
+            <th scope="col" class="py-3 px-6">Demo URL</th>
+            <th scope="col" class="py-3 px-6">Admin Contact</th>
+            <th scope="col" class="py-3 px-6 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr th:each="sb : ${model.activeSandboxes}" class="hover:bg-gray-50">
+            <td class="py-4 px-6">
+              <a th:href="|/sandboxes/${sb.id}|" class="font-medium text-blue-600 hover:underline" th:text="${sb.name}">Demo Staging</a>
+              <div class="text-xs text-gray-500" th:text="${sb.id}">demo-sb-1</div>
+            </td>
+            <td class="py-4 px-6 text-sm text-gray-700" th:text="${sb.civiformVersion}">v2.22.0</td>
+            <td class="py-4 px-6">
+              <span th:if="${sb.status.name() == 'RUNNING'}" class="cf-badge-active">Running</span>
+              <span th:if="${sb.status.name() == 'PROVISIONING'}" class="cf-badge-provisioning">Provisioning</span>
+              <span th:if="${sb.status.name() == 'STOPPED'}" class="cf-badge-stopped">Stopped</span>
+            </td>
+            <td class="py-4 px-6 text-sm">
+              <a th:href="${sb.url}" target="_blank" class="text-blue-600 hover:underline inline-flex items-center gap-1" th:text="${sb.url}">
+                https://demo-sb-1.civiform.dev
+              </a>
+            </td>
+            <td class="py-4 px-6 text-sm text-gray-600" th:text="${sb.adminEmail}">admin@civiform.dev</td>
+            <td class="py-4 px-6 text-right text-sm">
+              <form th:action="|/sandboxes/${sb.id}/delete|" method="POST" class="inline">
+                <button type="submit" class="text-red-600 hover:text-red-900 bg-transparent border-0 font-medium cursor-pointer p-0 text-sm">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(model.activeSandboxes)}">
+            <td colspan="6" class="py-8 text-center text-gray-500">
+              No sandboxes currently deployed. Click "Deploy Sandbox" above to create one.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Deploy Sandbox Form Card -->
+  <div id="create-modal" class="cf-card mb-8">
+    <h2 class="text-xl font-bold text-gray-900 mb-4">Deploy a New Civiform Sandbox</h2>
+    <form action="/sandboxes" method="POST" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1" for="name">Sandbox Name</label>
+          <input type="text" id="name" name="name" class="usa-input w-full border border-gray-300 rounded p-2" placeholder="e.g. Benefits Pilot Q3" required />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1" for="version">Civiform Version / Tag</label>
+          <input type="text" id="version" name="version" class="usa-input w-full border border-gray-300 rounded p-2" placeholder="e.g. latest or v2.22.0" value="latest" />
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1" for="adminEmail">Admin Email</label>
+          <input type="email" id="adminEmail" name="adminEmail" class="usa-input w-full border border-gray-300 rounded p-2" placeholder="admin@agency.gov" required />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1" for="notes">Notes / Purpose</label>
+          <input type="text" id="notes" name="notes" class="usa-input w-full border border-gray-300 rounded p-2" placeholder="Testing new SNAP application flow" />
+        </div>
+      </div>
+      <div class="pt-2">
+        <button type="submit" class="usa-button bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded">
+          Launch Sandbox Instance
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

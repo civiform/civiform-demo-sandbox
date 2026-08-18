@@ -1,0 +1,21 @@
+# Routes
+# ~~~~
+
+# Static assets from public/
+GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
+
+# Health Checks
+GET     /health                     controllers.HealthCheckController.health()
+GET     /ready                      controllers.HealthCheckController.ready()
+
+# Home / Dashboard
+GET     /                           controllers.HomeController.index(request: Request)
+
+# Sandbox Management
+GET     /sandboxes                  controllers.SandboxController.index(request: Request)
+POST    /sandboxes                  controllers.SandboxController.create(request: Request)
+GET     /sandboxes/:id              controllers.SandboxController.show(request: Request, id: String)
+POST    /sandboxes/:id/delete       controllers.SandboxController.delete(request: Request, id: String)
+
+# Trailing slash handler
+GET     /*path/                     controllers.UntrailingController.untrail(path: String)

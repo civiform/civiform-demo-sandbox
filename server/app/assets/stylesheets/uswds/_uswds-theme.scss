@@ -1,0 +1,20 @@
+@use 'uswds-core' with (
+  $theme-font-path: '../../../../node_modules/@uswds/uswds/dist/fonts',
+  $theme-image-path: '../../../../node_modules/@uswds/uswds/dist/img',
+  $theme-banner-background-color: 'blue-90',
+  $theme-focus-offset: 0.5,
+  $theme-heading-line-height: 2,
+  $theme-text-measure: 6,
+  $flex-settings: (responsive: true),
+  $flex-direction-settings: (responsive: true),
+  $align-self-settings: (responsive: true),
+  $justify-content-settings: (responsive: true),
+  $max-width-settings: (responsive: true),
+  $theme-show-notifications: false,
+  $theme-utility-breakpoints: (
+    'mobile-lg': true,
+    'tablet': true,
+    'desktop': true,
+    'desktop-lg': true
+  )
+);
