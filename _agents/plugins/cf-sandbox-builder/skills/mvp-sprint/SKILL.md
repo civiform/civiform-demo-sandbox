@@ -134,41 +134,111 @@ Note: `SandboxService` interface is identical — only `DockerSandboxService` is
 
 ---
 
-## Sprint 3 — Seeding Engine + Real Civic Programs
+## Sprint 3 — Seeding Engine + Two-Layer Program Strategy
 
 **Duration**: 2 weeks
-**Goal**: Every sandbox pre-loaded with real Burlington, VT civic programs.
+**Goal**: Every sandbox pre-loaded with programs that demonstrate CiviForm's maximum capabilities,
+PLUS 1-2 real programs specific to the demo city.
 
-> ⚠️ BLOCKER: Program JSON templates must be authored (exported from live CiviForm)
-> before this sprint starts. Who authors them?
+### Two-Layer Seeding Design (decided Aug 2026)
+
+Every sandbox gets **both layers**, always. Layer 1 is static. Layer 2 is city-specific.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  LAYER 1: Evergreen Showcase Programs (always seeded)│
+│  Purpose: demonstrate the hardest CiviForm features  │
+│  Authorship: eng team authors ONCE, ships with repo  │
+│  City-specific? NO — same 3 programs every sandbox   │
+├─────────────────────────────────────────────────────┤
+│  LAYER 2: City-Specific Programs (per-city, 1–2)    │
+│  Purpose: authenticity — "this is your actual form" │
+│  Authorship: Discovery Engine (Sprint 7) or manual  │
+│  City-specific? YES — Burlington gets Burlington     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Layer 1: Evergreen Showcase Programs (eng-authored, committed to repo)
+
+Three programs designed to jointly demonstrate the maximum possible CiviForm feature surface:
+
+#### Program 1: "Emergency Rental Assistance"
+The anchor program — most complex configuration possible.
+- **Complex enumerator**: Household members (name, age, relationship, income source, disability
+  status per member) — the feature that impresses technical evaluators most
+- **Address question**: With autocomplete
+- **File upload**: Income verification document
+- **Income predicate rule**: Show "Emergency Assistance Block" ONLY IF household income < $50k
+- **Cross-program prefill source**: Name, DOB, address, household size exported as shared fields
+
+#### Program 2: "Utility Bill Assistance"  
+Simpler program that showcases cross-program prefill as the "wow" moment.
+- **Cross-program prefill target**: Name, DOB, address, household size auto-filled from Program 1
+  (resident sees fields pre-populated — they don't re-enter their household)
+- **Income predicate rule**: Different threshold ($30k) for a different eligibility block
+- **Currency question type**: Monthly utility bill amount
+
+#### Program 3: "Free & Reduced School Lunch"
+Demonstrates a different enumerator: children rather than adults.
+- **Child enumerator**: Children in household (name, age, school, grade)
+- **Age predicate**: Show lunch eligibility block ONLY IF child age < 18
+- **Cross-program prefill target**: Address pre-filled from Program 1
+- **Date question**: School enrollment start date
+
+**Why these three**: Together they demo cross-program prefill end-to-end (apply P1 → open P2
+pre-filled), two different predicate rule types (income AND age), two different enumerator
+types (adults AND children), and every major question type (text, date, address, currency,
+file upload, radio, checkbox). A technical evaluator sees the full CiviForm feature surface
+in one session.
+
+**Authorship**: BE team creates these as CiviForm `ProgramDefinition` JSON exports using a
+running CiviForm dev instance. Store as `/server/conf/seed-data/showcase/*.json`. One-time
+work in Sprint 3, never changes city to city. **This resolves the open "who authors templates"
+question for the showcase layer.**
+
+### Layer 2: City-Specific Programs (1–2 per sandbox)
+
+For Sprint 3 MVP: one manually curated program JSON per target city, stored in
+`/server/conf/seed-data/cities/<city-slug>.json`. Example:
+
+- `burlington-vt.json` — Burlington, VT Housing Assistance (scraped from burlingtonvt.gov)
+- `allegheny-pa.json` — Allegheny County Rental Assistance (from county.allegheny.pa.us)
+
+Sprint 7: replace manual curation with the Gemini Discovery Engine (auto-crawl `.gov` site →
+extract programs → generate CiviForm JSON). The seeding engine API doesn't change — only the
+source of the JSON changes.
 
 ### Backend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| BE-22 | Program template library: 5+ exported program JSONs | 12 | Housing, utilities, workforce, childcare, senior tax relief |
-| BE-23 | `SeedingEngine.seedSandbox(sandboxId, templateId)` | 12 | Calls `ProgramMigrationService.saveImportedProgram()` after container RUNNING + 15s |
-| BE-24 | Cross-program data pre-fill (4 shared fields) | 8 | Name, DOB, address, household size |
-| BE-25 | Predicate rule: Show Block 3 IF Income < $50k | 8 | One working predicate rule per sandbox |
-| BE-26 | Synthetic applicant data seeder (3–5 mock profiles) | 8 | Pre-populated in Admin view |
-| BE-27 | Program template registry `GET /api/v1/templates` | 4 | List with metadata |
+| BE-22 | Author Layer 1 showcase programs (3 JSONs) | 16 | Requires running CiviForm dev instance to build + export. Complex enumerator + predicates. |
+| BE-23 | Author Layer 2 city programs (2 JSONs: Burlington + Allegheny) | 8 | Manual scrape/authoring from actual .gov sites |
+| BE-24 | `SeedingEngine.seedSandbox(sandboxId)` | 10 | Loads Layer 1 always; loads Layer 2 by city slug. Calls `ProgramMigrationService.saveImportedProgram()` |
+| BE-25 | Cross-program prefill wiring (4 shared fields) | 8 | Name, DOB, address, household size linked across all 3 showcase programs |
+| BE-26 | Predicate rules validation | 6 | Verify income < $50k and age < 18 predicates work correctly after seeding |
+| BE-27 | Synthetic applicant data seeder (3–5 mock profiles) | 8 | Pre-populated in Admin view. One profile per household type. |
+| BE-28 | City slug → Layer 2 JSON resolver | 4 | `cities/burlington-vt.json` based on cityName input |
+| BE-29 | Program template registry `GET /api/v1/templates` | 4 | Returns available cities + showcase programs |
 
-**BE Total: ~52 hrs**
+**BE Total: ~64 hrs** ⚠️ BE-22 (program authoring) is the longest task — needs a CiviForm
+dev environment. Start this on Day 1 of the sprint.
 
 ### Frontend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| FE-8 | Program template picker on Create form | 10 | Card grid: "Standard Mid-Size City", "Housing Focus", etc. |
-| FE-9 | Seeding progress phase | 4 | Second HTMX phase after container: "Seeding programs..." |
+| FE-8 | Program template picker on Create form | 8 | "Standard (3 showcase programs)" always checked. City programs shown as additional options. |
+| FE-9 | Seeding progress phase | 4 | HTMX second phase: "Seeding 5 programs..." after container RUNNING |
 
-**FE Total: ~14 hrs**
+**FE Total: ~12 hrs**
 
 ### Definition of Done
-1. Pick "Burlington Standard" template → programs appear automatically
-2. 3+ programs visible to Resident
-3. Cross-program prefill works for 4 fields
-4. Income predicate rule shows/hides correctly
+1. Create sandbox for "Burlington, VT" → 5 programs visible (3 showcase + 2 city)
+2. Apply to "Emergency Rental Assistance" with household members → enumerator works
+3. Open "Utility Bill Assistance" → Name/DOB/address/household already filled
+4. Income < $50k → extra assistance block visible; income > $50k → block hidden
+5. School lunch program shows child age predicate correctly
 
 ---
 
