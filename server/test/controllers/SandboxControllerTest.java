@@ -132,7 +132,33 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
-  public void validateAccess_wrongPin_returns400WithErrorMessage() {
+  public void validateAccess_correctPin_setsHttpOnlyAccessCookie() {
+    SandboxInstance sandbox = makeSandbox("sb-pin-cookie", SandboxStatus.RUNNING);
+    when(sandboxService.validatePin("sb-pin-cookie", "482917"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    play.mvc.Http.Request request = Helpers.fakeRequest()
+        .method("POST")
+        .uri("/sandboxes/sb-pin-cookie/access")
+        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"))
+        .build();
+
+    Result result = Helpers.invokeWithContext(request,
+        mat -> app.injector().instanceOf(SandboxController.class)
+            .validateAccess(request, "sb-pin-cookie"));
+
+    // Cookie must be present, HTTP-only, named correctly
+    Optional<play.mvc.Http.Cookie> cookie = result.cookie("sb_access_sb_pin_cookie");
+    assertThat(cookie).isPresent();
+    assertThat(cookie.get().value()).isEqualTo("granted");
+    assertThat(cookie.get().httpOnly()).isTrue();
+    assertThat(cookie.get().path()).isEqualTo("/sandboxes/sb-pin-cookie");
+    // 30 days in seconds = 2592000
+    assertThat(cookie.get().maxAge()).isEqualTo(java.util.OptionalInt.of(2_592_000));
+  }
+
+  @Test
+  public void validateAccess_wrongPin_doesNotSetCookie() {
     when(sandboxService.validatePin("sb-pin2", "000000"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
@@ -151,6 +177,8 @@ public class SandboxControllerTest extends WithApplication {
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
     assertThat(contentAsString(result)).contains("Incorrect PIN");
+    // No cookie on wrong PIN
+    assertThat(result.cookie("sb_access_sb_pin2")).isEmpty();
   }
 
   @Test
@@ -172,6 +200,50 @@ public class SandboxControllerTest extends WithApplication {
         mat -> app.injector().instanceOf(SandboxController.class).validateAccess(request, "sb-pin3"));
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
+    assertThat(result.cookie("sb_access_sb_pin3")).isEmpty();
+  }
+
+  @Test
+  public void pinGate_withValidCookie_bypassesPinFormAndRedirects() {
+    SandboxInstance sandbox = makeSandbox("sb-bypass", SandboxStatus.RUNNING);
+    when(sandboxService.getSandbox("sb-bypass"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    // Simulate a returning prospect who already has the access cookie
+    play.mvc.Http.Request request = Helpers.fakeRequest()
+        .method("GET")
+        .uri("/sandboxes/sb-bypass/access")
+        .cookie(play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "granted")
+            .withHttpOnly(true)
+            .withPath("/sandboxes/sb-bypass")
+            .build())
+        .build();
+
+    Result result = Helpers.invokeWithContext(request,
+        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "sb-bypass"));
+
+    // Cookie present → skip form, redirect straight to CiviForm URL
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation().orElse("")).isEqualTo("http://localhost:10001");
+  }
+
+  @Test
+  public void pinGate_withoutCookie_showsPinForm() {
+    SandboxInstance sandbox = makeSandbox("sb-nobypass", SandboxStatus.RUNNING);
+    when(sandboxService.getSandbox("sb-nobypass"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    // No cookie — normal flow, show the PIN form
+    play.mvc.Http.Request request = Helpers.fakeRequest()
+        .method("GET")
+        .uri("/sandboxes/sb-nobypass/access")
+        .build();
+
+    Result result = Helpers.invokeWithContext(request,
+        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "sb-nobypass"));
+
+    assertThat(result.status()).isEqualTo(OK);
+    assertThat(contentAsString(result)).containsIgnoringCase("Burlington");
   }
 
   // ── GET /sandboxes/:id/status — HTMX partial fragment ────────────────────
