@@ -1,38 +1,39 @@
 <th:block>
   <div class="usa-overlay"></div>
-  <header class="usa-header usa-header--basic bg-white border-b border-gray-200">
+  <header class="bg-white border-b border-gray-200" style="padding: 0.75rem 0;">
     <div class="usa-nav-container">
-      <div class="usa-navbar flex items-center justify-between py-2">
-        <div class="usa-logo" id="basic-logo">
-          <em class="usa-logo__text flex items-center gap-2">
-            <a href="/" title="Civiform Sandbox Builder" class="flex items-center gap-2 text-blue-900 font-bold no-underline text-xl">
-              <svg class="w-8 h-8 text-blue-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-              </svg>
-              <span>Civiform Sandbox Builder</span>
-            </a>
-          </em>
-        </div>
-        <button type="button" class="usa-menu-btn">Menu</button>
-      </div>
+      <div class="flex items-center justify-between">
 
-      <nav aria-label="Primary navigation" class="usa-nav">
-        <button type="button" class="usa-nav__close">Close</button>
-        <ul class="usa-nav__primary usa-accordion">
-          <li class="usa-nav__primary-item">
-            <a href="/" class="usa-nav__link">Dashboard</a>
-          </li>
-          <li class="usa-nav__primary-item">
-            <a href="/sandboxes" class="usa-nav__link">Sandboxes</a>
-          </li>
-          <li class="usa-nav__primary-item">
-            <a href="https://github.com/civiform/civiform" target="_blank" rel="noopener noreferrer" class="usa-nav__link flex items-center gap-1">
-              <span>Civiform GitHub</span>
-              <svg class="w-4 h-4 inline opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-            </a>
-          </li>
-        </ul>
-      </nav>
+        <!-- CiviForm Logo (matches prototype) -->
+        <a href="/sandboxes" class="flex items-center gap-2 no-underline" aria-label="CiviForm Demo Portal home">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect width="36" height="36" rx="4" fill="#1a4480"/>
+            <path d="M8 10h8v16H8V10zm4-4h4v4h-4V6zm8 4h8v16h-8V10zm4-4h4v4h-4V6z" fill="white" opacity="0.9"/>
+            <rect x="6" y="24" width="24" height="3" rx="1" fill="white" opacity="0.7"/>
+          </svg>
+          <div class="leading-tight">
+            <div class="font-bold text-blue-900 text-sm" style="font-size:1rem; line-height:1.2;">Civi</div>
+            <div class="font-bold text-blue-900 text-sm" style="font-size:1rem; line-height:1.2;">Form</div>
+          </div>
+        </a>
+
+        <!-- Right-side nav actions -->
+        <div class="flex items-center gap-3">
+          <a href="https://console.aws.amazon.com" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-1 px-4 py-2 rounded border border-blue-800 text-blue-800 text-sm font-medium hover:bg-blue-50 no-underline">
+            View in AWS
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
+          </a>
+          <!-- Log out — placeholder until Sprint 6 auth is wired -->
+          <a href="/logout" class="px-4 py-2 rounded border border-gray-800 text-gray-800 text-sm font-medium hover:bg-gray-50 no-underline">
+            Log out
+          </a>
+        </div>
+
+      </div>
     </div>
   </header>
 </th:block>

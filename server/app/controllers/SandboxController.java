@@ -50,9 +50,7 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return ok(Json.toJson(sandboxes));
       }
-      SandboxListViewModel model = SandboxListViewModel.builder()
-          .sandboxes(sandboxes)
-          .build();
+      SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
       return ok(listView.render(request, model)).as("text/html");
     });
   }
