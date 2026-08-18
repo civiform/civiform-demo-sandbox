@@ -50,9 +50,7 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return ok(Json.toJson(sandboxes));
       }
-      SandboxListViewModel model = SandboxListViewModel.builder()
-          .sandboxes(sandboxes)
-          .build();
+      SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
       return ok(listView.render(request, model)).as("text/html");
     });
   }
@@ -149,6 +147,17 @@ public class SandboxController extends Controller {
 
   /** GET /sandboxes/:id/access — PIN gate page for prospects. */
   public CompletionStage<Result> pinGate(Http.Request request, String id) {
+    // If the browser already has a valid access cookie for this sandbox, skip the PIN form
+    // and redirect directly to the live CiviForm URL.
+    if (hasAccessCookie(request, id)) {
+      return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
+        if (maybeSandbox.isEmpty()) {
+          return notFound("Sandbox not found: " + id);
+        }
+        return redirect(maybeSandbox.get().getUrl());
+      });
+    }
+
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
       if (maybeSandbox.isEmpty()) {
         return notFound("Sandbox not found: " + id);
@@ -164,8 +173,12 @@ public class SandboxController extends Controller {
 
   /**
    * POST /sandboxes/:id/access — validates the 6-digit PIN.
-   * Correct PIN → redirects to live CiviForm URL.
-   * Wrong PIN → re-renders PIN gate with error message.
+   *
+   * <p>Correct PIN → sets HTTP-only {@code sb_access_<id>} session cookie,
+   * then redirects to live CiviForm URL. The cookie lets returning prospects
+   * bypass the PIN form for the remainder of the sandbox lifetime.
+   *
+   * <p>Wrong PIN → re-renders PIN gate with error. No cookie is set.
    */
   public CompletionStage<Result> validateAccess(Http.Request request, String id) {
     DynamicForm form = formFactory.form().bindFromRequest(request);
@@ -173,11 +186,17 @@ public class SandboxController extends Controller {
 
     return sandboxService.validatePin(id, pin).thenCompose(maybeSandbox -> {
       if (maybeSandbox.isPresent()) {
-        // Correct PIN — redirect prospect to live CiviForm instance
+        // Correct PIN — set HTTP-only access cookie and redirect to live CiviForm
+        Http.Cookie accessCookie = Http.Cookie.builder(accessCookieName(id), "granted")
+            .withHttpOnly(true)
+            .withSameSite(Http.Cookie.SameSite.LAX)
+            .withPath("/sandboxes/" + id)
+            .withMaxAge(java.time.Duration.ofDays(30))
+            .build();
         return CompletableFuture.completedFuture(
-            redirect(maybeSandbox.get().getUrl()));
+            redirect(maybeSandbox.get().getUrl()).withCookies(accessCookie));
       }
-      // Wrong PIN — re-render gate with error, need cityName for the view
+      // Wrong PIN — re-render gate with error, no cookie set
       return sandboxService.getSandbox(id).thenApply(ms -> {
         PinGateViewModel model = PinGateViewModel.builder()
             .sandboxId(id)
@@ -205,5 +224,24 @@ public class SandboxController extends Controller {
 
   private String orDefault(String value, String defaultValue) {
     return (value != null && !value.isBlank()) ? value : defaultValue;
+  }
+
+  /**
+   * Returns the name of the HTTP-only access cookie for a given sandbox ID.
+   * Format: {@code sb_access_<id>} with dashes replaced by underscores.
+   * Example: {@code sb_access_sb_a1b2c3d4}
+   */
+  private static String accessCookieName(String sandboxId) {
+    return "sb_access_" + sandboxId.replace("-", "_");
+  }
+
+  /**
+   * Returns true if the request contains a valid access cookie for the given sandbox.
+   * Used by {@link #pinGate} to auto-bypass the PIN form for returning prospects.
+   */
+  private static boolean hasAccessCookie(Http.Request request, String sandboxId) {
+    return request.cookie(accessCookieName(sandboxId))
+        .map(c -> "granted".equals(c.value()))
+        .orElse(false);
   }
 }
