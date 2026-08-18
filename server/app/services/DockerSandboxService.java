@@ -274,7 +274,10 @@ public class DockerSandboxService implements SandboxService {
         .withExposedPorts(internalPort)
         .withHostConfig(HostConfig.newHostConfig()
             .withPortBindings(portBindings)
-            .withNetworkMode("bridge"))
+            .withNetworkMode("bridge")
+            // Ensure host.docker.internal resolves on Linux (Docker 20.10+)
+            // On Mac this is a no-op; on Linux it maps to the bridge gateway (e.g. 172.17.0.1)
+            .withExtraHosts("host.docker.internal:host-gateway"))
         .withEnv(
             "DATABASE_URL=" + dbUrl,
             "DATABASE_USERNAME=" + dbUser,

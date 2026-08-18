@@ -34,6 +34,10 @@ services:
     volumes:
       # Mount Docker socket so the builder can launch CiviForm containers (Sprint 1)
       - /var/run/docker.sock:/var/run/docker.sock
+    # Make host.docker.internal resolve on Linux (on Mac it works natively)
+    # host-gateway = Docker's bridge gateway IP (usually 172.17.0.1 on Linux)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     entrypoint: /bin/bash
 
 volumes:
