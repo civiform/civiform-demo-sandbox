@@ -1,17 +1,30 @@
 package views.sandboxes;
 
 import com.google.inject.Inject;
-import play.mvc.Http;
+import play.i18n.Messages;
 import views.BaseView;
 import views.shared.BaseViewDeps;
 
-public class PinGateView extends BaseView {
+/** View for the prospect PIN entry gate page at /sandboxes/:id/access. */
+public final class PinGateView extends BaseView<PinGateViewModel> {
+
   @Inject
-  public PinGateView(BaseViewDeps deps) {
-    super(deps, "sandboxes/PinGateView");
+  public PinGateView(BaseViewDeps baseViewDeps) {
+    super(baseViewDeps);
   }
 
-  public play.twirl.api.Content render(Http.Request request, PinGateViewModel model) {
-    return renderTemplate(request, model);
+  @Override
+  protected String pageTitle(PinGateViewModel model, Messages messages) {
+    return model.getCityName() + " Demo — Access";
+  }
+
+  @Override
+  protected String pageHeading(PinGateViewModel model, Messages messages) {
+    return model.getCityName() + " CiviForm Demo";
+  }
+
+  @Override
+  protected String pageTemplate() {
+    return "sandboxes/PinGateView";
   }
 }

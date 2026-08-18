@@ -12,14 +12,13 @@ import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.google.common.collect.ImmutableList;
+import com.typesafe.config.Config;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -35,6 +34,7 @@ import play.Logger;
 import play.Logger.ALogger;
 import play.db.Database;
 import play.libs.ws.WSClient;
+
 
 /**
  * Real {@link SandboxService} implementation that launches CiviForm containers
@@ -68,7 +68,7 @@ public class DockerSandboxService implements SandboxService {
       SandboxRepository repository,
       Database db,
       WSClient ws,
-      play.Configuration config) {
+      Config config) {
     this.repository = checkNotNull(repository);
     this.db = checkNotNull(db);
     this.ws = checkNotNull(ws);
