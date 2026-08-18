@@ -15,6 +15,8 @@ import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
 import services.SandboxService;
+import views.sandboxes.CreateSandboxView;
+import views.sandboxes.CreateSandboxViewModel;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
 import views.sandboxes.SandboxDetailsView;
@@ -28,6 +30,7 @@ public class SandboxController extends Controller {
   private final SandboxListView listView;
   private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
+  private final CreateSandboxView createView;
   private final FormFactory formFactory;
 
   @Inject
@@ -36,11 +39,13 @@ public class SandboxController extends Controller {
       SandboxListView listView,
       SandboxDetailsView detailsView,
       PinGateView pinGateView,
+      CreateSandboxView createView,
       FormFactory formFactory) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
+    this.createView = checkNotNull(createView);
     this.formFactory = checkNotNull(formFactory);
   }
 
@@ -216,6 +221,41 @@ public class SandboxController extends Controller {
       }
       return redirect(controllers.routes.SandboxController.index());
     });
+  }
+
+  /** GET /sandboxes/new — Create sandbox form. */
+  public Result newSandbox(Http.Request request) {
+    return ok(createView.render(request, CreateSandboxViewModel.empty())).as("text/html");
+  }
+
+  /**
+   * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
+   * Redirects back to the dashboard with the updated sandbox visible.
+   */
+  public CompletionStage<Result> extend(Http.Request request, String id) {
+    DynamicForm form = formFactory.form().bindFromRequest(request);
+    String daysStr = orDefault(form.get("days"), "30");
+    int days;
+    try {
+      days = Math.max(1, Math.min(90, Integer.parseInt(daysStr)));
+    } catch (NumberFormatException e) {
+      days = 30;
+    }
+    return sandboxService.extendSandbox(id, days).thenApply(maybeExtended -> {
+      if (maybeExtended.isEmpty()) {
+        return notFound("Sandbox not found: " + id);
+      }
+      return redirect(controllers.routes.SandboxController.index());
+    });
+  }
+
+  /**
+   * GET /logout — clears the session and redirects to the dashboard.
+   * Stub until Sprint 6 auth is wired; clears any cookies and session data.
+   */
+  public Result logout(Http.Request request) {
+    return redirect(controllers.routes.SandboxController.index())
+        .withNewSession();
   }
 
   private boolean isJsonRequest(Http.Request request) {
