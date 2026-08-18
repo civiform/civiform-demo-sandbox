@@ -74,8 +74,16 @@ public class DockerSandboxService implements SandboxService {
     this.ws = checkNotNull(ws);
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
+    this.dockerClient = buildDockerClient(config.getString("docker.socketPath"));
+  }
 
-    String socketPath = config.getString("docker.socketPath");
+  /**
+   * Constructs the {@link DockerClient} from the given socket path.
+   *
+   * <p>Protected and non-final so tests can subclass and return a mock client without
+   * requiring a real Docker socket to be present in the CI environment.
+   */
+  protected DockerClient buildDockerClient(String socketPath) {
     DockerClientConfig dockerConfig = DefaultDockerClientConfig
         .createDefaultConfigBuilder()
         .build();
@@ -85,7 +93,7 @@ public class DockerSandboxService implements SandboxService {
         .connectionTimeout(Duration.ofSeconds(30))
         .responseTimeout(Duration.ofSeconds(60))
         .build();
-    this.dockerClient = DockerClientImpl.getInstance(dockerConfig, httpClient);
+    return DockerClientImpl.getInstance(dockerConfig, httpClient);
   }
 
   @Override

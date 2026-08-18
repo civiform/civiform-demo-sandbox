@@ -40,6 +40,9 @@ lazy val root = (project in file("."))
       // Testing
       "org.assertj" % "assertj-core" % "3.27.3" % Test,
       "org.mockito" % "mockito-core" % "5.15.2" % Test,
+      "org.mockito" % "mockito-junit-jupiter" % "5.15.2" % Test,
+      // Play test helpers (GuiceApplicationBuilder, Helpers.fakeRequest, WithApplication)
+      PlayImport.component("play-test") % Test,
 
       // Docker (Sprint 1 — Docker socket runtime)
       "com.github.docker-java" % "docker-java-core" % "3.4.0",
