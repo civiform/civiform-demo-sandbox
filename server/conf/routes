@@ -11,12 +11,19 @@ GET     /ready                      controllers.HealthCheckController.ready()
 # Home / Dashboard
 GET     /                           controllers.HomeController.index(request: Request)
 
+# Auth (stub — real auth in Sprint 6)
+GET     /logout                     controllers.SandboxController.logout(request: Request)
+
 # Sandbox Management
+# NOTE: /sandboxes/new MUST be declared before /sandboxes/:id or the router
+# will match "new" as the :id parameter.
 GET     /sandboxes                  controllers.SandboxController.index(request: Request)
+GET     /sandboxes/new              controllers.SandboxController.newSandbox(request: Request)
 POST    /sandboxes                  controllers.SandboxController.create(request: Request)
 GET     /sandboxes/:id              controllers.SandboxController.show(request: Request, id: String)
 GET     /sandboxes/:id/status       controllers.SandboxController.statusFragment(request: Request, id: String)
 POST    /sandboxes/:id/delete       controllers.SandboxController.delete(request: Request, id: String)
+POST    /sandboxes/:id/extend       controllers.SandboxController.extend(request: Request, id: String)
 
 # PIN Gate (prospect access)
 GET     /sandboxes/:id/access       controllers.SandboxController.pinGate(request: Request, id: String)
