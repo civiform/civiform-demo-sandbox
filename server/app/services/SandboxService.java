@@ -20,6 +20,12 @@ public interface SandboxService {
   CompletionStage<Boolean> deleteSandbox(String id);
 
   /**
+   * Extends a sandbox's expiry by {@code days} days from now.
+   * Returns the updated instance, or empty if the sandbox was not found.
+   */
+  CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days);
+
+  /**
    * Validates a PIN for a sandbox. Returns the sandbox if PIN matches, empty otherwise.
    * Must use constant-time comparison to prevent timing attacks.
    */

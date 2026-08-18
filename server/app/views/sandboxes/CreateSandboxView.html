@@ -1,0 +1,126 @@
+<div th:fragment="content" class="min-h-screen bg-slate-50 py-12 px-4">
+  <div class="max-w-2xl mx-auto">
+
+    <!-- Breadcrumb -->
+    <nav class="mb-6 text-sm text-gray-500" aria-label="Breadcrumb">
+      <a href="/sandboxes" class="text-blue-700 hover:underline">← Back to Dashboard</a>
+    </nav>
+
+    <!-- Page heading -->
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-gray-900">Create New Demo</h1>
+      <p class="mt-1 text-gray-500 text-sm">
+        Spin up an isolated CiviForm instance. The sandbox will be live in under 30 minutes.
+      </p>
+    </div>
+
+    <!-- Error banner -->
+    <div th:if="${model.error != null}"
+         role="alert"
+         class="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+         th:text="${model.error}">
+    </div>
+
+    <!-- Form card -->
+    <div class="cf-card">
+
+      <form action="/sandboxes" method="POST" novalidate>
+
+        <!-- City / Civic Entity Name -->
+        <div class="usa-form-group mb-6">
+          <label for="cityName" class="usa-label font-semibold">
+            City / Civic Entity Name <span class="text-red-600" aria-hidden="true">*</span>
+          </label>
+          <p class="usa-hint text-sm text-gray-500 mt-0.5">
+            The city or county this demo is for. Used in the demo banner and for branding.
+          </p>
+          <input
+            id="cityName"
+            name="cityName"
+            type="text"
+            class="usa-input"
+            placeholder="e.g. Burlington, VT"
+            th:value="${model.cityName}"
+            required
+            aria-required="true"
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Admin Email -->
+        <div class="usa-form-group mb-6">
+          <label for="adminEmail" class="usa-label font-semibold">
+            Admin Notification Email <span class="text-red-600" aria-hidden="true">*</span>
+          </label>
+          <p class="usa-hint text-sm text-gray-500 mt-0.5">
+            Receives a notification when the sandbox is live and ready.
+          </p>
+          <input
+            id="adminEmail"
+            name="adminEmail"
+            type="email"
+            class="usa-input"
+            placeholder="e.g. civiform-dev@exygy.com"
+            th:value="${model.adminEmail}"
+            required
+            aria-required="true"
+            autocomplete="email"
+          />
+        </div>
+
+        <!-- CiviForm Version (optional) -->
+        <div class="usa-form-group mb-6">
+          <label for="version" class="usa-label font-semibold">CiviForm Version</label>
+          <p class="usa-hint text-sm text-gray-500 mt-0.5">
+            Leave blank to use the latest stable release.
+          </p>
+          <input
+            id="version"
+            name="version"
+            type="text"
+            class="usa-input"
+            placeholder="latest"
+            value=""
+            autocomplete="off"
+            aria-label="CiviForm version (optional)"
+          />
+        </div>
+
+        <!-- Notes (optional) -->
+        <div class="usa-form-group mb-8">
+          <label for="notes" class="usa-label font-semibold">Notes</label>
+          <p class="usa-hint text-sm text-gray-500 mt-0.5">
+            Optional. Prospect name, meeting date, deal stage, etc.
+          </p>
+          <textarea
+            id="notes"
+            name="notes"
+            rows="3"
+            class="usa-textarea"
+            placeholder="e.g. Meeting with Burlington IT on Aug 25, exploring housing + utilities programs"
+            th:text="${model.notes}"
+            aria-label="Notes (optional)"
+          ></textarea>
+        </div>
+
+        <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
+          <a href="/sandboxes" class="text-sm text-gray-500 hover:text-gray-800 no-underline">
+            Cancel
+          </a>
+          <button type="submit"
+                  class="usa-button px-8"
+                  aria-label="Create sandbox demo">
+            Create Demo →
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Info note -->
+    <p class="mt-6 text-center text-xs text-gray-400">
+      Sandbox provisioning takes up to 30 minutes. You'll see a live status badge on the dashboard.
+    </p>
+
+  </div>
+</div>

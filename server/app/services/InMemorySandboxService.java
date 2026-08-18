@@ -84,6 +84,19 @@ public class InMemorySandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days) {
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+    SandboxInstance extended = existing.toBuilder()
+        .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
+        .build();
+    sandboxes.put(id, extended);
+    return CompletableFuture.completedFuture(Optional.of(extended));
+  }
+
+  @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.completedFuture(
         Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
