@@ -22,8 +22,8 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "9000:9000"
-      - "5173:5173"
+      - "9001:9000"   # host:container — avoids conflict with civiform-civiform-1 on 9000
+      - "5174:5173"   # host:container — avoids conflict with civiform-civiform-1 on 5173
     environment:
       - DB_JDBC_URL=jdbc:postgresql://db:5432/sandbox_builder
       - DB_USER=postgres
