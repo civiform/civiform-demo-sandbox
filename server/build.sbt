@@ -42,7 +42,7 @@ lazy val root = (project in file("."))
       "org.mockito" % "mockito-core" % "5.15.2" % Test,
       "org.mockito" % "mockito-junit-jupiter" % "5.15.2" % Test,
       // Play test helpers (GuiceApplicationBuilder, Helpers.fakeRequest, WithApplication)
-      PlayImport.component("play-test") % Test,
+      "org.playframework" %% "play-test" % "3.0.6" % Test,
 
       // Docker (Sprint 1 — Docker socket runtime)
       "com.github.docker-java" % "docker-java-core" % "3.4.0",
