@@ -21,7 +21,7 @@ public class InMemorySandboxServiceTest {
   public void listSandboxes_returnsInitialDemoSandbox() throws ExecutionException, InterruptedException {
     var sandboxes = service.listSandboxes().toCompletableFuture().get();
     assertThat(sandboxes).isNotEmpty();
-    assertThat(sandboxes.get(0).getName()).isEqualTo("Civiform Demo Staging");
+    assertThat(sandboxes.get(0).getCityName()).isEqualTo("Burlington, VT");
     assertThat(sandboxes.get(0).getStatus()).isEqualTo(SandboxStatus.RUNNING);
   }
 
@@ -32,12 +32,12 @@ public class InMemorySandboxServiceTest {
     ).toCompletableFuture().get();
 
     assertThat(created.getId()).isNotNull();
-    assertThat(created.getName()).isEqualTo("Test Sandbox");
+    assertThat(created.getCityName()).isEqualTo("Test Sandbox");
     assertThat(created.getCiviformVersion()).isEqualTo("v2.22.0");
 
     var retrieved = service.getSandbox(created.getId()).toCompletableFuture().get();
     assertThat(retrieved).isPresent();
-    assertThat(retrieved.get().getName()).isEqualTo("Test Sandbox");
+    assertThat(retrieved.get().getCityName()).isEqualTo("Test Sandbox");
   }
 
   @Test

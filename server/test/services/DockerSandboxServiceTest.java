@@ -37,6 +37,7 @@ import models.SandboxStatus;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import play.db.ConnectionCallable;
 import play.db.Database;
 import play.libs.ws.WSClient;
 import play.libs.ws.WSRequest;
@@ -345,7 +346,7 @@ public class DockerSandboxServiceTest {
 
     // The schema name on the instance is "sandbox_sb_del2"
     // Verify db.withConnection was called (schema drop happens inside it)
-    verify(db, atLeastOnce()).withConnection(any());
+    verify(db, atLeastOnce()).withConnection(any(ConnectionCallable.class));
   }
 
   @Test
@@ -434,7 +435,7 @@ public class DockerSandboxServiceTest {
     when(dockerClient.startContainerCmd(anyString())).thenReturn(startCmd);
 
     // Stub db.withConnection for schema provisioning (no-op)
-    when(db.withConnection(any())).thenReturn(null);
+    when(db.withConnection(any(ConnectionCallable.class))).thenReturn(null);
   }
 
   private void stubDockerStop(String containerId) {
