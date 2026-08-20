@@ -149,7 +149,7 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(cookie.get().httpOnly()).isTrue();
     assertThat(cookie.get().path()).isEqualTo("/sandboxes/sb-pin-cookie");
     // 30 days in seconds = 2592000
-    assertThat(cookie.get().maxAge()).isEqualTo(java.util.OptionalInt.of(2_592_000));
+    assertThat(cookie.get().maxAge()).isEqualTo(2_592_000);
   }
 
   @Test

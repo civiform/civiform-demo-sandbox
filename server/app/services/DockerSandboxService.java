@@ -78,10 +78,34 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
+   * Protected constructor for tests — accepts a pre-built {@link DockerClient} directly.
+   *
+   * <p>Bypasses {@link #buildDockerClient} entirely, avoiding the Java constructor-ordering
+   * pitfall where calling an overridable method from a parent constructor means the subclass
+   * override runs before the subclass's own fields are initialised.
+   */
+  protected DockerSandboxService(
+      SandboxRepository repository,
+      Database db,
+      WSClient ws,
+      Config config,
+      DockerClient dockerClient) {
+    this.repository = checkNotNull(repository);
+    this.db = checkNotNull(db);
+    this.ws = checkNotNull(ws);
+    this.civiformImage = config.getString("sandbox.civiformImage");
+    this.dbHost = config.getString("sandbox.dbHost");
+    this.dockerClient = checkNotNull(dockerClient);
+  }
+
+  /**
    * Constructs the {@link DockerClient} from the given socket path.
    *
    * <p>Protected and non-final so tests can subclass and return a mock client without
    * requiring a real Docker socket to be present in the CI environment.
+   *
+   * @deprecated Prefer the protected constructor that accepts a {@link DockerClient} directly;
+   *     overriding this method is error-prone due to Java constructor field-initialisation order.
    */
   protected DockerClient buildDockerClient(String socketPath) {
     DockerClientConfig dockerConfig = DefaultDockerClientConfig

@@ -78,12 +78,14 @@ public class DockerSandboxServiceTest {
   private DockerSandboxServiceTestable service;
 
   /**
-   * Testable subclass that lets tests inject a pre-built DockerClient and skip the
-   * ApacheDockerHttpClient construction (which needs a real socket path).
+   * Testable subclass that uses the protected constructor to inject a pre-built DockerClient,
+   * bypassing ApacheDockerHttpClient construction (which needs a real socket path).
+   *
+   * <p>Note: do NOT override {@code buildDockerClient} here — the override runs before the
+   * subclass field {@code injectedDockerClient} is initialised (Java constructor ordering),
+   * causing a NullPointerException. The protected super-constructor avoids this entirely.
    */
   static class DockerSandboxServiceTestable extends DockerSandboxService {
-
-    private final DockerClient injectedDockerClient;
 
     DockerSandboxServiceTestable(
         SandboxRepository repository,
@@ -91,13 +93,7 @@ public class DockerSandboxServiceTest {
         WSClient ws,
         Config config,
         DockerClient injectedDockerClient) {
-      super(repository, db, ws, config);
-      this.injectedDockerClient = injectedDockerClient;
-    }
-
-    @Override
-    protected DockerClient buildDockerClient(String socketPath) {
-      return injectedDockerClient;
+      super(repository, db, ws, config, injectedDockerClient);
     }
   }
 
