@@ -124,21 +124,28 @@
 
               <!-- Info → modal with URL + PIN (password) -->
               <button type="button"
-                      th:onclick="'openInfoModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ',' + |'${sb.sandbox.url}'| + ',' + |'${sb.sandbox.pin}'| + ')'"
+                      data-id="${sb.sandbox.id}"
+                      data-city-name="${sb.cityName}"
+                      data-url="${sb.sandbox.url}"
+                      data-pin="${sb.sandbox.pin}"
+                      th:onclick="openInfoModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
                       class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50">
                 Info
               </button>
 
               <!-- Extend → modal -->
               <button type="button"
-                      th:onclick="'openExtendModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ')'"
+                      data-id="${sb.sandbox.id}"
+                      data-city-name="${sb.cityName}"
+                      th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
                       class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50">
                 Extend
               </button>
 
               <!-- Delete → confirm dialog then form POST -->
               <form th:action="'/sandboxes/' + ${sb.sandbox.id} + '/delete'" method="POST" class="inline"
-                    th:onsubmit="'return confirm(\'Are you sure you want to permanently delete the sandbox demo for ' + ${sb.cityName} + '? This action cannot be undone.\')'" >
+                    data-city-name="${sb.cityName}"
+                    th:onsubmit="'return confirm(\'Are you sure you want to permanently delete the sandbox demo for ' + this.getAttribute('data-city-name') + '? This action cannot be undone.\')'" >
                 <button type="submit"
                         class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
                   Delete

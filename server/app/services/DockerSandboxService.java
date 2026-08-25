@@ -10,6 +10,7 @@ import com.github.dockerjava.api.model.Ports;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
+import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
 import com.google.common.collect.ImmutableList;
 import com.typesafe.config.Config;
@@ -284,10 +285,18 @@ public class DockerSandboxService implements SandboxService {
   private void provisionSchema(String schemaName, String dbUser, String dbPassword) {
     db.withConnection(conn -> {
       try (Statement st = conn.createStatement()) {
+        // Extensions are globally scoped, so we create them in the pg_catalog schema if they don't exist.
+        // This avoids an evolution error because the newly created user doesn't have permission to create extensions.
+        st.execute(
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA pg_catalog;" +
+            "CREATE EXTENSION IF NOT EXISTS btree_gin SCHEMA pg_catalog;");
+
+        // Create user and schema
         st.execute(String.format(
             "CREATE USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
         st.execute(String.format(
             "CREATE SCHEMA %s AUTHORIZATION %s", schemaName, dbUser));
+
         // Grant connect on the database
         st.execute(String.format(
             "GRANT CONNECT ON DATABASE sandbox_builder TO %s", dbUser));
@@ -317,6 +326,18 @@ public class DockerSandboxService implements SandboxService {
     Ports portBindings = new Ports();
     portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
 
+try{
+
+    dockerClient.pullImageCmd("civiform/civiform")
+      .withTag(imageTag)
+      .exec(new PullImageResultCallback())
+      .awaitCompletion();
+} catch(InterruptedException e){
+throw new RuntimeException("Failed to pull image", e);
+}
+
+    log.warn(" Starting up container with DB: {}", dbUrl);
+
     CreateContainerResponse container = dockerClient
         .createContainerCmd(civiformImage.replace(":latest", ":" + imageTag))
         .withName("civiform-sandbox-" + sandboxId)
@@ -326,13 +347,25 @@ public class DockerSandboxService implements SandboxService {
             .withNetworkMode("bridge")
             // Ensure host.docker.internal resolves on Linux (Docker 20.10+)
             // On Mac this is a no-op; on Linux it maps to the bridge gateway (e.g. 172.17.0.1)
-            .withExtraHosts("host.docker.internal:host-gateway"))
+            .withExtraHosts(
+                "host.docker.internal:host-gateway",
+                "dev-oidc:host-gateway"))
         .withEnv(
-            "DATABASE_URL=" + dbUrl,
-            "DATABASE_USERNAME=" + dbUser,
-            "DATABASE_PASSWORD=" + dbPassword,
-            "APPLICATION_SECRET=" + appSecret,
+            "DB_JDBC_STRING=" + dbUrl,
+            "DB_USERNAME=" + dbUser,
+            "DB_PASSWORD=" + dbPassword,
+            "SECRET_KEY=" + appSecret,
+            "IDCS_CLIENT_ID=idcs-fake-oidc-client",
+            "IDCS_SECRET=idcs-fake-oidc-secret",
+            "IDCS_DISCOVERY_URI=http://dev-oidc:3390/.well-known/openid-configuration",
+            "STAGING_HOSTNAME=localhost",
             "STAGING_DISABLE_DEMO_MODE_LOGINS=false",
+            "CIVIFORM_APPLICANT_IDP=generic-oidc",
+            "APPLICANT_OIDC_DISCOVERY_URI=http://dev-oidc:3390/.well-known/openid-configuration",
+            "APPLICANT_OIDC_CLIENT_SECRET=bar",
+            "APPLICANT_OIDC_CLIENT_ID=generic-fake-oidc-client",
+            "WHITELABEL_CIVIC_ENTITY_SHORT_NAME="+cityName,
+            "WHITELABEL_CIVIC_ENTITY_LONG_NAME="+cityName,
             "PORT=9000")
         .exec();
 
@@ -341,11 +374,13 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
-   * Polls CiviForm's /health endpoint until it returns 200, or throws after max attempts.
+   * Polls CiviForm's /programs endpoint until it returns 200, or throws after max attempts.
    * Uses WSClient so the HTTP call is non-blocking relative to Play's pool.
    */
   private void waitForHealthy(String sandboxId, int hostPort) throws Exception {
-    String healthUrl = "http://localhost:" + hostPort + "/health";
+    // Use host.docker.internal to refer to the host machine from inside the container.
+    // There's no /health endpoint in CiviForm, so we use /programs instead.
+    String healthUrl = "http://host.docker.internal:" + hostPort + "/programs";
     for (int attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
       try {
         int status = ws.url(healthUrl)
