@@ -1,0 +1,33 @@
+#! /usr/bin/env bash
+
+# DOC: Autoformat Java, TypeScript, HTML, SCSS, JSON, Markdown, and Shell source files.
+#
+# Run with -d <diffbase> to customize the git diff base (default: origin/main or HEAD).
+# Example usage:
+#   * Format uncommitted changes:
+#     bin/fmt
+#   * Format changes relative to main branch:
+#     bin/fmt -d main
+#   * Format changes relative to a specific commit:
+#     bin/fmt -d HEAD~1
+
+set -euo pipefail
+
+# Pull image if not already cached locally
+if ! docker image inspect civiform/formatter:latest > /dev/null 2>&1; then
+  echo "Pulling civiform/formatter:latest image..."
+  docker pull civiform/formatter:latest
+fi
+
+# Can't use interactive TTY in CI or non-interactive shells
+interactive_flag="-it"
+if [[ -n "${CI:-}" || ! -t 0 ]]; then
+  interactive_flag=""
+fi
+
+readonly GIT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+docker run --rm ${interactive_flag} \
+  -v "${GIT_DIR}:/code" \
+  civiform/formatter \
+  "$@"

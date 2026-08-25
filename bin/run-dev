@@ -5,5 +5,11 @@ source bin/lib.sh
 echo "Starting Civiform Sandbox Builder development environment..."
 docker::compose_dev up -d --build
 
-echo "Starting Civiform Sandbox Builder at http://localhost:9000 (Ctrl+C to stop)..."
+# Ensure frontend assets are built into the mounted volume if missing
+if [ ! -f server/public/dist/uswds.min.js ]; then
+  echo "Building frontend assets..."
+  docker::compose_dev exec -T builder npm run build
+fi
+
+echo "Starting Civiform Sandbox Builder at http://localhost:9001 (Ctrl+C to stop)..."
 docker::compose_dev exec builder sbt ~run
