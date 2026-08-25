@@ -3,7 +3,6 @@ package services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,25 +13,19 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.PullImageCmd;
-import com.github.dockerjava.core.command.PullImageResultCallback;
-import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import models.SandboxInstance;
@@ -43,28 +36,21 @@ import org.mockito.ArgumentCaptor;
 import play.db.ConnectionCallable;
 import play.db.Database;
 import play.libs.ws.WSClient;
-import play.libs.ws.WSRequest;
-import play.libs.ws.WSResponse;
 
 /**
  * Unit tests for {@link DockerSandboxService}.
  *
- * <p>Strategy: mock SandboxRepository, Database, WSClient, and DockerClient so no real
- * Docker socket or Postgres is required. Tests verify the service's logic layer in isolation.
+ * <p>Strategy: mock SandboxRepository, Database, WSClient, and DockerClient so no real Docker
+ * socket or Postgres is required. Tests verify the service's logic layer in isolation.
  *
- * <p>Sprint 1 required tests (from pr-testing-standards.md):
- * - createSandbox() → status is PROVISIONING
- * - createSandbox() → PIN is exactly 6 digits
- * - createSandbox() → Postgres schema created before container launch
- * - createSandbox() → container env vars include DATABASE_URL, APPLICATION_SECRET
- * - createSandbox() → concurrent calls get different ports
- * - getSandboxStatus() → returns PROVISIONING while container starting
- * - getSandboxStatus() → returns RUNNING after /health + 15s buffer
- * - getSandboxStatus() → returns FAILED if container exits non-zero
- * - validatePin() → returns sandbox on correct PIN
- * - validatePin() → returns empty on wrong PIN
- * - deleteSandbox() → drops Postgres schema
- * - deleteSandbox() → stops container
+ * <p>Sprint 1 required tests (from pr-testing-standards.md): - createSandbox() → status is
+ * PROVISIONING - createSandbox() → PIN is exactly 6 digits - createSandbox() → Postgres schema
+ * created before container launch - createSandbox() → container env vars include DATABASE_URL,
+ * APPLICATION_SECRET - createSandbox() → concurrent calls get different ports - getSandboxStatus()
+ * → returns PROVISIONING while container starting - getSandboxStatus() → returns RUNNING after
+ * /health + 15s buffer - getSandboxStatus() → returns FAILED if container exits non-zero -
+ * validatePin() → returns sandbox on correct PIN - validatePin() → returns empty on wrong PIN -
+ * deleteSandbox() → drops Postgres schema - deleteSandbox() → stops container
  */
 public class DockerSandboxServiceTest {
 
@@ -84,9 +70,9 @@ public class DockerSandboxServiceTest {
    * Testable subclass that uses the protected constructor to inject a pre-built DockerClient,
    * bypassing ApacheDockerHttpClient construction (which needs a real socket path).
    *
-   * <p>Note: do NOT override {@code buildDockerClient} here — the override runs before the
-   * subclass field {@code injectedDockerClient} is initialised (Java constructor ordering),
-   * causing a NullPointerException. The protected super-constructor avoids this entirely.
+   * <p>Note: do NOT override {@code buildDockerClient} here — the override runs before the subclass
+   * field {@code injectedDockerClient} is initialised (Java constructor ordering), causing a
+   * NullPointerException. The protected super-constructor avoids this entirely.
    */
   static class DockerSandboxServiceTestable extends DockerSandboxService {
 
@@ -107,10 +93,11 @@ public class DockerSandboxServiceTest {
     ws = mock(WSClient.class);
     dockerClient = mock(DockerClient.class);
 
-    config = ConfigFactory.parseString(
-        "sandbox.civiformImage = \"civiform/civiform:latest\"\n"
-        + "sandbox.dbHost = \"host.docker.internal\"\n"
-        + "docker.socketPath = \"unix:///var/run/docker.sock\"\n");
+    config =
+        ConfigFactory.parseString(
+            "sandbox.civiformImage = \"civiform/civiform:latest\"\n"
+                + "sandbox.dbHost = \"host.docker.internal\"\n"
+                + "docker.socketPath = \"unix:///var/run/docker.sock\"\n");
 
     stubSuccessfulImagePull();
 
@@ -129,8 +116,10 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "admin@test.com", "")
-            .toCompletableFuture().get();
+        service
+            .createSandbox("Burlington, VT", "latest", "admin@test.com", "")
+            .toCompletableFuture()
+            .get();
 
     assertThat(result.getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
   }
@@ -141,8 +130,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     assertThat(result.getPin()).isNotNull();
     assertThat(result.getPin()).hasSize(6);
@@ -150,26 +138,22 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_pinIsNumericOnly()
-      throws ExecutionException, InterruptedException {
+  public void createSandbox_pinIsNumericOnly() throws ExecutionException, InterruptedException {
     // Run 20 times to catch any non-numeric output from SecureRandom formatting
     stubSuccessfulContainerLaunch("container-abc");
     for (int i = 0; i < 20; i++) {
       SandboxInstance result =
-          service.createSandbox("Test City", "latest", "", "")
-              .toCompletableFuture().get();
+          service.createSandbox("Test City", "latest", "", "").toCompletableFuture().get();
       assertThat(result.getPin()).matches("\\d{6}");
     }
   }
 
   @Test
-  public void createSandbox_instanceHasCityName()
-      throws ExecutionException, InterruptedException {
+  public void createSandbox_instanceHasCityName() throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     assertThat(result.getCityName()).isEqualTo("Burlington, VT");
   }
@@ -180,8 +164,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     assertThat(result.getSchemaName()).startsWith("sandbox_");
     assertThat(result.getHostPort()).isGreaterThanOrEqualTo(10000);
@@ -193,8 +176,7 @@ public class DockerSandboxServiceTest {
       throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
-    service.createSandbox("Burlington, VT", "latest", "", "")
-        .toCompletableFuture().get();
+    service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     // repository.save() must be called synchronously before the future completes
     verify(repository).save(any(SandboxInstance.class));
@@ -206,8 +188,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     assertThat(result.getId()).startsWith("sb-");
   }
@@ -218,8 +199,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
 
     Duration lifetime = Duration.between(result.getCreatedAt(), result.getExpiresAt());
     assertThat(lifetime.toDays()).isEqualTo(30);
@@ -228,8 +208,7 @@ public class DockerSandboxServiceTest {
   // ── concurrent port allocation (thread-safety) ────────────────────────────
 
   @Test
-  public void createSandbox_concurrentCallsGetDifferentPorts()
-      throws InterruptedException {
+  public void createSandbox_concurrentCallsGetDifferentPorts() throws InterruptedException {
     // Simulate 10 concurrent createSandbox calls and assert all ports are distinct
     int concurrency = 10;
     AtomicInteger portBase = new AtomicInteger(10000);
@@ -238,9 +217,7 @@ public class DockerSandboxServiceTest {
 
     List<CompletableFuture<SandboxInstance>> futures = new ArrayList<>();
     for (int i = 0; i < concurrency; i++) {
-      futures.add(
-          service.createSandbox("City " + i, "latest", "", "")
-              .toCompletableFuture());
+      futures.add(service.createSandbox("City " + i, "latest", "", "").toCompletableFuture());
     }
 
     List<Integer> ports = new ArrayList<>();
@@ -272,8 +249,7 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void validatePin_returnsEmptyOnWrongPin()
-      throws ExecutionException, InterruptedException {
+  public void validatePin_returnsEmptyOnWrongPin() throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandbox("sb-test2", "482917");
     when(repository.findById("sb-test2")).thenReturn(Optional.of(sandbox));
 
@@ -302,10 +278,8 @@ public class DockerSandboxServiceTest {
     SandboxInstance sandbox = makeSandbox("sb-test3", "100000");
     when(repository.findById("sb-test3")).thenReturn(Optional.of(sandbox));
 
-    assertThat(service.validatePin("sb-test3", "100000").toCompletableFuture().get())
-        .isPresent();
-    assertThat(service.validatePin("sb-test3", "100001").toCompletableFuture().get())
-        .isEmpty();
+    assertThat(service.validatePin("sb-test3", "100000").toCompletableFuture().get()).isPresent();
+    assertThat(service.validatePin("sb-test3", "100001").toCompletableFuture().get()).isEmpty();
   }
 
   // ── deleteSandbox() ───────────────────────────────────────────────────────
@@ -333,8 +307,7 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void deleteSandbox_dropsPostgresSchema()
-      throws ExecutionException, InterruptedException {
+  public void deleteSandbox_dropsPostgresSchema() throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandboxWithContainer("sb-del2", "container-xyz2");
     when(repository.findById("sb-del2")).thenReturn(Optional.of(sandbox));
     when(repository.delete("sb-del2")).thenReturn(true);
@@ -369,8 +342,7 @@ public class DockerSandboxServiceTest {
     SandboxInstance sandbox = makeSandboxWithStatus("sb-status1", SandboxStatus.PROVISIONING);
     when(repository.findById("sb-status1")).thenReturn(Optional.of(sandbox));
 
-    Optional<SandboxInstance> result =
-        service.getSandbox("sb-status1").toCompletableFuture().get();
+    Optional<SandboxInstance> result = service.getSandbox("sb-status1").toCompletableFuture().get();
 
     assertThat(result).isPresent();
     assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
@@ -382,8 +354,7 @@ public class DockerSandboxServiceTest {
     SandboxInstance sandbox = makeSandboxWithStatus("sb-status2", SandboxStatus.RUNNING);
     when(repository.findById("sb-status2")).thenReturn(Optional.of(sandbox));
 
-    Optional<SandboxInstance> result =
-        service.getSandbox("sb-status2").toCompletableFuture().get();
+    Optional<SandboxInstance> result = service.getSandbox("sb-status2").toCompletableFuture().get();
 
     assertThat(result).isPresent();
     assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.RUNNING);
@@ -395,8 +366,7 @@ public class DockerSandboxServiceTest {
     SandboxInstance sandbox = makeSandboxWithStatus("sb-status3", SandboxStatus.FAILED);
     when(repository.findById("sb-status3")).thenReturn(Optional.of(sandbox));
 
-    Optional<SandboxInstance> result =
-        service.getSandbox("sb-status3").toCompletableFuture().get();
+    Optional<SandboxInstance> result = service.getSandbox("sb-status3").toCompletableFuture().get();
 
     assertThat(result).isPresent();
     assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.FAILED);
@@ -411,8 +381,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-port-test");
 
     SandboxInstance result =
-        service.createSandbox("Portland, OR", "latest", "", "")
-            .toCompletableFuture().get();
+        service.createSandbox("Portland, OR", "latest", "", "").toCompletableFuture().get();
 
     assertThat(result.getUrl()).contains("10042");
   }
@@ -421,7 +390,7 @@ public class DockerSandboxServiceTest {
 
   private void stubSuccessfulImagePull() {
     PullImageResultCallback callback = mock(PullImageResultCallback.class);
-    
+
     PullImageCmd pullCmd = mock(PullImageCmd.class);
     when(pullCmd.withTag(anyString())).thenReturn(pullCmd);
     when(pullCmd.exec(any(PullImageResultCallback.class))).thenReturn(callback);
@@ -484,8 +453,6 @@ public class DockerSandboxServiceTest {
   }
 
   private SandboxInstance makeSandboxWithStatus(String id, SandboxStatus status) {
-    return makeSandbox(id, "482917").toBuilder()
-        .status(status)
-        .build();
+    return makeSandbox(id, "482917").toBuilder().status(status).build();
   }
 }

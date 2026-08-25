@@ -1,11 +1,10 @@
 <div th:fragment="content" class="grid-container py-8">
-
   <!-- Page Header -->
   <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">CiviForm Demo Portal</h1>
     </div>
-    <a href="/sandboxes/new" class="usa-button flex items-center gap-2 w-fit" style="background-color:#1a4480;">
+    <a href="/sandboxes/new" class="usa-button flex items-center gap-2 w-fit" style="background-color: #1a4480">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
       </svg>
@@ -41,7 +40,6 @@
 
   <!-- Sandbox Table -->
   <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-
     <!-- Empty state -->
     <div th:if="${model.sandboxes.isEmpty()}" class="text-center py-16 text-gray-400">
       <p class="text-5xl mb-4">🏛️</p>
@@ -55,21 +53,26 @@
         <tr>
           <th class="text-left px-6 py-3 font-semibold text-gray-700">
             Civic entity
-            <button class="ml-1 text-gray-400 hover:text-gray-600" aria-label="Sort by civic entity">↕</button>
+            <button class="ml-1 text-gray-400 hover:text-gray-600" aria-label="Sort by civic entity">
+              ↕
+            </button>
           </th>
           <th class="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
           <th class="text-left px-4 py-3 font-semibold text-gray-700">
             Days Remaining
-            <button class="ml-1 text-gray-400 hover:text-gray-600" aria-label="Sort by days remaining">↕</button>
+            <button class="ml-1 text-gray-400 hover:text-gray-600" aria-label="Sort by days remaining">
+              ↕
+            </button>
           </th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         <tr th:each="sb : ${model.sandboxes}" th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''">
-
           <!-- Civic entity name -->
-          <td class="px-6 py-4 font-semibold text-gray-900" th:text="${sb.cityName}">Burlington, VT</td>
+          <td class="px-6 py-4 font-semibold text-gray-900" th:text="${sb.cityName}">
+            Burlington, VT
+          </td>
 
           <!-- Status badge -->
           <td class="px-4 py-4">
@@ -96,20 +99,21 @@
           <td class="px-4 py-4 text-gray-700">
             <div th:if="${sb.daysRemaining > 0}">
               <span class="font-medium" th:text="${sb.daysRemaining} + ' days'">30 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expires ' + ${sb.expiryFormatted}">Expires Sep 13,
-                2026</div>
+              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expires ' + ${sb.expiryFormatted}">
+                Expires Sep 13, 2026
+              </div>
             </div>
             <div th:if="${sb.daysRemaining <= 0}">
               <span class="font-medium text-gray-400">0 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expired ' + ${sb.expiryFormatted}">Expired Aug 18,
-                2026</div>
+              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expired ' + ${sb.expiryFormatted}">
+                Expired Aug 18, 2026
+              </div>
             </div>
           </td>
 
           <!-- Action buttons -->
           <td class="px-4 py-4">
             <div class="flex items-center gap-2 flex-wrap">
-
               <!-- Launch → opens CiviForm in new tab -->
               <a th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/access| : '#'"
                 target="_blank" rel="noopener"
@@ -147,6 +151,15 @@
                 Extend
               </button>
 
+              <!-- Delete → confirm dialog then form POST -->
+              <form th:action="'/sandboxes/' + ${sb.sandbox.id} + '/delete'" method="POST" class="inline"
+                data-city-name="${sb.cityName}"
+                th:onsubmit="'return confirm(\'Are you sure you want to permanently delete the sandbox demo for ' + this.getAttribute('data-city-name') + '? This action cannot be undone.\')'">
+                <button type="submit"
+                  class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
+                  Delete
+                </button>
+              </form>
               <!-- Delete → styled confirmation modal -->
               <button type="button"
                 th:onclick="'openDeleteModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ')'"
@@ -166,11 +179,15 @@
     class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
       <button onclick="closeModal('info-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+        ×
+      </button>
       <h2 id="info-modal-title" class="text-xl font-bold text-gray-900 mb-1">
         Sandbox Info: <span id="info-city-name"></span>
       </h2>
-      <p class="text-sm text-gray-500 mb-5">View and copy the URL and credentials for this CiviForm sandbox demo.</p>
+      <p class="text-sm text-gray-500 mb-5">
+        View and copy the URL and credentials for this CiviForm sandbox demo.
+      </p>
 
       <!-- Demo URL -->
       <div class="mb-4">
@@ -212,7 +229,7 @@
       </div>
 
       <!-- Copy All -->
-      <button id="copy-all-btn" onclick="copyAll()" class="usa-button w-full" style="background-color:#1a4480;">
+      <button id="copy-all-btn" onclick="copyAll()" class="usa-button w-full" style="background-color: #1a4480">
         Copy All
       </button>
     </div>
@@ -223,11 +240,15 @@
     class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
       <button onclick="closeModal('extend-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+        ×
+      </button>
       <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
         Extend Demo: <span id="extend-city-name"></span>
       </h2>
-      <p class="text-sm text-gray-600 mb-5">Specify the number of days you want to extend this sandbox demo by.</p>
+      <p class="text-sm text-gray-600 mb-5">
+        Specify the number of days you want to extend this sandbox demo by.
+      </p>
       <form id="extend-form" method="POST">
         <div class="mb-5">
           <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1">Extend by (days):</label>
@@ -235,7 +256,7 @@
             class="w-full border border-gray-300 rounded px-3 py-2 text-sm" aria-label="Number of days to extend" />
         </div>
         <div class="flex items-center gap-4">
-          <button type="submit" class="usa-button" style="background-color:#1a4480;">
+          <button type="submit" class="usa-button" style="background-color: #1a4480">
             Extend Demo
           </button>
           <button type="button" onclick="closeModal('extend-modal')"
@@ -285,18 +306,18 @@
     <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
     <script>
       function openInfoModal(id, cityName, url, pin) {
-        document.getElementById('info-city-name').textContent = cityName;
-        document.getElementById('info-url').value = url;
-        document.getElementById('info-pin').value = pin;
-        document.getElementById('info-pin').type = 'password';
-        openModal('info-modal');
+        document.getElementById('info-city-name').textContent = cityName
+        document.getElementById('info-url').value = url
+        document.getElementById('info-pin').value = pin
+        document.getElementById('info-pin').type = 'password'
+        openModal('info-modal')
       }
 
       function openExtendModal(id, cityName) {
-        document.getElementById('extend-city-name').textContent = cityName;
-        document.getElementById('extend-form').action = '/sandboxes/' + id + '/extend';
-        document.getElementById('extend-days').value = 30;
-        openModal('extend-modal');
+        document.getElementById('extend-city-name').textContent = cityName
+        document.getElementById('extend-form').action = '/sandboxes/' + id + '/extend'
+        document.getElementById('extend-days').value = 30
+        openModal('extend-modal')
       }
 
 
@@ -320,33 +341,32 @@
       }
 
       function closeModal(id) {
-        document.getElementById(id).classList.add('hidden');
+        document.getElementById(id).classList.add('hidden')
       }
 
       function togglePinVisibility() {
-        const input = document.getElementById('info-pin');
-        input.type = input.type === 'password' ? 'text' : 'password';
+        const input = document.getElementById('info-pin')
+        input.type = input.type === 'password' ? 'text' : 'password'
       }
 
       function copyField(inputId, btn) {
-        const val = document.getElementById(inputId).value;
+        const val = document.getElementById(inputId).value
         navigator.clipboard.writeText(val).then(() => {
-          const orig = btn.textContent;
-          btn.textContent = '✓ Copied';
-          setTimeout(() => btn.textContent = orig, 1800);
-        });
+          const orig = btn.textContent
+          btn.textContent = '✓ Copied'
+          setTimeout(() => (btn.textContent = orig), 1800)
+        })
       }
 
       function copyAll() {
-        const url = document.getElementById('info-url').value;
-        const pin = document.getElementById('info-pin').value;
-        const text = 'Demo URL: ' + url + '\nPassword: ' + pin;
+        const url = document.getElementById('info-url').value
+        const pin = document.getElementById('info-pin').value
+        const text = 'Demo URL: ' + url + '\nPassword: ' + pin
         navigator.clipboard.writeText(text).then(() => {
-          const btn = document.getElementById('copy-all-btn');
-          btn.textContent = '✓ Copied!';
-          setTimeout(() => btn.textContent = 'Copy All', 1800);
-        });
+          const btn = document.getElementById('copy-all-btn')
+          btn.textContent = '✓ Copied!'
+          setTimeout(() => (btn.textContent = 'Copy All'), 1800)
+        })
       }
     </script>
-
   </div>
