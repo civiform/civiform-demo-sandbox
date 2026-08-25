@@ -1,0 +1,10 @@
+target/
+node_modules/
+dist/
+app/assets/dist/
+.vite/
+logs/
+RUNNING_PID
+.bsp/
+.metals/
+.bloop/
