@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # Pull image if not already cached locally
-if ! docker image inspect civiform/formatter:latest > /dev/null 2>&1; then
+if ! docker image inspect civiform/formatter:latest >/dev/null 2>&1; then
   echo "Pulling civiform/formatter:latest image..."
   docker pull civiform/formatter:latest
 fi
