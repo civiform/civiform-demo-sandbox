@@ -40,6 +40,19 @@ services:
       - "host.docker.internal:host-gateway"
     entrypoint: /bin/bash
 
+  # The dev oidc server needs to be visible to the Civiform server and web browsers
+  # on the same host:port. Developers need to add a localhost IP alias for this
+  # container name in their /etc/hosts file for the web brower to load the auth url.
+  # EG: 127.0.0.1 dev-oidc
+  dev-oidc:
+    image: civiform-oidc-provider
+    restart: always
+    expose:
+      - 3390
+    environment:
+      # Use an explicit port to not conflict with other test instances.
+      - OIDC_PORT=3390
+
 volumes:
   postgres_data:
 
