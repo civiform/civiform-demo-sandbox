@@ -4,13 +4,9 @@
     <div>
       <h1 class="text-3xl font-bold text-gray-900">CiviForm Demo Portal</h1>
     </div>
-    <a
-      href="/sandboxes/new"
-      class="usa-button flex items-center gap-2 w-fit"
-      style="background-color: #1a4480"
-    >
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+    <a href="/sandboxes/new" class="usa-button flex items-center gap-2 w-fit">
+      <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+        <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
       </svg>
       Create new demo
     </a>
@@ -51,64 +47,55 @@
     </div>
 
     <!-- Table -->
-    <table th:if="${!model.sandboxes.isEmpty()}" class="w-full text-sm">
-      <thead class="border-b border-gray-200 bg-gray-50">
+    <table
+      th:if="${!model.sandboxes.isEmpty()}"
+      class="usa-table usa-table--borderless w-full text-sm"
+      data-sortable
+    >
+      <thead>
         <tr>
-          <th class="text-left px-6 py-3 font-semibold text-gray-700">
-            Civic entity
-            <button
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              aria-label="Sort by civic entity"
-            >
-              ↕
-            </button>
-          </th>
-          <th class="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
-          <th class="text-left px-4 py-3 font-semibold text-gray-700">
-            Days Remaining
-            <button
-              class="ml-1 text-gray-400 hover:text-gray-600"
-              aria-label="Sort by days remaining"
-            >
-              ↕
-            </button>
-          </th>
-          <th class="px-4 py-3"></th>
+          <th data-sortable scope="col" role="columnheader">Civic entity</th>
+          <th data-sortable scope="col" role="columnheader">Status</th>
+          <th data-sortable scope="col" role="columnheader">Days Remaining</th>
+          <th scope="col" role="columnheader"><span class="usa-sr-only">Actions</span></th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-100">
+      <tbody>
         <tr
           th:each="sb : ${model.sandboxes}"
           th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''"
         >
           <!-- Civic entity name -->
-          <td class="px-6 py-4 font-semibold text-gray-900" th:text="${sb.cityName}">
+          <td
+            class="font-semibold text-gray-900"
+            th:data-sort-value="${sb.cityName}"
+            th:text="${sb.cityName}"
+          >
             Burlington, VT
           </td>
 
           <!-- Status badge -->
-          <td class="px-4 py-4">
-            <span
-              th:if="${sb.daysRemaining <= 0}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-gray-200 text-gray-600"
-            >
+          <td
+            th:data-sort-value="${sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : sb.sandbox.status.name())}"
+          >
+            <span th:if="${sb.daysRemaining <= 0}" class="usa-tag bg-base-dark text-white">
               EXPIRED
             </span>
             <span
               th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800"
+              class="usa-tag bg-warning text-ink"
             >
               EXPIRING
             </span>
             <span
               th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800"
+              class="usa-tag bg-success-dark text-white"
             >
               ACTIVE
             </span>
             <span
               th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800"
+              class="usa-tag bg-warning text-ink"
               th:text="${sb.sandbox.status}"
             >
               PROVISIONING
@@ -116,7 +103,7 @@
           </td>
 
           <!-- Days remaining + expiry date -->
-          <td class="px-4 py-4 text-gray-700">
+          <td class="text-gray-700" th:data-sort-value="${sb.daysRemaining}">
             <div th:if="${sb.daysRemaining > 0}">
               <span class="font-medium" th:text="${sb.daysRemaining} + ' days'">30 days</span>
               <div
@@ -138,7 +125,7 @@
           </td>
 
           <!-- Action buttons -->
-          <td class="px-4 py-4">
+          <td>
             <div class="flex items-center gap-2 flex-wrap">
               <!-- Launch → opens CiviForm in new tab -->
               <a
@@ -146,72 +133,69 @@
                 target="_blank"
                 rel="noopener"
                 th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 border border-gray-800 no-underline"
+                class="usa-button inline-flex items-center gap-1 no-underline"
               >
                 Launch
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
+                <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                  <use href="/assets/dist/img/sprite.svg#launch"></use>
                 </svg>
               </a>
 
-              <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
-              <a
-                href="https://console.aws.amazon.com"
-                target="_blank"
-                rel="noopener"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50 no-underline"
-              >
-                AWS
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
-
-              <!-- Info → modal with URL + PIN (password) -->
-              <button
-                type="button"
-                data-id="${sb.sandbox.id}"
-                data-city-name="${sb.cityName}"
-                data-url="${sb.sandbox.url}"
-                data-pin="${sb.sandbox.pin}"
-                th:onclick="openInfoModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
-                class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50"
-              >
-                Info
-              </button>
-
-              <!-- Extend → modal -->
-              <button
-                type="button"
-                data-id="${sb.sandbox.id}"
-                data-city-name="${sb.cityName}"
-                th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50"
-              >
-                Extend
-              </button>
+              <!-- AWS, Info, Extend button group -->
+              <ul class="usa-button-group usa-button-group--segmented">
+                <li class="usa-button-group__item">
+                  <!-- Info → modal with URL + PIN (password) -->
+                  <button
+                    type="button"
+                    th:data-id="${sb.sandbox.id}"
+                    th:data-city-name="${sb.cityName}"
+                    th:data-url="${sb.sandbox.url}"
+                    th:data-pin="${sb.sandbox.pin}"
+                    th:onclick="openInfoModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
+                    class="usa-button usa-button--outline"
+                  >
+                    Info
+                  </button>
+                </li>
+                <li class="usa-button-group__item">
+                  <!-- Extend → modal -->
+                  <button
+                    type="button"
+                    th:data-id="${sb.sandbox.id}"
+                    th:data-city-name="${sb.cityName}"
+                    th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
+                    class="usa-button usa-button--outline"
+                  >
+                    Extend
+                  </button>
+                </li>
+                <li class="usa-button-group__item">
+                  <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
+                  <a
+                    href="https://console.aws.amazon.com"
+                    target="_blank"
+                    rel="noopener"
+                    class="usa-button usa-button--outline inline-flex items-center gap-1 no-underline"
+                  >
+                    AWS
+                    <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                      <use href="/assets/dist/img/sprite.svg#launch"></use>
+                    </svg>
+                  </a>
+                </li>
+              </ul>
 
               <!-- Delete → confirm dialog then form POST -->
               <form
                 th:action="'/sandboxes/' + ${sb.sandbox.id} + '/delete'"
                 method="POST"
                 class="inline"
-                data-city-name="${sb.cityName}"
+                th:data-city-name="${sb.cityName}"
                 th:onsubmit="'return confirm(\'Are you sure you want to permanently delete the sandbox demo for ' + this.getAttribute('data-city-name') + '? This action cannot be undone.\')'"
               >
                 <button
                   type="submit"
-                  class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600"
+                  class="usa-button bg-red-600 hover:bg-red-700 text-white border-red-600"
                 >
                   Delete
                 </button>
@@ -235,7 +219,7 @@
       <button
         onclick="closeModal('info-modal')"
         aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
       >
         ×
       </button>
@@ -259,7 +243,7 @@
           />
           <button
             onclick="copyField('info-url', this)"
-            class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+            class="usa-button usa-button--outline whitespace-nowrap"
           >
             Copy
           </button>
@@ -282,7 +266,7 @@
               type="button"
               onclick="togglePinVisibility()"
               aria-label="Toggle password visibility"
-              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
+              class="usa-button usa-button--unstyled absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
             >
               <svg
                 id="eye-icon"
@@ -308,7 +292,7 @@
           </div>
           <button
             onclick="copyField('info-pin', this)"
-            class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+            class="usa-button usa-button--outline whitespace-nowrap"
           >
             Copy
           </button>
@@ -316,14 +300,25 @@
       </div>
 
       <!-- Copy All -->
-      <button
-        id="copy-all-btn"
-        onclick="copyAll()"
-        class="usa-button w-full"
-        style="background-color: #1a4480"
-      >
-        Copy All
-      </button>
+      <button id="copy-all-btn" onclick="copyAll()" class="usa-button w-full">Copy All</button>
+      <!-- Details Page Link -->
+      <div class="mt-4 pt-4 border-t border-gray-200 text-center">
+        <a
+          id="info-details-link"
+          href="#"
+          class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+        >
+          View sandbox details
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -339,7 +334,7 @@
       <button
         onclick="closeModal('extend-modal')"
         aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
       >
         ×
       </button>
@@ -366,13 +361,11 @@
           />
         </div>
         <div class="flex items-center gap-4">
-          <button type="submit" class="usa-button" style="background-color: #1a4480">
-            Extend Demo
-          </button>
+          <button type="submit" class="usa-button">Extend Demo</button>
           <button
             type="button"
             onclick="closeModal('extend-modal')"
-            class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer"
+            class="usa-button usa-button--unstyled text-blue-600 hover:underline text-sm font-medium cursor-pointer"
           >
             Cancel
           </button>
@@ -383,67 +376,68 @@
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
-    function openInfoModal(id, cityName, url, pin) {
-      document.getElementById('info-city-name').textContent = cityName
-      document.getElementById('info-url').value = url
-      document.getElementById('info-pin').value = pin
-      document.getElementById('info-pin').type = 'password'
-      openModal('info-modal')
-    }
+       function openInfoModal(id, cityName, url, pin) {
+         document.getElementById('info-city-name').textContent = cityName
+         document.getElementById('info-url').value = url
+         document.getElementById('info-pin').value = pin
+         document.getElementById('info-pin').type = 'password'
+    e  '/sandboxes/' + id
+         openModal('info-modal')
+       }
 
-    function openExtendModal(id, cityName) {
-      document.getElementById('extend-city-name').textContent = cityName
-      document.getElementById('extend-form').action = '/sandboxes/' + id + '/extend'
-      document.getElementById('extend-days').value = 30
-      openModal('extend-modal')
-    }
+       function openExtendModal(id, cityName) {
+         document.getElementById('extend-city-name').textContent = cityName
+         document.getElementById('extend-form').action = '/sandboxes/' + id + '/extend'
+         document.getElementById('extend-days').value = 30
+         openModal('extend-modal')
+       }
 
-    function openModal(id) {
-      const modal = document.getElementById(id)
-      modal.classList.remove('hidden')
-      // trap focus — close on backdrop click
-      modal.addEventListener('click', function onBackdrop(e) {
-        if (e.target === modal) {
-          closeModal(id)
-          modal.removeEventListener('click', onBackdrop)
-        }
-      })
-      // close on Escape
-      document.addEventListener('keydown', function onEsc(e) {
-        if (e.key === 'Escape') {
-          closeModal(id)
-          document.removeEventListener('keydown', onEsc)
-        }
-      })
-    }
+       function openModal(id) {
+         const modal = document.getElementById(id)
+         modal.classList.remove('hidden')
+         // trap focus — close on backdrop click
+         modal.addEventListener('click', function onBackdrop(e) {
+           if (e.target === modal) {
+             closeModal(id)
+             modal.removeEventListener('click', onBackdrop)
+           }
+         })
+         // close on Escape
+         document.addEventListener('keydown', function onEsc(e) {
+           if (e.key === 'Escape') {
+             closeModal(id)
+             document.removeEventListener('keydown', onEsc)
+           }
+         })
+       }
 
-    function closeModal(id) {
-      document.getElementById(id).classList.add('hidden')
-    }
+       function closeModal(id) {
+         document.getElementById(id).classList.add('hidden')
+       }
 
-    function togglePinVisibility() {
-      const input = document.getElementById('info-pin')
-      input.type = input.type === 'password' ? 'text' : 'password'
-    }
+       function togglePinVisibility() {
+         const input = document.getElementById('info-pin')
+         input.type = input.type === 'password' ? 'text' : 'password'
+       }
 
-    function copyField(inputId, btn) {
-      const val = document.getElementById(inputId).value
-      navigator.clipboard.writeText(val).then(() => {
-        const orig = btn.textContent
-        btn.textContent = '✓ Copied'
-        setTimeout(() => (btn.textContent = orig), 1800)
-      })
-    }
+       function copyField(inputId, btn) {
+         const val = document.getElementById(inputId).value
+         navigator.clipboard.writeText(val).then(() => {
+           const orig = btn.textContent
+           btn.textContent = '✓ Copied'
+           setTimeout(() => (btn.textContent = orig), 1800)
+         })
+       }
 
-    function copyAll() {
-      const url = document.getElementById('info-url').value
-      const pin = document.getElementById('info-pin').value
-      const text = 'Demo URL: ' + url + '\nPassword: ' + pin
-      navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById('copy-all-btn')
-        btn.textContent = '✓ Copied!'
-        setTimeout(() => (btn.textContent = 'Copy All'), 1800)
-      })
-    }
+       function copyAll() {
+         const url = document.getElementById('info-url').value
+         const pin = document.getElementById('info-pin').value
+         const text = 'Demo URL: ' + url + '\nPassword: ' + pin
+         navigator.clipboard.writeText(text).then(() => {
+           const btn = document.getElementById('copy-all-btn')
+           btn.textContent = '✓ Copied!'
+           setTimeout(() => (btn.textContent = 'Copy All'), 1800)
+         })
+       }
   </script>
 </div>

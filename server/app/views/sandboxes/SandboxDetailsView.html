@@ -1,16 +1,16 @@
 <div th:fragment="content" class="grid-container py-8">
-
   <!-- Header -->
   <div class="mb-6 flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900" th:text="${model.sandbox.cityName}">Burlington, VT</h1>
+      <h1 class="text-2xl font-bold text-gray-900" th:text="${model.sandbox.cityName}">
+        Burlington, VT
+      </h1>
       <p class="text-sm text-gray-500" th:text="'Sandbox ID: ' + ${model.sandbox.id}"></p>
     </div>
     <a href="/sandboxes" class="usa-button usa-button--outline">← All Sandboxes</a>
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
     <!-- Left: Access Info (PIN + URL) -->
     <div class="cf-card">
       <h2 class="text-lg font-bold text-gray-900 mb-4">Prospect Access</h2>
@@ -18,21 +18,27 @@
       <!-- Status badge — HTMX polls until RUNNING, then page auto-navigates -->
       <div class="mb-4">
         <dt class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</dt>
-        <span th:if="${model.sandbox.status.name() == 'RUNNING'}"
-              class="cf-badge-active">RUNNING</span>
-        <span th:if="${model.sandbox.status.name() == 'FAILED'}"
-              class="cf-badge-error">FAILED</span>
-        <span th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
-              class="cf-badge-pending"
-              th:id="'status-badge'"
-              hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
-              hx-trigger="every 3s"
-              hx-swap="outerHTML"
-              th:text="${model.sandbox.status}">
+        <span th:if="${model.sandbox.status.name() == 'RUNNING'}" class="cf-badge-active"
+          >RUNNING</span
+        >
+        <span th:if="${model.sandbox.status.name() == 'FAILED'}" class="cf-badge-error"
+          >FAILED</span
+        >
+        <span
+          th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
+          class="cf-badge-pending"
+          th:id="'status-badge'"
+          hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
+          hx-trigger="every 3s"
+          hx-swap="outerHTML"
+          th:text="${model.sandbox.status}"
+        >
           PROVISIONING
         </span>
-        <p th:if="${model.sandbox.status.name() == 'PROVISIONING'}"
-           class="text-xs text-gray-500 mt-1">
+        <p
+          th:if="${model.sandbox.status.name() == 'PROVISIONING'}"
+          class="text-xs text-gray-500 mt-1"
+        >
           ⏳ Launching CiviForm… this takes ~2 minutes. Page will refresh automatically.
         </p>
       </div>
@@ -40,12 +46,20 @@
       <!-- 6-digit PIN — visible immediately even while provisioning -->
       <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
         <p class="text-xs font-semibold text-blue-700 uppercase mb-1">Prospect Access PIN</p>
-        <p class="text-4xl font-mono font-bold tracking-widest text-blue-900"
-           th:text="${model.sandbox.pin}">000000</p>
+        <p
+          class="text-4xl font-mono font-bold tracking-widest text-blue-900"
+          th:text="${model.sandbox.pin}"
+        >
+          000000
+        </p>
         <button
-          onclick="navigator.clipboard.writeText(this.dataset.pin); this.textContent='✓ Copied!';"
+          onclick="
+            navigator.clipboard.writeText(this.dataset.pin)
+            this.textContent = '✓ Copied!'
+          "
           th:data-pin="${model.sandbox.pin}"
-          class="mt-3 text-xs text-blue-600 hover:underline cursor-pointer border-0 bg-transparent">
+          class="usa-button usa-button--unstyled mt-3 text-xs text-blue-600 hover:underline cursor-pointer"
+        >
           Copy PIN
         </button>
       </div>
@@ -55,9 +69,11 @@
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Prospect Access URL</dt>
           <dd class="text-sm mt-1">
-            <a th:href="|/sandboxes/${model.sandbox.id}/access|"
-               class="text-blue-600 hover:underline break-all"
-               th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|">
+            <a
+              th:href="|/sandboxes/${model.sandbox.id}/access|"
+              class="text-blue-600 hover:underline break-all"
+              th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|"
+            >
             </a>
           </dd>
           <dd class="text-xs text-gray-400 mt-1">Share this URL + PIN with prospects</dd>
@@ -65,8 +81,12 @@
         <div th:if="${model.sandbox.status.name() == 'RUNNING'}">
           <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Direct URL</dt>
           <dd class="text-sm mt-1">
-            <a th:href="${model.sandbox.url}" target="_blank"
-               class="text-blue-600 hover:underline" th:text="${model.sandbox.url}"></a>
+            <a
+              th:href="${model.sandbox.url}"
+              target="_blank"
+              class="text-blue-600 hover:underline"
+              th:text="${model.sandbox.url}"
+            ></a>
           </dd>
         </div>
       </dl>
@@ -78,7 +98,10 @@
       <dl class="space-y-3">
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Version</dt>
-          <dd class="text-sm text-gray-900 font-medium" th:text="${model.sandbox.civiformVersion}"></dd>
+          <dd
+            class="text-sm text-gray-900 font-medium"
+            th:text="${model.sandbox.civiformVersion}"
+          ></dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Created</dt>
@@ -94,16 +117,23 @@
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Notes</dt>
-          <dd class="text-sm text-gray-700"
-              th:text="${#strings.isEmpty(model.sandbox.notes) ? 'None' : model.sandbox.notes}"></dd>
+          <dd
+            class="text-sm text-gray-700"
+            th:text="${#strings.isEmpty(model.sandbox.notes) ? 'None' : model.sandbox.notes}"
+          ></dd>
         </div>
       </dl>
 
       <div class="mt-6 pt-4 border-t border-gray-200">
-        <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST"
-              onsubmit="return confirm('Destroy this sandbox? This cannot be undone.');">
-          <button type="submit"
-                  class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded">
+        <form
+          th:action="|/sandboxes/${model.sandbox.id}/delete|"
+          method="POST"
+          onsubmit="return confirm('Destroy this sandbox? This cannot be undone.')"
+        >
+          <button
+            type="submit"
+            class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded"
+          >
             Destroy Sandbox
           </button>
         </form>

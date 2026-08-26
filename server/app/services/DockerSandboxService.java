@@ -197,6 +197,8 @@ public class DockerSandboxService implements SandboxService {
                 POST_HEALTH_BUFFER_MS);
             Thread.sleep(POST_HEALTH_BUFFER_MS);
 
+            log.warn("Sandbox is available at http://localhost:{}", hostPort);
+
             // 5. Mark RUNNING
             repository.updateStatus(id, SandboxStatus.RUNNING);
             log.info("[{}] Status → RUNNING", id);
@@ -376,6 +378,7 @@ public class DockerSandboxService implements SandboxService {
                 "IDCS_CLIENT_ID=idcs-fake-oidc-client",
                 "IDCS_SECRET=idcs-fake-oidc-secret",
                 "IDCS_DISCOVERY_URI=http://dev-oidc:3390/.well-known/openid-configuration",
+                "BASE_URL=http://localhost:" + hostPort,
                 "STAGING_HOSTNAME=localhost",
                 "STAGING_DISABLE_DEMO_MODE_LOGINS=false",
                 "CIVIFORM_APPLICANT_IDP=generic-oidc",
