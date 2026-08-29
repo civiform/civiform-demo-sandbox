@@ -9,6 +9,17 @@
     <a href="/sandboxes" class="usa-button usa-button--outline">← All Sandboxes</a>
   </div>
 
+  <!-- Expired warning banner -->
+  <div th:if="${model.expired}"
+       role="alert"
+       class="mb-6 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+    <span class="text-amber-600 text-lg leading-none mt-0.5">⚠️</span>
+    <div>
+      <p class="text-sm font-semibold text-amber-800">This demo has expired.</p>
+      <p class="text-sm text-amber-700">Extend the demo below to restore access for prospects.</p>
+    </div>
+  </div>
+
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <!-- Left: Access Info (PIN + URL) -->
@@ -18,32 +29,25 @@
       <!-- Status badge — HTMX polls until RUNNING, then page auto-navigates -->
       <div class="mb-4">
         <dt class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</dt>
-        <span th:if="${model.sandbox.status.name() == 'RUNNING'}"
-              class="cf-badge-active">RUNNING</span>
-        <span th:if="${model.sandbox.status.name() == 'FAILED'}"
-              class="cf-badge-error">FAILED</span>
+        <span th:if="${model.sandbox.status.name() == 'RUNNING'}" class="cf-badge-active">RUNNING</span>
+        <span th:if="${model.sandbox.status.name() == 'FAILED'}" class="cf-badge-error">FAILED</span>
         <span th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
-              class="cf-badge-pending"
-              th:id="'status-badge'"
+              class="cf-badge-pending" th:id="'status-badge'"
               hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
-              hx-trigger="every 3s"
-              hx-swap="outerHTML"
+              hx-trigger="every 3s" hx-swap="outerHTML"
               th:text="${model.sandbox.status}">
           PROVISIONING
         </span>
-        <p th:if="${model.sandbox.status.name() == 'PROVISIONING'}"
-           class="text-xs text-gray-500 mt-1">
+        <p th:if="${model.sandbox.status.name() == 'PROVISIONING'}" class="text-xs text-gray-500 mt-1">
           ⏳ Launching CiviForm… this takes ~2 minutes. Page will refresh automatically.
         </p>
       </div>
 
-      <!-- 6-digit PIN — visible immediately even while provisioning -->
+      <!-- 6-digit PIN -->
       <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
         <p class="text-xs font-semibold text-blue-700 uppercase mb-1">Prospect Access PIN</p>
-        <p class="text-4xl font-mono font-bold tracking-widest text-blue-900"
-           th:text="${model.sandbox.pin}">000000</p>
-        <button
-          onclick="navigator.clipboard.writeText(this.dataset.pin); this.textContent='✓ Copied!';"
+        <p class="text-4xl font-mono font-bold tracking-widest text-blue-900" th:text="${model.sandbox.pin}">000000</p>
+        <button onclick="navigator.clipboard.writeText(this.dataset.pin); this.textContent='✓ Copied!';"
           th:data-pin="${model.sandbox.pin}"
           class="mt-3 text-xs text-blue-600 hover:underline cursor-pointer border-0 bg-transparent">
           Copy PIN
@@ -57,8 +61,7 @@
           <dd class="text-sm mt-1">
             <a th:href="|/sandboxes/${model.sandbox.id}/access|"
                class="text-blue-600 hover:underline break-all"
-               th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|">
-            </a>
+               th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|"></a>
           </dd>
           <dd class="text-xs text-gray-400 mt-1">Share this URL + PIN with prospects</dd>
         </div>
@@ -74,7 +77,7 @@
 
     <!-- Right: Lifecycle & Mgmt -->
     <div class="cf-card">
-      <h2 class="text-lg font-bold text-gray-900 mb-4">Lifecycle &amp; Details</h2>
+      <h2 class="text-lg font-bold text-gray-900 mb-4">Lifecycle & Details</h2>
       <dl class="space-y-3">
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Version</dt>
@@ -99,7 +102,11 @@
         </div>
       </dl>
 
-      <div class="mt-6 pt-4 border-t border-gray-200">
+      <div class="mt-6 pt-4 border-t border-gray-200 flex gap-3 flex-wrap">
+        <button type="button" onclick="openExtendModal()"
+                class="usa-button">
+          Extend Demo
+        </button>
         <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST"
               onsubmit="return confirm('Destroy this sandbox? This cannot be undone.');">
           <button type="submit"
@@ -110,4 +117,57 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Extend Modal ────────────────────────────────────────────────────── -->
+  <div id="extend-modal"
+       role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
+       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+      <button onclick="closeExtendModal()"
+              aria-label="Close"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+      <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
+        Extend Demo: <span th:text="${model.sandbox.cityName}"></span>
+      </h2>
+      <p class="text-sm text-gray-600 mb-5">Specify the number of days you want to extend this sandbox demo by.</p>
+      <form th:action="|/sandboxes/${model.sandbox.id}/extend|" method="POST">
+        <div class="mb-5">
+          <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1">Extend by (days):</label>
+          <input id="extend-days" name="days" type="number" value="30" min="1" max="90"
+                 class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                 aria-label="Number of days to extend"/>
+        </div>
+        <div class="flex items-center gap-4">
+          <button type="submit" class="usa-button" style="background-color:#1a4480;">
+            Extend Demo
+          </button>
+          <button type="button" onclick="closeExtendModal()"
+                  class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
+  <script>
+    function openExtendModal() {
+      const modal = document.getElementById('extend-modal');
+      modal.classList.remove('hidden');
+      // Close on backdrop click
+      modal.addEventListener('click', function onBackdrop(e) {
+        if (e.target === modal) { closeExtendModal(); modal.removeEventListener('click', onBackdrop); }
+      });
+      // Close on Escape
+      document.addEventListener('keydown', function onEsc(e) {
+        if (e.key === 'Escape') { closeExtendModal(); document.removeEventListener('keydown', onEsc); }
+      });
+    }
+
+    function closeExtendModal() {
+      document.getElementById('extend-modal').classList.add('hidden');
+    }
+  </script>
+
 </div>

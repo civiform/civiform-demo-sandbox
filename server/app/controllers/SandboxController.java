@@ -91,7 +91,8 @@ public class SandboxController extends Controller {
           }
           // Redirect to detail page — PIN is immediately visible there
           // Note: Request param NOT included in reverse route call
-          return redirect(controllers.routes.SandboxController.show(instance.getId()));
+          return redirect(controllers.routes.SandboxController.show(instance.getId()))
+              .flashing("success", "Demo created! PIN: " + instance.getPin());
         });
   }
 
@@ -107,6 +108,7 @@ public class SandboxController extends Controller {
       }
       SandboxDetailsViewModel model = SandboxDetailsViewModel.builder()
           .sandbox(sandbox)
+          .expired(sandbox.getExpiresAt().isBefore(java.time.Instant.now()))
           .build();
       return ok(detailsView.render(request, model)).as("text/html");
     });
@@ -219,7 +221,8 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return ok(Json.newObject().put("deleted", deleted));
       }
-      return redirect(controllers.routes.SandboxController.index());
+      return redirect(controllers.routes.SandboxController.index())
+          .flashing("success", "Demo deleted.");
     });
   }
 
@@ -245,7 +248,8 @@ public class SandboxController extends Controller {
       if (maybeExtended.isEmpty()) {
         return notFound("Sandbox not found: " + id);
       }
-      return redirect(controllers.routes.SandboxController.index());
+      return redirect(controllers.routes.SandboxController.index())
+          .flashing("success", "Demo extended successfully.");
     });
   }
 

@@ -9,4 +9,5 @@ import views.BaseViewModel;
 @Builder
 public class SandboxDetailsViewModel implements BaseViewModel {
   SandboxInstance sandbox;
+  boolean expired;
 }
