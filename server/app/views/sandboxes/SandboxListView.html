@@ -14,7 +14,7 @@
   </div>
 
   <!-- Flash message banner (shown after create / extend / delete) -->
-  <div th:if="${#maps.containsKey(flash, 'success')}"
+  <div th:if="${flash != null && #maps.containsKey(flash, 'success')}"
        role="status"
        class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
     <span>✓</span>
@@ -146,7 +146,9 @@
 
               <!-- Delete → styled confirmation modal -->
               <button type="button"
-                      th:onclick="'openDeleteModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ')'"
+                      th:data-id="${sb.sandbox.id}"
+                      th:data-city-name="${sb.cityName}"
+                      th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
                       class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
                 Delete
               </button>
