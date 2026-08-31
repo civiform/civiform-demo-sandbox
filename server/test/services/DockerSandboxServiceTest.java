@@ -13,6 +13,9 @@ import static org.mockito.Mockito.when;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.PullImageCmd;
+import com.github.dockerjava.core.command.PullImageResultCallback;
+import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
@@ -108,6 +111,8 @@ public class DockerSandboxServiceTest {
         "sandbox.civiformImage = \"civiform/civiform:latest\"\n"
         + "sandbox.dbHost = \"host.docker.internal\"\n"
         + "docker.socketPath = \"unix:///var/run/docker.sock\"\n");
+
+    stubSuccessfulImagePull();
 
     // Default: nextPort() returns a unique incrementing value
     AtomicInteger portCounter = new AtomicInteger(10000);
@@ -413,6 +418,16 @@ public class DockerSandboxServiceTest {
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
+
+  private void stubSuccessfulImagePull() {
+    PullImageResultCallback callback = mock(PullImageResultCallback.class);
+    
+    PullImageCmd pullCmd = mock(PullImageCmd.class);
+    when(pullCmd.withTag(anyString())).thenReturn(pullCmd);
+    when(pullCmd.exec(any(PullImageResultCallback.class))).thenReturn(callback);
+
+    when(dockerClient.pullImageCmd(anyString())).thenReturn(pullCmd);
+  }
 
   /** Stubs a minimal successful docker container launch. */
   private void stubSuccessfulContainerLaunch(String containerId) {

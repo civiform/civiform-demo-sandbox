@@ -15,9 +15,9 @@ description: >-
 ./bin/run-dev
 ```
 
-- Web UI: http://localhost:9000
-- Health check: http://localhost:9000/health
-- Vite dev server (frontend hot-reload): http://localhost:5173
+- Web UI: http://localhost:9001
+- Health check: http://localhost:9001/health
+- Vite dev server (frontend hot-reload): http://localhost:5174
 
 ## Stopping
 
