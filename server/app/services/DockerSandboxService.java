@@ -343,13 +343,11 @@ public class DockerSandboxService implements SandboxService {
     portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
 
     try {
-
-      dockerClient
-          .pullImageCmd("civiform/civiform")
+      dockerClient.pullImageCmd("civiform/civiform")
           .withTag(imageTag)
           .exec(new PullImageResultCallback())
           .awaitCompletion();
-    } catch (InterruptedException e) {
+    } catch(InterruptedException e){
       throw new RuntimeException("Failed to pull image", e);
     }
 
