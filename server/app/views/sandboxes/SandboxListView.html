@@ -74,15 +74,12 @@
               EXPIRING
             </span>
             <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800">
-              <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
-                class="usa-tag bg-success-dark text-white">
-                ACTIVE
-              </span>
-              <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
-                class="usa-tag bg-warning text-ink" th:text="${sb.sandbox.status}">
-                PROVISIONING
-              </span>
+              class="usa-tag bg-success-dark text-white">
+              ACTIVE
+            </span>
+            <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
+              class="usa-tag bg-warning text-ink" th:text="${sb.sandbox.status}">
+              PROVISIONING
             </span>
           </td>
 
@@ -147,18 +144,10 @@
                 </li>
               </ul>
 
-              <!-- Delete → confirm dialog then form POST -->
-              <form th:action="'/sandboxes/' + ${sb.sandbox.id} + '/delete'" method="POST" class="inline"
-                th:data-city-name="${sb.cityName}"
-                th:onsubmit="'return confirm(\'Are you sure you want to permanently delete the sandbox demo for ' + this.getAttribute('data-city-name') + '? This action cannot be undone.\')'">
-                <button type="submit" class="usa-button bg-red-600 hover:bg-red-700 text-white border-red-600">
-                  Delete
-                </button>
-              </form>
               <!-- Delete → styled confirmation modal -->
               <button type="button" th:data-id="${sb.sandbox.id}" th:data-city-name="${sb.cityName}"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
+                class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600">
                 Delete
               </button>
             </div>
@@ -266,6 +255,43 @@
     </div>
   </div>
 
+<!-- ── Delete Modal ─────────────────────────────────────────────────── -->
+<div id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title"
+  class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+    <button onclick="closeModal('delete-modal')" aria-label="Close"
+      class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+      ×
+    </button>
+    <div class="flex items-start gap-4 mb-4">
+      <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+        <svg class="usa-icon w-5 h-5 text-red-600" aria-hidden="true" focusable="false" role="img">
+          <use href="/assets/dist/img/sprite.svg#delete"></use>
+        </svg>
+      </div>
+      <div>
+        <h2 id="delete-modal-title" class="text-lg font-bold text-gray-900">Delete demo?</h2>
+        <p class="text-sm text-gray-600 mt-1">
+          This will permanently delete the demo for <strong id="delete-city-name"></strong> from
+          AWS. This cannot be undone.
+        </p>
+      </div>
+    </div>
+    <form id="delete-form" method="POST">
+      <div class="flex items-center gap-4 justify-end pt-2">
+        <button type="button" onclick="closeModal('delete-modal')"
+          class="text-gray-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
+          Cancel
+        </button>
+        <button type="submit"
+          class="px-4 py-2 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
+          Delete demo
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
     function openInfoModal(id, cityName, url, pin) {
@@ -274,6 +300,12 @@
       document.getElementById('info-pin').value = pin
       document.getElementById('info-pin').type = 'password'
       openModal('info-modal')
+    }
+
+    function openDeleteModal(id, cityName) {
+      document.getElementById('delete-city-name').textContent = cityName
+      document.getElementById('delete-form').action = '/sandboxes/' + id + '/delete'
+      openModal('delete-modal')
     }
 
     function openExtendModal(id, cityName) {
