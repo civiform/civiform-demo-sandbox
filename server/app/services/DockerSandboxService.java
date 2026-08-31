@@ -326,15 +326,14 @@ public class DockerSandboxService implements SandboxService {
     Ports portBindings = new Ports();
     portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
 
-try{
-
-    dockerClient.pullImageCmd("civiform/civiform")
-      .withTag(imageTag)
-      .exec(new PullImageResultCallback())
-      .awaitCompletion();
-} catch(InterruptedException e){
-throw new RuntimeException("Failed to pull image", e);
-}
+    try {
+      dockerClient.pullImageCmd("civiform/civiform")
+          .withTag(imageTag)
+          .exec(new PullImageResultCallback())
+          .awaitCompletion();
+    } catch(InterruptedException e){
+      throw new RuntimeException("Failed to pull image", e);
+    }
 
     log.warn(" Starting up container with DB: {}", dbUrl);
 

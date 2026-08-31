@@ -7,15 +7,16 @@
     </div>
     <a href="/sandboxes/new" class="usa-button flex items-center gap-2 w-fit" style="background-color:#1a4480;">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
       </svg>
       Create new demo
     </a>
   </div>
 
   <!-- Flash message banner (shown after create / extend / delete) -->
-  <div th:if="${#maps.containsKey(flash, 'success')}" role="status"
-    class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
+  <div th:if="${#maps.containsKey(flash, 'success')}"
+       role="status"
+       class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
     <span>✓</span>
     <span th:text="${flash['success']}"></span>
   </div>
@@ -31,10 +32,10 @@
       <span class="text-gray-600 ml-1">Active</span>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-4 text-center"
-      th:classappend="${model.expiringCount > 0} ? 'border-yellow-300 bg-yellow-50' : ''">
+         th:classappend="${model.expiringCount > 0} ? 'border-yellow-300 bg-yellow-50' : ''">
       <span th:if="${model.expiringCount > 0}" class="text-yellow-600 mr-1">⚠</span>
       <span class="text-2xl font-bold" th:classappend="${model.expiringCount > 0} ? 'text-yellow-700' : 'text-gray-900'"
-        th:text="${model.expiringCount}">0</span>
+            th:text="${model.expiringCount}">0</span>
       <span class="text-gray-600 ml-1">Expiring in ≤ 5 days</span>
     </div>
   </div>
@@ -66,7 +67,8 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
-        <tr th:each="sb : ${model.sandboxes}" th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''">
+        <tr th:each="sb : ${model.sandboxes}" 
+            th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''">
 
           <!-- Civic entity name -->
           <td class="px-6 py-4 font-semibold text-gray-900" th:text="${sb.cityName}">Burlington, VT</td>
@@ -74,20 +76,20 @@
           <!-- Status badge -->
           <td class="px-4 py-4">
             <span th:if="${sb.daysRemaining <= 0}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-gray-200 text-gray-600">
+                  class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-gray-200 text-gray-600">
               EXPIRED
             </span>
             <span th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800">
+                  class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800">
               EXPIRING
             </span>
             <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800">
+                  class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-green-100 text-green-800">
               ACTIVE
             </span>
             <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
-              class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800"
-              th:text="${sb.sandbox.status}">
+                  class="inline-flex items-center px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wide bg-yellow-100 text-yellow-800"
+                  th:text="${sb.sandbox.status}">
               PROVISIONING
             </span>
           </td>
@@ -96,13 +98,11 @@
           <td class="px-4 py-4 text-gray-700">
             <div th:if="${sb.daysRemaining > 0}">
               <span class="font-medium" th:text="${sb.daysRemaining} + ' days'">30 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expires ' + ${sb.expiryFormatted}">Expires Sep 13,
-                2026</div>
+              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expires ' + ${sb.expiryFormatted}">Expires Sep 13, 2026</div>
             </div>
             <div th:if="${sb.daysRemaining <= 0}">
               <span class="font-medium text-gray-400">0 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expired ' + ${sb.expiryFormatted}">Expired Aug 18,
-                2026</div>
+              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expired ' + ${sb.expiryFormatted}">Expired Aug 18, 2026</div>
             </div>
           </td>
 
@@ -112,29 +112,26 @@
 
               <!-- Launch → opens CiviForm in new tab -->
               <a th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/access| : '#'"
-                target="_blank" rel="noopener"
-                th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 border border-gray-800 no-underline">
+                 target="_blank" rel="noopener"
+                 th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
+                 class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 border border-gray-800 no-underline">
                 Launch
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
 
               <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
               <a href="https://console.aws.amazon.com" target="_blank" rel="noopener"
-                class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50 no-underline">
+                 class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50 no-underline">
                 AWS
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
 
               <!-- Info → modal with URL + PIN (password) -->
-              <button type="button" data-id="${sb.sandbox.id}" data-city-name="${sb.cityName}"
-                data-url="${sb.sandbox.url}" data-pin="${sb.sandbox.pin}"
+              <button type="button" data-id="${sb.sandbox.id}" data-city-name="${sb.cityName}" data-url="${sb.sandbox.url}" data-pin="${sb.sandbox.pin}"
                 th:onclick="openInfoModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
                 class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50">
                 Info
@@ -142,15 +139,15 @@
 
               <!-- Extend → modal -->
               <button type="button" data-id="${sb.sandbox.id}" data-city-name="${sb.cityName}"
-                th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50">
+                      th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
+                      class="px-3 py-1.5 rounded text-sm font-medium text-gray-700 bg-white border border-gray-700 hover:bg-gray-50">
                 Extend
               </button>
 
               <!-- Delete → styled confirmation modal -->
               <button type="button"
-                th:onclick="'openDeleteModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ')'"
-                class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
+                      th:onclick="'openDeleteModal(' + |'${sb.sandbox.id}'| + ',' + |'${sb.cityName}'| + ')'"
+                      class="px-3 py-1.5 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
                 Delete
               </button>
 
@@ -162,11 +159,13 @@
   </div>
 
   <!-- ── Info Modal ──────────────────────────────────────────────────────── -->
-  <div id="info-modal" role="dialog" aria-modal="true" aria-labelledby="info-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div id="info-modal" 
+       role="dialog" aria-modal="true" aria-labelledby="info-modal-title"
+       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeModal('info-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+      <button onclick="closeModal('info-modal')" 
+              aria-label="Close"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
       <h2 id="info-modal-title" class="text-xl font-bold text-gray-900 mb-1">
         Sandbox Info: <span id="info-city-name"></span>
       </h2>
@@ -177,10 +176,10 @@
         <label class="block text-xs font-semibold text-blue-700 uppercase mb-1">Demo URL</label>
         <div class="flex gap-2">
           <input id="info-url" type="text" readonly
-            class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-            aria-label="Demo URL" />
+                 class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
+                 aria-label="Demo URL" />
           <button onclick="copyField('info-url', this)"
-            class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                  class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap">
             Copy
           </button>
         </div>
@@ -192,38 +191,41 @@
         <div class="flex gap-2">
           <div class="relative flex-1">
             <input id="info-pin" type="password"
-              class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono" readonly
-              aria-label="Sandbox password (PIN)" />
+                   class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono"
+                   readonly aria-label="Sandbox password (PIN)" />
             <button type="button" onclick="togglePinVisibility()" aria-label="Toggle password visibility"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800">
               <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             </button>
           </div>
           <button onclick="copyField('info-pin', this)"
-            class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+                  class="px-3 py-2 rounded border border-gray-700 text-sm font-medium text-gray-700 hover:bg-gray-50 whitespace-nowrap">
             Copy
           </button>
         </div>
       </div>
 
       <!-- Copy All -->
-      <button id="copy-all-btn" onclick="copyAll()" class="usa-button w-full" style="background-color:#1a4480;">
+      <button id="copy-all-btn" onclick="copyAll()"
+              class="usa-button w-full" style="background-color:#1a4480;">
         Copy All
       </button>
     </div>
   </div>
 
   <!-- ── Extend Modal ────────────────────────────────────────────────────── -->
-  <div id="extend-modal" role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div id="extend-modal"
+       role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
+       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeModal('extend-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+      <button onclick="closeModal('extend-modal')"
+              aria-label="Close"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
       <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
         Extend Demo: <span id="extend-city-name"></span>
       </h2>
@@ -232,14 +234,15 @@
         <div class="mb-5">
           <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1">Extend by (days):</label>
           <input id="extend-days" name="days" type="number" value="30" min="1" max="90"
-            class="w-full border border-gray-300 rounded px-3 py-2 text-sm" aria-label="Number of days to extend" />
+                 class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                 aria-label="Number of days to extend" />
         </div>
         <div class="flex items-center gap-4">
           <button type="submit" class="usa-button" style="background-color:#1a4480;">
             Extend Demo
           </button>
           <button type="button" onclick="closeModal('extend-modal')"
-            class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
+                  class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
             Cancel
           </button>
         </div>
@@ -247,8 +250,9 @@
     </div>
 
     <!-- ── Delete Modal ─────────────────────────────────────────────────── -->
-    <div id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title"
-      class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+    <div id="delete-modal"
+         role="dialog" aria-modal="true" aria-labelledby="delete-modal-title"
+         class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
         <button onclick="closeModal('delete-modal')" aria-label="Close"
           class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
