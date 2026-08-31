@@ -345,7 +345,6 @@ public class DockerSandboxService implements SandboxService {
     portBindings.bind(internalPort, Ports.Binding.bindPort(hostPort));
 
     try {
-
       dockerClient
           .pullImageCmd("civiform/civiform")
           .withTag(imageTag)
