@@ -1,6 +1,5 @@
 <div th:fragment="content" class="min-h-screen bg-slate-50 py-12 px-4">
   <div class="max-w-2xl mx-auto">
-
     <!-- Breadcrumb -->
     <nav class="mb-6 text-sm text-gray-500" aria-label="Breadcrumb">
       <a href="/sandboxes" class="text-blue-700 hover:underline">&#x2190; Back to Dashboard</a>
@@ -15,22 +14,27 @@
     </div>
 
     <!-- Error banner (server-side repopulation errors) -->
-    <div th:if="${model.error != null}"
-         role="alert"
-         class="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
-         th:text="${model.error}">
-    </div>
+    <div
+      th:if="${model.error != null}"
+      role="alert"
+      class="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+      th:text="${model.error}"
+    ></div>
 
     <!-- Step Indicator -->
     <div class="mb-8" aria-label="Form progress" role="navigation">
       <ol class="flex items-center gap-0" id="step-indicator">
-
         <!-- Step 1 -->
         <li class="flex items-center flex-1" id="step-ind-1">
           <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white"
-                  aria-current="step">1</span>
-            <span class="step-label text-sm font-semibold text-blue-700 hidden sm:block">CiviForm Setup</span>
+            <span
+              class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white"
+              aria-current="step"
+              >1</span
+            >
+            <span class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
+              >CiviForm Setup</span
+            >
           </div>
           <div class="step-connector flex-1 h-0.5 mx-3 bg-gray-200" id="connector-1-2"></div>
         </li>
@@ -38,8 +42,13 @@
         <!-- Step 2 -->
         <li class="flex items-center flex-1" id="step-ind-2">
           <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400">2</span>
-            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block">AWS Setup</span>
+            <span
+              class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
+              >2</span
+            >
+            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+              >AWS Setup</span
+            >
           </div>
           <div class="step-connector flex-1 h-0.5 mx-3 bg-gray-200" id="connector-2-3"></div>
         </li>
@@ -47,29 +56,35 @@
         <!-- Step 3 -->
         <li class="flex items-center" id="step-ind-3">
           <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400">3</span>
-            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block">Program Setup</span>
+            <span
+              class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
+              >3</span
+            >
+            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+              >Program Setup</span
+            >
           </div>
         </li>
-
       </ol>
     </div>
 
     <!-- Inline validation error -->
-    <div id="wizard-error"
-         role="alert"
-         aria-live="polite"
-         class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-    </div>
+    <div
+      id="wizard-error"
+      role="alert"
+      aria-live="polite"
+      class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+    ></div>
 
     <!-- Form card -->
     <div class="cf-card">
       <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
-
         <!-- Step 1: CiviForm Setup -->
         <div id="step-panel-1" class="wizard-panel">
           <div class="mb-6">
-            <h2 class="text-base font-semibold text-gray-900">Step 1 of 3 &#x2014; CiviForm Setup</h2>
+            <h2 class="text-base font-semibold text-gray-900">
+              Step 1 of 3 &#x2014; CiviForm Setup
+            </h2>
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Configure general demo and banner information. This is visible to all demo users.
             </p>
@@ -83,11 +98,16 @@
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               The city or county this demo is for. Used in the demo banner and for branding.
             </p>
-            <input id="cityName" name="cityName" type="text" class="usa-input"
+            <input
+              id="cityName"
+              name="cityName"
+              type="text"
+              class="usa-input"
               placeholder="e.g. Burlington, VT"
               th:value="${model.cityName}"
               autocomplete="off"
-              aria-required="true" />
+              aria-required="true"
+            />
           </div>
 
           <!-- Admin Notification Email -->
@@ -98,18 +118,29 @@
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Receives a notification when the sandbox is live and ready.
             </p>
-            <input id="adminEmail" name="adminEmail" type="email" class="usa-input"
+            <input
+              id="adminEmail"
+              name="adminEmail"
+              type="email"
+              class="usa-input"
               placeholder="e.g. civiform-dev@exygy.com"
               th:value="${model.adminEmail}"
               autocomplete="email"
-              aria-required="true" />
+              aria-required="true"
+            />
           </div>
 
           <!-- Step 1 footer -->
           <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
-            <a href="/sandboxes" class="text-sm text-gray-500 hover:text-gray-800 no-underline">Cancel</a>
-            <button type="button" class="usa-button px-8" onclick="wizardNext(1)"
-                    aria-label="Continue to Step 2: AWS Setup">
+            <a href="/sandboxes" class="text-sm text-gray-500 hover:text-gray-800 no-underline"
+              >Cancel</a
+            >
+            <button
+              type="button"
+              class="usa-button px-8"
+              onclick="wizardNext(1)"
+              aria-label="Continue to Step 2: AWS Setup"
+            >
               Next &#x2192;
             </button>
           </div>
@@ -130,23 +161,34 @@
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Leave blank to use the latest stable release.
             </p>
-            <input id="version" name="version" type="text" class="usa-input"
+            <input
+              id="version"
+              name="version"
+              type="text"
+              class="usa-input"
               placeholder="latest"
               value=""
               autocomplete="off"
-              aria-label="CiviForm version (optional)" />
+              aria-label="CiviForm version (optional)"
+            />
           </div>
 
           <!-- Step 2 footer -->
           <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
-            <button type="button"
-                    class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                    onclick="wizardBack(2)"
-                    aria-label="Back to Step 1: CiviForm Setup">
+            <button
+              type="button"
+              class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
+              onclick="wizardBack(2)"
+              aria-label="Back to Step 1: CiviForm Setup"
+            >
               &#x2190; Back
             </button>
-            <button type="button" class="usa-button px-8" onclick="wizardNext(2)"
-                    aria-label="Continue to Step 3: Program Setup">
+            <button
+              type="button"
+              class="usa-button px-8"
+              onclick="wizardNext(2)"
+              aria-label="Continue to Step 3: Program Setup"
+            >
               Next &#x2192;
             </button>
           </div>
@@ -155,12 +197,16 @@
         <!-- Step 3: Program Setup -->
         <div id="step-panel-3" class="wizard-panel hidden">
           <div class="mb-6">
-            <h2 class="text-base font-semibold text-gray-900">Step 3 of 3 &#x2014; Program Setup</h2>
+            <h2 class="text-base font-semibold text-gray-900">
+              Step 3 of 3 &#x2014; Program Setup
+            </h2>
           </div>
 
           <!-- Pre-loaded programs info block -->
           <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
-            <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true">&#x2139;</span>
+            <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true"
+              >&#x2139;</span
+            >
             <p class="text-sm text-blue-800 leading-relaxed">
               Demos are pre-loaded with a generic set of programs designed to demonstrate the range
               of CiviForm features for different user roles.
@@ -173,17 +219,24 @@
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Optional. Prospect name, meeting date, deal stage, etc.
             </p>
-            <textarea id="notes" name="notes" rows="3" class="usa-textarea"
+            <textarea
+              id="notes"
+              name="notes"
+              rows="3"
+              class="usa-textarea"
               placeholder="e.g. Meeting with Burlington IT on Aug 25, exploring housing + utilities programs"
               th:text="${model.notes}"
-              aria-label="Notes (optional)"></textarea>
+              aria-label="Notes (optional)"
+            ></textarea>
           </div>
 
           <!-- PDF Scaffolder: coming soon placeholder -->
           <div class="usa-form-group mb-8">
             <div class="flex items-center gap-2 mb-1">
               <label class="usa-label font-semibold mb-0">Upload PDF Forms</label>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide">
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide"
+              >
                 Coming soon
               </span>
             </div>
@@ -192,14 +245,23 @@
               the demo. Imported programs are editable after the demo is provisioned.
             </p>
             <div class="relative">
-              <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed opacity-50"
-                     aria-disabled="true">
+              <label
+                class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed opacity-50"
+                aria-disabled="true"
+              >
                 <span class="text-gray-400 text-sm text-center px-4">
                   <span class="block text-2xl mb-1" aria-hidden="true">&#x1F4C4;</span>
                   Drag &amp; drop PDFs here, or click to browse
                 </span>
-                <input type="file" class="sr-only" disabled accept=".pdf" multiple
-                       aria-label="PDF upload (not yet available)" tabindex="-1" />
+                <input
+                  type="file"
+                  class="sr-only"
+                  disabled
+                  accept=".pdf"
+                  multiple
+                  aria-label="PDF upload (not yet available)"
+                  tabindex="-1"
+                />
               </label>
             </div>
           </div>
@@ -209,171 +271,208 @@
             on Step 3 and the live inputs in earlier panels are disabled.
             JS keeps these in sync on every keystroke.
           -->
-          <input type="hidden" id="hidden-cityName"   name="cityName"   value="" />
-          <input type="hidden" id="hidden-adminEmail"  name="adminEmail"  value="" />
-          <input type="hidden" id="hidden-version"    name="version"    value="" />
+          <input type="hidden" id="hidden-cityName" name="cityName" value="" />
+          <input type="hidden" id="hidden-adminEmail" name="adminEmail" value="" />
+          <input type="hidden" id="hidden-version" name="version" value="" />
 
           <!-- Step 3 footer -->
           <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
-            <button type="button"
-                    class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                    onclick="wizardBack(3)"
-                    aria-label="Back to Step 2: AWS Setup">
+            <button
+              type="button"
+              class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
+              onclick="wizardBack(3)"
+              aria-label="Back to Step 2: AWS Setup"
+            >
               &#x2190; Back
             </button>
-            <button type="submit" class="usa-button px-8"
-                    aria-label="Create sandbox demo"
-                    onclick="syncHiddenInputs()">
+            <button
+              type="submit"
+              class="usa-button px-8"
+              aria-label="Create sandbox demo"
+              onclick="syncHiddenInputs()"
+            >
               Create Demo &#x2192;
             </button>
           </div>
         </div>
-
       </form>
     </div>
 
     <p class="mt-6 text-center text-xs text-gray-400">
       Sandbox provisioning takes up to 30 minutes. You'll see a live status badge on the dashboard.
     </p>
-
   </div>
 
-<!-- Wizard JavaScript -->
-<script>
-(function () {
-  'use strict';
+  <!-- Wizard JavaScript -->
+  <script>
+    ;(function () {
+      'use strict'
 
-  var TOTAL_STEPS = 3;
+      var TOTAL_STEPS = 3
 
-  // Update step indicator circles, labels, and connector lines
-  function showStep(targetStep) {
-    for (var i = 1; i <= TOTAL_STEPS; i++) {
-      var panel = document.getElementById('step-panel-' + i);
-      if (panel) {
-        if (i === targetStep) { panel.classList.remove('hidden'); }
-        else { panel.classList.add('hidden'); }
+      // Update step indicator circles, labels, and connector lines
+      function showStep(targetStep) {
+        for (var i = 1; i <= TOTAL_STEPS; i++) {
+          var panel = document.getElementById('step-panel-' + i)
+          if (panel) {
+            if (i === targetStep) {
+              panel.classList.remove('hidden')
+            } else {
+              panel.classList.add('hidden')
+            }
+          }
+        }
+        for (var s = 1; s <= TOTAL_STEPS; s++) {
+          var circle = document.querySelector('#step-ind-' + s + ' .step-circle')
+          var label = document.querySelector('#step-ind-' + s + ' .step-label')
+          if (!circle) continue
+          if (s < targetStep) {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
+            circle.textContent = '\u2713'
+            circle.removeAttribute('aria-current')
+            if (label)
+              label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+          } else if (s === targetStep) {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
+            circle.textContent = String(s)
+            circle.setAttribute('aria-current', 'step')
+            if (label)
+              label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+          } else {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400'
+            circle.textContent = String(s)
+            circle.removeAttribute('aria-current')
+            if (label)
+              label.className = 'step-label text-sm font-medium text-gray-400 hidden sm:block'
+          }
+        }
+        var c12 = document.getElementById('connector-1-2')
+        var c23 = document.getElementById('connector-2-3')
+        if (c12)
+          c12.className =
+            'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200')
+        if (c23)
+          c23.className =
+            'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200')
+        var card = document.querySelector('.cf-card')
+        if (card) card.scrollIntoView({behavior: 'smooth', block: 'nearest'})
       }
-    }
-    for (var s = 1; s <= TOTAL_STEPS; s++) {
-      var circle = document.querySelector('#step-ind-' + s + ' .step-circle');
-      var label  = document.querySelector('#step-ind-' + s + ' .step-label');
-      if (!circle) continue;
-      if (s < targetStep) {
-        circle.className = 'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white';
-        circle.textContent = '\u2713';
-        circle.removeAttribute('aria-current');
-        if (label) label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block';
-      } else if (s === targetStep) {
-        circle.className = 'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white';
-        circle.textContent = String(s);
-        circle.setAttribute('aria-current', 'step');
-        if (label) label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block';
-      } else {
-        circle.className = 'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400';
-        circle.textContent = String(s);
-        circle.removeAttribute('aria-current');
-        if (label) label.className = 'step-label text-sm font-medium text-gray-400 hidden sm:block';
+
+      function showError(msg) {
+        var el = document.getElementById('wizard-error')
+        el.textContent = msg
+        el.classList.remove('hidden')
+        el.scrollIntoView({behavior: 'smooth', block: 'nearest'})
       }
-    }
-    var c12 = document.getElementById('connector-1-2');
-    var c23 = document.getElementById('connector-2-3');
-    if (c12) c12.className = 'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200');
-    if (c23) c23.className = 'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200');
-    var card = document.querySelector('.cf-card');
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
 
-  function showError(msg) {
-    var el = document.getElementById('wizard-error');
-    el.textContent = msg;
-    el.classList.remove('hidden');
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+      function clearError() {
+        var el = document.getElementById('wizard-error')
+        el.textContent = ''
+        el.classList.add('hidden')
+      }
 
-  function clearError() {
-    var el = document.getElementById('wizard-error');
-    el.textContent = '';
-    el.classList.add('hidden');
-  }
+      function markFieldError(fieldId, hasError) {
+        var input = document.getElementById(fieldId)
+        var fg = document.getElementById('fg-' + fieldId)
+        if (!input) return
+        if (hasError) {
+          input.classList.add('border-red-500')
+          input.setAttribute('aria-invalid', 'true')
+          if (fg) fg.classList.add('usa-form-group--error')
+        } else {
+          input.classList.remove('border-red-500')
+          input.removeAttribute('aria-invalid')
+          if (fg) fg.classList.remove('usa-form-group--error')
+        }
+      }
 
-  function markFieldError(fieldId, hasError) {
-    var input = document.getElementById(fieldId);
-    var fg    = document.getElementById('fg-' + fieldId);
-    if (!input) return;
-    if (hasError) {
-      input.classList.add('border-red-500');
-      input.setAttribute('aria-invalid', 'true');
-      if (fg) fg.classList.add('usa-form-group--error');
-    } else {
-      input.classList.remove('border-red-500');
-      input.removeAttribute('aria-invalid');
-      if (fg) fg.classList.remove('usa-form-group--error');
-    }
-  }
+      function validateStep1() {
+        var cityVal = (document.getElementById('cityName').value || '').trim()
+        var emailVal = (document.getElementById('adminEmail').value || '').trim()
+        var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var cityOk = cityVal.length > 0
+        var emailOk = emailVal.length > 0 && emailRe.test(emailVal)
+        markFieldError('cityName', !cityOk)
+        markFieldError('adminEmail', !emailOk)
+        if (!cityOk && !emailOk) {
+          showError('City / Civic Entity Name and a valid Admin Email are required.')
+          return false
+        }
+        if (!cityOk) {
+          showError('City / Civic Entity Name is required.')
+          return false
+        }
+        if (emailVal.length === 0) {
+          showError('Admin Notification Email is required.')
+          return false
+        }
+        if (!emailRe.test(emailVal)) {
+          showError('Please enter a valid email address.')
+          return false
+        }
+        return true
+      }
 
-  function validateStep1() {
-    var cityVal  = (document.getElementById('cityName').value   || '').trim();
-    var emailVal = (document.getElementById('adminEmail').value || '').trim();
-    var emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    var cityOk   = cityVal.length > 0;
-    var emailOk  = emailVal.length > 0 && emailRe.test(emailVal);
-    markFieldError('cityName',   !cityOk);
-    markFieldError('adminEmail', !emailOk);
-    if (!cityOk && !emailOk) { showError('City / Civic Entity Name and a valid Admin Email are required.'); return false; }
-    if (!cityOk)              { showError('City / Civic Entity Name is required.'); return false; }
-    if (emailVal.length === 0){ showError('Admin Notification Email is required.'); return false; }
-    if (!emailRe.test(emailVal)){ showError('Please enter a valid email address.'); return false; }
-    return true;
-  }
+      // Mirror Step 1 + Step 2 field values into the hidden inputs on Step 3
+      // so they are included in the final form POST even when those panels are disabled.
+      function syncHiddenInputs() {
+        document.getElementById('hidden-cityName').value = (
+          document.getElementById('cityName').value || ''
+        ).trim()
+        document.getElementById('hidden-adminEmail').value = (
+          document.getElementById('adminEmail').value || ''
+        ).trim()
+        document.getElementById('hidden-version').value = (
+          document.getElementById('version').value || ''
+        ).trim()
+      }
 
-  // Mirror Step 1 + Step 2 field values into the hidden inputs on Step 3
-  // so they are included in the final form POST even when those panels are disabled.
-  function syncHiddenInputs() {
-    document.getElementById('hidden-cityName').value   = (document.getElementById('cityName').value   || '').trim();
-    document.getElementById('hidden-adminEmail').value = (document.getElementById('adminEmail').value || '').trim();
-    document.getElementById('hidden-version').value    = (document.getElementById('version').value    || '').trim();
-  }
+      ;['cityName', 'adminEmail', 'version'].forEach(function (id) {
+        var el = document.getElementById(id)
+        if (el) el.addEventListener('input', syncHiddenInputs)
+      })
 
-  ['cityName', 'adminEmail', 'version'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('input', syncHiddenInputs);
-  });
+      function setStepInputsDisabled(stepNum, disabled) {
+        var panel = document.getElementById('step-panel-' + stepNum)
+        if (!panel) return
+        panel.querySelectorAll('input:not([type=hidden]), textarea, select').forEach(function (el) {
+          el.disabled = disabled
+        })
+      }
 
-  function setStepInputsDisabled(stepNum, disabled) {
-    var panel = document.getElementById('step-panel-' + stepNum);
-    if (!panel) return;
-    panel.querySelectorAll('input:not([type=hidden]), textarea, select').forEach(function (el) {
-      el.disabled = disabled;
-    });
-  }
+      window.wizardNext = function (currentStep) {
+        clearError()
+        if (currentStep === 1 && !validateStep1()) {
+          document.getElementById('cityName').focus()
+          return
+        }
+        var nextStep = currentStep + 1
+        if (nextStep > TOTAL_STEPS) return
+        syncHiddenInputs()
+        setStepInputsDisabled(currentStep, true)
+        setStepInputsDisabled(nextStep, false)
+        showStep(nextStep)
+      }
 
-  window.wizardNext = function (currentStep) {
-    clearError();
-    if (currentStep === 1 && !validateStep1()) { document.getElementById('cityName').focus(); return; }
-    var nextStep = currentStep + 1;
-    if (nextStep > TOTAL_STEPS) return;
-    syncHiddenInputs();
-    setStepInputsDisabled(currentStep, true);
-    setStepInputsDisabled(nextStep, false);
-    showStep(nextStep);
-  };
+      window.wizardBack = function (currentStep) {
+        clearError()
+        var prevStep = currentStep - 1
+        if (prevStep < 1) return
+        setStepInputsDisabled(prevStep, false)
+        setStepInputsDisabled(currentStep, true)
+        showStep(prevStep)
+      }
 
-  window.wizardBack = function (currentStep) {
-    clearError();
-    var prevStep = currentStep - 1;
-    if (prevStep < 1) return;
-    setStepInputsDisabled(prevStep, false);
-    setStepInputsDisabled(currentStep, true);
-    showStep(prevStep);
-  };
+      // Called synchronously by the submit button's onclick before the POST fires
+      window.syncHiddenInputs = syncHiddenInputs
 
-  // Called synchronously by the submit button's onclick before the POST fires
-  window.syncHiddenInputs = syncHiddenInputs;
-
-  // Always start at Step 1 on page load (handles server-error repopulation too)
-  document.addEventListener('DOMContentLoaded', function () { showStep(1); });
-
-}());
-</script>
-
+      // Always start at Step 1 on page load (handles server-error repopulation too)
+      document.addEventListener('DOMContentLoaded', function () {
+        showStep(1)
+      })
+    })()
+  </script>
 </div>
