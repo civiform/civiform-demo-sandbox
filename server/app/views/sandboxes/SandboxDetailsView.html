@@ -10,9 +10,8 @@
   </div>
 
   <!-- Expired warning banner -->
-  <div th:if="${model.expired}"
-       role="alert"
-       class="mb-6 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+  <div th:if="${model.expired}" role="alert"
+    class="mb-6 px-4 py-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
     <span class="text-amber-600 text-lg leading-none mt-0.5">⚠️</span>
     <div>
       <p class="text-sm font-semibold text-amber-800">This demo has expired.</p>
@@ -32,10 +31,8 @@
         <span th:if="${model.sandbox.status.name() == 'RUNNING'}" class="cf-badge-active">RUNNING</span>
         <span th:if="${model.sandbox.status.name() == 'FAILED'}" class="cf-badge-error">FAILED</span>
         <span th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
-              class="cf-badge-pending" th:id="'status-badge'"
-              hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
-              hx-trigger="every 3s" hx-swap="outerHTML"
-              th:text="${model.sandbox.status}">
+          class="cf-badge-pending" th:id="'status-badge'" th:hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
+          hx-trigger="every 3s" hx-swap="outerHTML" th:text="${model.sandbox.status}">
           PROVISIONING
         </span>
         <p th:if="${model.sandbox.status.name() == 'PROVISIONING'}" class="text-xs text-gray-500 mt-1">
@@ -59,17 +56,16 @@
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Prospect Access URL</dt>
           <dd class="text-sm mt-1">
-            <a th:href="|/sandboxes/${model.sandbox.id}/access|"
-               class="text-blue-600 hover:underline break-all"
-               th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|"></a>
+            <a th:href="|/sandboxes/${model.sandbox.id}/access|" class="text-blue-600 hover:underline break-all"
+              th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|"></a>
           </dd>
           <dd class="text-xs text-gray-400 mt-1">Share this URL + PIN with prospects</dd>
         </div>
         <div th:if="${model.sandbox.status.name() == 'RUNNING'}">
           <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Direct URL</dt>
           <dd class="text-sm mt-1">
-            <a th:href="${model.sandbox.url}" target="_blank"
-               class="text-blue-600 hover:underline" th:text="${model.sandbox.url}"></a>
+            <a th:href="${model.sandbox.url}" target="_blank" class="text-blue-600 hover:underline"
+              th:text="${model.sandbox.url}"></a>
           </dd>
         </div>
       </dl>
@@ -98,19 +94,17 @@
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Notes</dt>
           <dd class="text-sm text-gray-700"
-              th:text="${#strings.isEmpty(model.sandbox.notes) ? 'None' : model.sandbox.notes}"></dd>
+            th:text="${#strings.isEmpty(model.sandbox.notes) ? 'None' : model.sandbox.notes}"></dd>
         </div>
       </dl>
 
       <div class="mt-6 pt-4 border-t border-gray-200 flex gap-3 flex-wrap">
-        <button type="button" onclick="openExtendModal()"
-                class="usa-button">
+        <button type="button" onclick="openExtendModal()" class="usa-button">
           Extend Demo
         </button>
         <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST"
-              onsubmit="return confirm('Destroy this sandbox? This cannot be undone.');">
-          <button type="submit"
-                  class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded">
+          onsubmit="return confirm('Destroy this sandbox? This cannot be undone.');">
+          <button type="submit" class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded">
             Destroy Sandbox
           </button>
         </form>
@@ -119,13 +113,11 @@
   </div>
 
   <!-- ── Extend Modal ────────────────────────────────────────────────────── -->
-  <div id="extend-modal"
-       role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
-       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div id="extend-modal" role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeExtendModal()"
-              aria-label="Close"
-              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+      <button onclick="closeExtendModal()" aria-label="Close"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
       <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
         Extend Demo: <span th:text="${model.sandbox.cityName}"></span>
       </h2>
@@ -134,15 +126,14 @@
         <div class="mb-5">
           <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1">Extend by (days):</label>
           <input id="extend-days" name="days" type="number" value="30" min="1" max="90"
-                 class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                 aria-label="Number of days to extend"/>
+            class="w-full border border-gray-300 rounded px-3 py-2 text-sm" aria-label="Number of days to extend" />
         </div>
         <div class="flex items-center gap-4">
           <button type="submit" class="usa-button" style="background-color:#1a4480;">
             Extend Demo
           </button>
           <button type="button" onclick="closeExtendModal()"
-                  class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
+            class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
             Cancel
           </button>
         </div>
