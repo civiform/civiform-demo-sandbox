@@ -2,12 +2,20 @@
   <!-- Header -->
   <div class="mb-6 flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900" th:text="${model.sandbox.cityName}">
+      <h1
+        class="text-2xl font-bold text-gray-900"
+        th:text="${model.sandbox.cityName}"
+      >
         Burlington, VT
       </h1>
-      <p class="text-sm text-gray-500" th:text="'Sandbox ID: ' + ${model.sandbox.id}"></p>
+      <p
+        class="text-sm text-gray-500"
+        th:text="'Sandbox ID: ' + ${model.sandbox.id}"
+      ></p>
     </div>
-    <a href="/sandboxes" class="usa-button usa-button--outline">← All Sandboxes</a>
+    <a href="/sandboxes" class="usa-button usa-button--outline"
+      >← All Sandboxes</a
+    >
   </div>
 
   <!-- Expired warning banner -->
@@ -19,7 +27,9 @@
     <span class="text-amber-600 text-lg leading-none mt-0.5">⚠️</span>
     <div>
       <p class="text-sm font-semibold text-amber-800">This demo has expired.</p>
-      <p class="text-sm text-amber-700">Extend the demo below to restore access for prospects.</p>
+      <p class="text-sm text-amber-700">
+        Extend the demo below to restore access for prospects.
+      </p>
     </div>
   </div>
 
@@ -30,18 +40,24 @@
 
       <!-- Status badge — HTMX polls until RUNNING, then page auto-navigates -->
       <div class="mb-4">
-        <dt class="text-xs font-semibold text-gray-500 uppercase mb-1">Status</dt>
-        <span th:if="${model.sandbox.status.name() == 'RUNNING'}" class="cf-badge-active"
+        <dt class="text-xs font-semibold text-gray-500 uppercase mb-1">
+          Status
+        </dt>
+        <span
+          th:if="${model.sandbox.status.name() == 'RUNNING'}"
+          class="cf-badge-active"
           >RUNNING</span
         >
-        <span th:if="${model.sandbox.status.name() == 'FAILED'}" class="cf-badge-error"
+        <span
+          th:if="${model.sandbox.status.name() == 'FAILED'}"
+          class="cf-badge-error"
           >FAILED</span
         >
         <span
           th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
           class="cf-badge-pending"
           th:id="'status-badge'"
-          hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
+          th:hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
           hx-trigger="every 3s"
           hx-swap="outerHTML"
           th:text="${model.sandbox.status}"
@@ -52,13 +68,18 @@
           th:if="${model.sandbox.status.name() == 'PROVISIONING'}"
           class="text-xs text-gray-500 mt-1"
         >
-          ⏳ Launching CiviForm… this takes ~2 minutes. Page will refresh automatically.
+          ⏳ Launching CiviForm… this takes ~2 minutes. Page will refresh
+          automatically.
         </p>
       </div>
 
       <!-- 6-digit PIN -->
-      <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-        <p class="text-xs font-semibold text-blue-700 uppercase mb-1">Prospect Access PIN</p>
+      <div
+        class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center"
+      >
+        <p class="text-xs font-semibold text-blue-700 uppercase mb-1">
+          Prospect Access PIN
+        </p>
         <p
           class="text-4xl font-mono font-bold tracking-widest text-blue-900"
           th:text="${model.sandbox.pin}"
@@ -80,7 +101,9 @@
       <!-- Access URL -->
       <dl class="space-y-3">
         <div>
-          <dt class="text-xs font-semibold text-gray-500 uppercase">Prospect Access URL</dt>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">
+            Prospect Access URL
+          </dt>
           <dd class="text-sm mt-1">
             <a
               th:href="|/sandboxes/${model.sandbox.id}/access|"
@@ -89,10 +112,14 @@
             >
             </a>
           </dd>
-          <dd class="text-xs text-gray-400 mt-1">Share this URL + PIN with prospects</dd>
+          <dd class="text-xs text-gray-400 mt-1">
+            Share this URL + PIN with prospects
+          </dd>
         </div>
         <div th:if="${model.sandbox.status.name() == 'RUNNING'}">
-          <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Direct URL</dt>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">
+            CiviForm Direct URL
+          </dt>
           <dd class="text-sm mt-1">
             <a
               th:href="${model.sandbox.url}"
@@ -110,7 +137,9 @@
       <h2 class="text-lg font-bold text-gray-900 mb-4">Lifecycle & Details</h2>
       <dl class="space-y-3">
         <div>
-          <dt class="text-xs font-semibold text-gray-500 uppercase">CiviForm Version</dt>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">
+            CiviForm Version
+          </dt>
           <dd
             class="text-sm text-gray-900 font-medium"
             th:text="${model.sandbox.civiformVersion}"
@@ -118,15 +147,28 @@
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Created</dt>
-          <dd class="text-sm text-gray-900" th:text="${model.sandbox.createdAt}"></dd>
+          <dd
+            class="text-sm text-gray-900"
+            th:text="${model.sandbox.createdAt}"
+          ></dd>
         </div>
         <div>
-          <dt class="text-xs font-semibold text-gray-500 uppercase">Expires (30 days)</dt>
-          <dd class="text-sm text-gray-900" th:text="${model.sandbox.expiresAt}"></dd>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">
+            Expires (30 days)
+          </dt>
+          <dd
+            class="text-sm text-gray-900"
+            th:text="${model.sandbox.expiresAt}"
+          ></dd>
         </div>
         <div>
-          <dt class="text-xs font-semibold text-gray-500 uppercase">Admin Contact</dt>
-          <dd class="text-sm text-gray-900" th:text="${model.sandbox.adminEmail}"></dd>
+          <dt class="text-xs font-semibold text-gray-500 uppercase">
+            Admin Contact
+          </dt>
+          <dd
+            class="text-sm text-gray-900"
+            th:text="${model.sandbox.adminEmail}"
+          ></dd>
         </div>
         <div>
           <dt class="text-xs font-semibold text-gray-500 uppercase">Notes</dt>
@@ -141,7 +183,9 @@
         <form
           th:action="|/sandboxes/${model.sandbox.id}/delete|"
           method="POST"
-          onsubmit="return confirm('Destroy this sandbox? This cannot be undone.')"
+          onsubmit="
+            return confirm('Destroy this sandbox? This cannot be undone.')
+          "
         >
           <button
             type="submit"
@@ -178,7 +222,9 @@
       </p>
       <form th:action="|/sandboxes/${model.sandbox.id}/extend|" method="POST">
         <div class="mb-5">
-          <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1"
+          <label
+            for="extend-days"
+            class="block text-sm font-medium text-gray-700 mb-1"
             >Extend by (days):</label
           >
           <input
@@ -193,7 +239,11 @@
           />
         </div>
         <div class="flex items-center gap-4">
-          <button type="submit" class="usa-button" style="background-color: #1a4480">
+          <button
+            type="submit"
+            class="usa-button"
+            style="background-color: #1a4480"
+          >
             Extend Demo
           </button>
           <button
