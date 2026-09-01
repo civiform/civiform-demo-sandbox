@@ -2,14 +2,17 @@
   <div class="max-w-2xl mx-auto">
     <!-- Breadcrumb -->
     <nav class="mb-6 text-sm text-gray-500" aria-label="Breadcrumb">
-      <a href="/sandboxes" class="text-blue-700 hover:underline">&#x2190; Back to Dashboard</a>
+      <a href="/sandboxes" class="text-blue-700 hover:underline"
+        >&#x2190; Back to Dashboard</a
+      >
     </nav>
 
     <!-- Page heading -->
     <div class="mb-8">
       <h1 class="text-2xl font-bold text-gray-900">Create New Demo</h1>
       <p class="mt-1 text-gray-500 text-sm">
-        Spin up an isolated CiviForm instance. The sandbox will be live in under 30 minutes.
+        Spin up an isolated CiviForm instance. The sandbox will be live in under
+        30 minutes.
       </p>
     </div>
 
@@ -32,11 +35,15 @@
               aria-current="step"
               >1</span
             >
-            <span class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
+            <span
+              class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
               >CiviForm Setup</span
             >
           </div>
-          <div class="step-connector flex-1 h-0.5 mx-3 bg-gray-200" id="connector-1-2"></div>
+          <div
+            class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
+            id="connector-1-2"
+          ></div>
         </li>
 
         <!-- Step 2 -->
@@ -46,11 +53,15 @@
               class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
               >2</span
             >
-            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+            <span
+              class="step-label text-sm font-medium text-gray-400 hidden sm:block"
               >AWS Setup</span
             >
           </div>
-          <div class="step-connector flex-1 h-0.5 mx-3 bg-gray-200" id="connector-2-3"></div>
+          <div
+            class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
+            id="connector-2-3"
+          ></div>
         </li>
 
         <!-- Step 3 -->
@@ -60,7 +71,8 @@
               class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
               >3</span
             >
-            <span class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+            <span
+              class="step-label text-sm font-medium text-gray-400 hidden sm:block"
               >Program Setup</span
             >
           </div>
@@ -86,17 +98,20 @@
               Step 1 of 3 &#x2014; CiviForm Setup
             </h2>
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
-              Configure general demo and banner information. This is visible to all demo users.
+              Configure general demo and banner information. This is visible to
+              all demo users.
             </p>
           </div>
 
           <!-- City / Civic Entity Name -->
           <div class="usa-form-group mb-6" id="fg-cityName">
             <label for="cityName" class="usa-label font-semibold">
-              City / Civic Entity Name <span class="text-red-600" aria-hidden="true">*</span>
+              City / Civic Entity Name
+              <span class="text-red-600" aria-hidden="true">*</span>
             </label>
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
-              The city or county this demo is for. Used in the demo banner and for branding.
+              The city or county this demo is for. Used in the demo banner and
+              for branding.
             </p>
             <input
               id="cityName"
@@ -113,7 +128,8 @@
           <!-- Admin Notification Email -->
           <div class="usa-form-group mb-8" id="fg-adminEmail">
             <label for="adminEmail" class="usa-label font-semibold">
-              Admin Notification Email <span class="text-red-600" aria-hidden="true">*</span>
+              Admin Notification Email
+              <span class="text-red-600" aria-hidden="true">*</span>
             </label>
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Receives a notification when the sandbox is live and ready.
@@ -131,8 +147,12 @@
           </div>
 
           <!-- Step 1 footer -->
-          <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
-            <a href="/sandboxes" class="text-sm text-gray-500 hover:text-gray-800 no-underline"
+          <div
+            class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4"
+          >
+            <a
+              href="/sandboxes"
+              class="text-sm text-gray-500 hover:text-gray-800 no-underline"
               >Cancel</a
             >
             <button
@@ -149,7 +169,9 @@
         <!-- Step 2: AWS Setup -->
         <div id="step-panel-2" class="wizard-panel hidden">
           <div class="mb-6">
-            <h2 class="text-base font-semibold text-gray-900">Step 2 of 3 &#x2014; AWS Setup</h2>
+            <h2 class="text-base font-semibold text-gray-900">
+              Step 2 of 3 &#x2014; AWS Setup
+            </h2>
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Configure setup details for the AWS deployment.
             </p>
@@ -157,7 +179,9 @@
 
           <!-- CiviForm Version -->
           <div class="usa-form-group mb-8">
-            <label for="version" class="usa-label font-semibold">CiviForm Version</label>
+            <label for="version" class="usa-label font-semibold"
+              >CiviForm Version</label
+            >
             <p class="usa-hint text-sm text-gray-500 mt-0.5">
               Leave blank to use the latest stable release.
             </p>
@@ -174,7 +198,9 @@
           </div>
 
           <!-- Step 2 footer -->
-          <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
+          <div
+            class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4"
+          >
             <button
               type="button"
               class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
@@ -203,13 +229,18 @@
           </div>
 
           <!-- Pre-loaded programs info block -->
-          <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
-            <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true"
+          <div
+            class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3"
+          >
+            <span
+              class="text-blue-500 text-lg flex-shrink-0 mt-0.5"
+              aria-hidden="true"
               >&#x2139;</span
             >
             <p class="text-sm text-blue-800 leading-relaxed">
-              Demos are pre-loaded with a generic set of programs designed to demonstrate the range
-              of CiviForm features for different user roles.
+              Demos are pre-loaded with a generic set of programs designed to
+              demonstrate the range of CiviForm features for different user
+              roles.
             </p>
           </div>
 
@@ -233,7 +264,9 @@
           <!-- PDF Scaffolder: coming soon placeholder -->
           <div class="usa-form-group mb-8">
             <div class="flex items-center gap-2 mb-1">
-              <label class="usa-label font-semibold mb-0">Upload PDF Forms</label>
+              <label class="usa-label font-semibold mb-0"
+                >Upload PDF Forms</label
+              >
               <span
                 class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide"
               >
@@ -241,8 +274,9 @@
               </span>
             </div>
             <p class="usa-hint text-sm text-gray-500 mt-0.5 mb-3">
-              Upload PDF forms to automatically extract and generate additional custom programs in
-              the demo. Imported programs are editable after the demo is provisioned.
+              Upload PDF forms to automatically extract and generate additional
+              custom programs in the demo. Imported programs are editable after
+              the demo is provisioned.
             </p>
             <div class="relative">
               <label
@@ -250,7 +284,9 @@
                 aria-disabled="true"
               >
                 <span class="text-gray-400 text-sm text-center px-4">
-                  <span class="block text-2xl mb-1" aria-hidden="true">&#x1F4C4;</span>
+                  <span class="block text-2xl mb-1" aria-hidden="true"
+                    >&#x1F4C4;</span
+                  >
                   Drag &amp; drop PDFs here, or click to browse
                 </span>
                 <input
@@ -272,11 +308,18 @@
             JS keeps these in sync on every keystroke.
           -->
           <input type="hidden" id="hidden-cityName" name="cityName" value="" />
-          <input type="hidden" id="hidden-adminEmail" name="adminEmail" value="" />
+          <input
+            type="hidden"
+            id="hidden-adminEmail"
+            name="adminEmail"
+            value=""
+          />
           <input type="hidden" id="hidden-version" name="version" value="" />
 
           <!-- Step 3 footer -->
-          <div class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4">
+          <div
+            class="border-t border-gray-100 pt-6 flex items-center justify-between gap-4"
+          >
             <button
               type="button"
               class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
@@ -299,7 +342,8 @@
     </div>
 
     <p class="mt-6 text-center text-xs text-gray-400">
-      Sandbox provisioning takes up to 30 minutes. You'll see a live status badge on the dashboard.
+      Sandbox provisioning takes up to 30 minutes. You'll see a live status
+      badge on the dashboard.
     </p>
   </div>
 
@@ -323,7 +367,9 @@
           }
         }
         for (var s = 1; s <= TOTAL_STEPS; s++) {
-          var circle = document.querySelector('#step-ind-' + s + ' .step-circle')
+          var circle = document.querySelector(
+            '#step-ind-' + s + ' .step-circle',
+          )
           var label = document.querySelector('#step-ind-' + s + ' .step-label')
           if (!circle) continue
           if (s < targetStep) {
@@ -332,31 +378,36 @@
             circle.textContent = '\u2713'
             circle.removeAttribute('aria-current')
             if (label)
-              label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+              label.className =
+                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
           } else if (s === targetStep) {
             circle.className =
               'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
             circle.textContent = String(s)
             circle.setAttribute('aria-current', 'step')
             if (label)
-              label.className = 'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+              label.className =
+                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
           } else {
             circle.className =
               'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400'
             circle.textContent = String(s)
             circle.removeAttribute('aria-current')
             if (label)
-              label.className = 'step-label text-sm font-medium text-gray-400 hidden sm:block'
+              label.className =
+                'step-label text-sm font-medium text-gray-400 hidden sm:block'
           }
         }
         var c12 = document.getElementById('connector-1-2')
         var c23 = document.getElementById('connector-2-3')
         if (c12)
           c12.className =
-            'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200')
+            'step-connector flex-1 h-0.5 mx-3 ' +
+            (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200')
         if (c23)
           c23.className =
-            'step-connector flex-1 h-0.5 mx-3 ' + (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200')
+            'step-connector flex-1 h-0.5 mx-3 ' +
+            (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200')
         var card = document.querySelector('.cf-card')
         if (card) card.scrollIntoView({behavior: 'smooth', block: 'nearest'})
       }
@@ -391,14 +442,18 @@
 
       function validateStep1() {
         var cityVal = (document.getElementById('cityName').value || '').trim()
-        var emailVal = (document.getElementById('adminEmail').value || '').trim()
+        var emailVal = (
+          document.getElementById('adminEmail').value || ''
+        ).trim()
         var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         var cityOk = cityVal.length > 0
         var emailOk = emailVal.length > 0 && emailRe.test(emailVal)
         markFieldError('cityName', !cityOk)
         markFieldError('adminEmail', !emailOk)
         if (!cityOk && !emailOk) {
-          showError('City / Civic Entity Name and a valid Admin Email are required.')
+          showError(
+            'City / Civic Entity Name and a valid Admin Email are required.',
+          )
           return false
         }
         if (!cityOk) {
@@ -438,9 +493,11 @@
       function setStepInputsDisabled(stepNum, disabled) {
         var panel = document.getElementById('step-panel-' + stepNum)
         if (!panel) return
-        panel.querySelectorAll('input:not([type=hidden]), textarea, select').forEach(function (el) {
-          el.disabled = disabled
-        })
+        panel
+          .querySelectorAll('input:not([type=hidden]), textarea, select')
+          .forEach(function (el) {
+            el.disabled = disabled
+          })
       }
 
       window.wizardNext = function (currentStep) {
