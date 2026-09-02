@@ -214,29 +214,22 @@
       >
         ×
       </button>
-      <h2 id="destroy-modal-title" class="text-xl font-bold text-gray-900 mb-2">
-        Destroy Sandbox: <span th:text="${model.sandbox.cityName}"></span>
+      <h2 id="destroy-modal-title" class="text-xl font-bold text-gray-900 mb-3">
+        Delete demo?
       </h2>
-      <p class="text-sm text-gray-600 mb-5">
-        This will permanently destroy the sandbox and all associated data. This
-        action cannot be undone.
+      <p class="text-sm text-gray-700 mb-6">
+        This will permanently delete the demo for
+        <strong th:text="${model.sandbox.cityName}">Burlington, VT</strong>
+        from AWS. This cannot be undone.
       </p>
       <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST">
-        <div class="flex items-center gap-4">
-          <button
-            type="submit"
-            class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded"
-          >
-            Yes, Destroy
-          </button>
-          <button
-            type="button"
-            onclick="closeDestroyModal()"
-            class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer"
-          >
-            Cancel
-          </button>
-        </div>
+        <button
+          type="submit"
+          class="usa-button w-full"
+          style="background-color: #c0392b; width: 100%"
+        >
+          Delete demo
+        </button>
       </form>
     </div>
   </div>
