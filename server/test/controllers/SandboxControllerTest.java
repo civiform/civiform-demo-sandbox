@@ -25,6 +25,7 @@ import org.junit.Before;
 import org.junit.Test;
 import play.Application;
 import play.inject.guice.GuiceApplicationBuilder;
+import play.mvc.Http;
 import play.mvc.Result;
 import play.test.Helpers;
 import play.test.WithApplication;
@@ -35,6 +36,9 @@ import services.SandboxService;
  *
  * <p>Strategy: bind a Mockito mock of {@link SandboxService} via Guice so the full Play
  * routing + controller wiring is exercised without any real database or Docker socket.
+ *
+ * <p>Uses {@link Helpers#route(Application, Http.RequestBuilder)} (Play 3.0 API) to drive
+ * requests through the full router. {@code invokeWithContext} was removed in Play 3.0.
  *
  * <p>Sprint 1 required tests (from pr-testing-standards.md):
  * - POST /sandboxes → 303 redirect to /sandboxes/:id
@@ -67,18 +71,16 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.createSandbox(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(CompletableFuture.completedFuture(created));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes")
         .bodyForm(com.google.common.collect.ImmutableMap.of(
             "cityName", "Burlington, VT",
             "version", "latest",
             "adminEmail", "admin@test.com",
-            "notes", ""))
-        .build();
+            "notes", ""));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).create(request));
+    Result result = Helpers.route(app, request);
 
     // Must be a 303 redirect, not 200 or redirect to home
     assertThat(result.status()).isEqualTo(SEE_OTHER);
@@ -92,18 +94,16 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.createSandbox(anyString(), anyString(), anyString(), anyString()))
         .thenReturn(CompletableFuture.completedFuture(created));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes")
         .bodyForm(com.google.common.collect.ImmutableMap.of(
             "cityName", "Portland, OR",
             "version", "latest",
             "adminEmail", "",
-            "notes", ""))
-        .build();
+            "notes", ""));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).create(request));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.redirectLocation().orElse("")).isNotEqualTo("/");
     assertThat(result.redirectLocation().orElse("")).isNotEqualTo("/sandboxes");
@@ -117,14 +117,12 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.validatePin("sb-pin1", "482917"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes/sb-pin1/access")
-        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"))
-        .build();
+        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).validateAccess(request, "sb-pin1"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
@@ -137,15 +135,12 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.validatePin("sb-pin-cookie", "482917"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes/sb-pin-cookie/access")
-        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"))
-        .build();
+        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class)
-            .validateAccess(request, "sb-pin-cookie"));
+    Result result = Helpers.route(app, request);
 
     // Cookie must be present, HTTP-only, named correctly
     Optional<play.mvc.Http.Cookie> cookie = result.cookie("sb_access_sb_pin_cookie");
@@ -154,7 +149,7 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(cookie.get().httpOnly()).isTrue();
     assertThat(cookie.get().path()).isEqualTo("/sandboxes/sb-pin-cookie");
     // 30 days in seconds = 2592000
-    assertThat(cookie.get().maxAge()).isEqualTo(java.util.OptionalInt.of(2_592_000));
+    assertThat(cookie.get().maxAge()).isEqualTo(2_592_000);
   }
 
   @Test
@@ -166,14 +161,12 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-pin2"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes/sb-pin2/access")
-        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "000000"))
-        .build();
+        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "000000"));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).validateAccess(request, "sb-pin2"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
     assertThat(contentAsString(result)).contains("Incorrect PIN");
@@ -190,14 +183,12 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-pin3"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes/sb-pin3/access")
-        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", ""))
-        .build();
+        .bodyForm(com.google.common.collect.ImmutableMap.of("pin", ""));
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).validateAccess(request, "sb-pin3"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
     assertThat(result.cookie("sb_access_sb_pin3")).isEmpty();
@@ -210,17 +201,15 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     // Simulate a returning prospect who already has the access cookie
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
         .uri("/sandboxes/sb-bypass/access")
         .cookie(play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "granted")
             .withHttpOnly(true)
             .withPath("/sandboxes/sb-bypass")
-            .build())
-        .build();
+            .build());
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "sb-bypass"));
+    Result result = Helpers.route(app, request);
 
     // Cookie present → skip form, redirect straight to CiviForm URL
     assertThat(result.status()).isEqualTo(SEE_OTHER);
@@ -234,13 +223,11 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     // No cookie — normal flow, show the PIN form
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-nobypass/access")
-        .build();
+        .uri("/sandboxes/sb-nobypass/access");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "sb-nobypass"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
     assertThat(contentAsString(result)).containsIgnoringCase("Burlington");
@@ -254,13 +241,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-status1"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-status1/status")
-        .build();
+        .uri("/sandboxes/sb-status1/status");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).statusFragment(request, "sb-status1"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
     String body = contentAsString(result);
@@ -277,13 +262,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-status2"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-status2/status")
-        .build();
+        .uri("/sandboxes/sb-status2/status");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).statusFragment(request, "sb-status2"));
+    Result result = Helpers.route(app, request);
 
     String body = contentAsString(result);
     // While provisioning: HTMX polling attributes must be present
@@ -298,13 +281,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-status3"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-status3/status")
-        .build();
+        .uri("/sandboxes/sb-status3/status");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).statusFragment(request, "sb-status3"));
+    Result result = Helpers.route(app, request);
 
     String body = contentAsString(result);
     // When RUNNING: no HTMX polling (done), but redirect script injected
@@ -319,13 +300,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-status4"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-status4/status")
-        .build();
+        .uri("/sandboxes/sb-status4/status");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).statusFragment(request, "sb-status4"));
+    Result result = Helpers.route(app, request);
 
     String body = contentAsString(result);
     // Polling must stop once RUNNING — no hx-trigger
@@ -337,13 +316,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("nonexistent"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/nonexistent/status")
-        .build();
+        .uri("/sandboxes/nonexistent/status");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).statusFragment(request, "nonexistent"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
@@ -356,13 +333,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-show1"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-show1")
-        .build();
+        .uri("/sandboxes/sb-show1");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).show(request, "sb-show1"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
   }
@@ -372,13 +347,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("nope"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/nope")
-        .build();
+        .uri("/sandboxes/nope");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).show(request, "nope"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
@@ -391,13 +364,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-gate1"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/sb-gate1/access")
-        .build();
+        .uri("/sandboxes/sb-gate1/access");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "sb-gate1"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
     assertThat(contentAsString(result)).containsIgnoringCase("Burlington");
@@ -408,13 +379,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("gone"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes/gone/access")
-        .build();
+        .uri("/sandboxes/gone/access");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).pinGate(request, "gone"));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
@@ -426,13 +395,11 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.listSandboxes())
         .thenReturn(CompletableFuture.completedFuture(ImmutableList.of()));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes")
-        .build();
+        .uri("/sandboxes");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).index(request));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
   }
@@ -442,14 +409,12 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.listSandboxes())
         .thenReturn(CompletableFuture.completedFuture(ImmutableList.of()));
 
-    play.mvc.Http.Request request = Helpers.fakeRequest()
+    Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
         .uri("/sandboxes")
-        .header("Accept", "application/json")
-        .build();
+        .header("Accept", "application/json");
 
-    Result result = Helpers.invokeWithContext(request,
-        mat -> app.injector().instanceOf(SandboxController.class).index(request));
+    Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(OK);
     assertThat(result.contentType()).contains("application/json");

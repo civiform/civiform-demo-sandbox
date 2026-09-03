@@ -1,0 +1,128 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+# Allow git commands inside container on mounted volume
+git config --global --add safe.directory /code 2>/dev/null || true
+git config --global --add safe.directory '*' 2>/dev/null || true
+cd /code
+
+diffbase=""
+
+while getopts d: flag; do
+  case "${flag}" in
+    d)
+      diffbase="${OPTARG}"
+      ;;
+  esac
+done
+
+if [[ -z "${diffbase}" ]]; then
+  if git rev-parse --verify origin/main >/dev/null 2>&1; then
+    diffbase="origin/main"
+  elif git rev-parse --verify main >/dev/null 2>&1; then
+    diffbase="main"
+  else
+    diffbase="HEAD"
+  fi
+fi
+
+echo "Using diffbase: ${diffbase}"
+
+# Tracked modified files relative to diffbase (excluding deleted files)
+function get_tracked_modified_files() {
+  git diff --diff-filter=d --name-only "${diffbase}" 2>/dev/null || true
+}
+
+# Untracked files that are not gitignored
+function get_untracked_files() {
+  git ls-files --others --exclude-standard 2>/dev/null || true
+}
+
+function get_all_modified_files() {
+  (
+    get_tracked_modified_files
+    get_untracked_files
+  ) | sort -u
+}
+
+function get_modified_java_files() {
+  get_all_modified_files | grep -E '\.java$' || true
+}
+
+function get_modified_json_files() {
+  get_all_modified_files | grep -E '\.json$' || true
+}
+
+function get_modified_ts_files() {
+  get_all_modified_files | grep -E '\.(ts|js)$' || true
+}
+
+function get_modified_md_files() {
+  get_all_modified_files | grep -E '\.md$' || true
+}
+
+function get_modified_html_files() {
+  get_all_modified_files | grep -E '\.html$' | grep -E -v '\.scala\.html$' || true
+}
+
+function get_modified_scss_files() {
+  get_all_modified_files | grep -E '\.(scss|css)$' || true
+}
+
+function get_modified_sql_files() {
+  get_all_modified_files | grep -E '\.sql$' || true
+}
+
+function get_modified_prettier_files() {
+  (
+    get_modified_json_files
+    get_modified_ts_files
+    get_modified_md_files
+    get_modified_html_files
+    get_modified_scss_files
+  ) | sort -u
+}
+
+# 1. Format Java files with Google Java Format
+modified_java="$(get_modified_java_files)"
+if [[ -z "${modified_java}" ]]; then
+  echo "No modified Java files found."
+else
+  echo "Start format java"
+  java -jar /fmt.jar --replace ${modified_java}
+  echo "Done formatting java"
+fi
+
+# 2. Format HTML, TS, SCSS, JSON, Markdown with Prettier
+modified_prettier="$(get_modified_prettier_files)"
+if [[ -z "${modified_prettier}" ]]; then
+  echo "No modified Prettier files found."
+else
+  echo "Start formatting with prettier"
+  npx --yes prettier \
+    --write \
+    --config .prettierrc.js \
+    --ignore-path .gitignore \
+    --ignore-unknown \
+    -- ${modified_prettier}
+  echo "Done formatting with prettier"
+fi
+
+# 3. Format Shell scripts with shfmt
+echo "Start format shell"
+shell_files="$(shfmt -f bin/ 2>/dev/null || true)"
+if [[ -n "${shell_files}" ]]; then
+  shfmt -bn -ci -i 2 -w ${shell_files}
+fi
+echo "Done formatting shell"
+
+# 4. Format SQL files if any
+modified_sql="$(get_modified_sql_files)"
+if [[ -n "${modified_sql}" ]]; then
+  echo "Start format sql"
+  npx --yes sql-formatter --fix ${modified_sql} 2>/dev/null || true
+  echo "Done formatting sql"
+fi
+
+echo "Done formatting!"

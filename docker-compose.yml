@@ -22,8 +22,8 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "9000:9000"
-      - "5173:5173"
+      - "9001:9000"   # host:container — avoids conflict with civiform-civiform-1 on 9000
+      - "5174:5173"   # host:container — avoids conflict with civiform-civiform-1 on 5173
     environment:
       - DB_JDBC_URL=jdbc:postgresql://db:5432/sandbox_builder
       - DB_USER=postgres
@@ -40,6 +40,26 @@ services:
       - "host.docker.internal:host-gateway"
     entrypoint: /bin/bash
 
+  # The dev oidc server needs to be visible to the Civiform server and web browsers
+  # on the same host:port. Developers need to add a localhost IP alias for this
+  # container name in their /etc/hosts file for the web brower to load the auth url.
+  # EG: 127.0.0.1 dev-oidc
+  dev-oidc:
+    image: civiform-oidc-provider
+    restart: always
+    expose:
+      - 3390
+    environment:
+      # Use an explicit port to not conflict with other test instances.
+      - OIDC_PORT=3390
+
 volumes:
   postgres_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24
 

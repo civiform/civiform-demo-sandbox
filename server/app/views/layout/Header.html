@@ -1,38 +1,56 @@
 <th:block>
   <div class="usa-overlay"></div>
-  <header class="bg-white border-b border-gray-200" style="padding: 0.75rem 0;">
+  <header class="bg-white border-b border-gray-200" style="padding: 0.75rem 0">
     <div class="usa-nav-container">
       <div class="flex items-center justify-between">
-
         <!-- CiviForm Logo (matches prototype) -->
-        <a href="/sandboxes" class="flex items-center gap-2 no-underline" aria-label="CiviForm Demo Portal home">
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect width="36" height="36" rx="4" fill="#1a4480"/>
-            <path d="M8 10h8v16H8V10zm4-4h4v4h-4V6zm8 4h8v16h-8V10zm4-4h4v4h-4V6z" fill="white" opacity="0.9"/>
-            <rect x="6" y="24" width="24" height="3" rx="1" fill="white" opacity="0.7"/>
+        <a
+          href="/sandboxes"
+          class="flex items-center gap-2 no-underline"
+          aria-label="CiviForm Demo Portal home"
+        >
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 36 36"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <rect width="36" height="36" rx="4" fill="#1a4480" />
+            <path
+              d="M8 10h8v16H8V10zm4-4h4v4h-4V6zm8 4h8v16h-8V10zm4-4h4v4h-4V6z"
+              fill="white"
+              opacity="0.9"
+            />
+            <rect x="6" y="24" width="24" height="3" rx="1" fill="white" opacity="0.7" />
           </svg>
           <div class="leading-tight">
-            <div class="font-bold text-blue-900 text-sm" style="font-size:1rem; line-height:1.2;">Civi</div>
-            <div class="font-bold text-blue-900 text-sm" style="font-size:1rem; line-height:1.2;">Form</div>
+            <div class="font-bold text-blue-900 text-sm" style="font-size: 1rem; line-height: 1.2">
+              Civi
+            </div>
+            <div class="font-bold text-blue-900 text-sm" style="font-size: 1rem; line-height: 1.2">
+              Form
+            </div>
           </div>
         </a>
 
         <!-- Right-side nav actions -->
         <div class="flex items-center gap-3">
-          <a href="https://console.aws.amazon.com" target="_blank" rel="noopener"
-             class="inline-flex items-center gap-1 px-4 py-2 rounded border border-blue-800 text-blue-800 text-sm font-medium hover:bg-blue-50 no-underline">
+          <a
+            href="https://console.aws.amazon.com"
+            target="_blank"
+            rel="noopener"
+            class="usa-button usa-button--outline inline-flex items-center gap-1 no-underline"
+          >
             View in AWS
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+              <use href="/assets/dist/img/sprite.svg#launch"></use>
             </svg>
           </a>
           <!-- Log out — placeholder until Sprint 6 auth is wired -->
-          <a href="/logout" class="px-4 py-2 rounded border border-gray-800 text-gray-800 text-sm font-medium hover:bg-gray-50 no-underline">
-            Log out
-          </a>
+          <a href="/logout" class="usa-button usa-button--outline no-underline"> Log out </a>
         </div>
-
       </div>
     </div>
   </header>

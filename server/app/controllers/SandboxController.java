@@ -91,7 +91,8 @@ public class SandboxController extends Controller {
           }
           // Redirect to detail page — PIN is immediately visible there
           // Note: Request param NOT included in reverse route call
-          return redirect(controllers.routes.SandboxController.show(instance.getId()));
+          return redirect(controllers.routes.SandboxController.show(instance.getId()))
+              .flashing("success", "Demo created! PIN: " + instance.getPin());
         });
   }
 
@@ -107,6 +108,7 @@ public class SandboxController extends Controller {
       }
       SandboxDetailsViewModel model = SandboxDetailsViewModel.builder()
           .sandbox(sandbox)
+          .expired(sandbox.getExpiresAt().isBefore(java.time.Instant.now()))
           .build();
       return ok(detailsView.render(request, model)).as("text/html");
     });
@@ -215,11 +217,49 @@ public class SandboxController extends Controller {
 
   /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
   public CompletionStage<Result> delete(Http.Request request, String id) {
-    return sandboxService.deleteSandbox(id).thenApply(deleted -> {
-      if (isJsonRequest(request)) {
-        return ok(Json.newObject().put("deleted", deleted));
+    return sandboxService
+        .getSandbox(id)
+        .thenCompose(
+            maybeSandbox -> {
+              String cityName =
+                  maybeSandbox.map(s -> s.getCityName()).orElse("sandbox");
+              return sandboxService
+                  .deleteSandbox(id)
+                  .thenApply(
+                      deleted -> {
+                        if (isJsonRequest(request)) {
+                          return ok(Json.newObject().put("deleted", deleted));
+                        }
+                        return redirect(controllers.routes.SandboxController.index())
+                            .flashing("deleted", "Deleted demo for " + cityName + ".");
+                      });
+            });
+  }
+
+  /** GET /sandboxes/new — Create sandbox form. */
+  public Result newSandbox(Http.Request request) {
+    return ok(createView.render(request, CreateSandboxViewModel.empty())).as("text/html");
+  }
+
+  /**
+   * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
+   * Redirects back to the dashboard with the updated sandbox visible.
+   */
+  public CompletionStage<Result> extend(Http.Request request, String id) {
+    DynamicForm form = formFactory.form().bindFromRequest(request);
+    String daysStr = orDefault(form.get("days"), "30");
+    int days;
+    try {
+      days = Math.max(1, Math.min(90, Integer.parseInt(daysStr)));
+    } catch (NumberFormatException e) {
+      days = 30;
+    }
+    return sandboxService.extendSandbox(id, days).thenApply(maybeExtended -> {
+      if (maybeExtended.isEmpty()) {
+        return notFound("Sandbox not found: " + id);
       }
-      return redirect(controllers.routes.SandboxController.index());
+      return redirect(controllers.routes.SandboxController.index())
+          .flashing("success", "Demo extended successfully.");
     });
   }
 

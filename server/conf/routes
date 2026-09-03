@@ -9,7 +9,10 @@ GET     /health                     controllers.HealthCheckController.health()
 GET     /ready                      controllers.HealthCheckController.ready()
 
 # Home / Dashboard
-GET     /                           controllers.HomeController.index(request: Request)
+GET     /                           controllers.SandboxController.index(request: Request)
+
+# Auth (stub — real auth in Sprint 6)
+GET     /logout                     controllers.SandboxController.logout(request: Request)
 
 # Auth (stub — real auth in Sprint 6)
 GET     /logout                     controllers.SandboxController.logout(request: Request)

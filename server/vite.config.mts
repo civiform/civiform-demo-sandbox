@@ -7,6 +7,7 @@ const assetPaths = {
   uswds_css: 'app/assets/stylesheets/uswds/styles.scss',
   uswds_js: 'node_modules/@uswds/uswds/dist/js/uswds.min.js',
   uswdsinit_js: 'node_modules/@uswds/uswds/dist/js/uswds-init.min.js',
+  uswds_img: 'node_modules/@uswds/uswds/dist/img/**',
   tailwind_css: 'app/assets/stylesheets/styles.css',
 }
 
@@ -72,6 +73,10 @@ export default defineConfig({
           src: assetPaths.uswds_js,
           dest: '.',
           rename: 'uswds.min.js',
+        },
+        {
+          src: assetPaths.uswds_img,
+          dest: 'img',
         },
       ],
     }),

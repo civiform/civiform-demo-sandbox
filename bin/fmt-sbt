@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+# DOC: Format server/build.sbt and project/*.scala files using scalafmt.
+
+source bin/lib.sh
+
+docker::compose_dev exec builder sbt scalafmtSbt
