@@ -14,9 +14,6 @@ GET     /                           controllers.SandboxController.index(request:
 # Auth (stub — real auth in Sprint 6)
 GET     /logout                     controllers.SandboxController.logout(request: Request)
 
-# Auth (stub — real auth in Sprint 6)
-GET     /logout                     controllers.SandboxController.logout(request: Request)
-
 # Sandbox Management
 # NOTE: /sandboxes/new MUST be declared before /sandboxes/:id or the router
 # will match "new" as the :id parameter.
