@@ -46,6 +46,13 @@ lazy val root = (project in file("."))
 
       // Docker (Sprint 1 — Docker socket runtime)
       "com.github.docker-java" % "docker-java-core" % "3.4.0",
-      "com.github.docker-java" % "docker-java-transport-httpclient5" % "3.4.0"
+      "com.github.docker-java" % "docker-java-transport-httpclient5" % "3.4.0",
+
+      // AWS SDK v2 (Sprint 2 — ECS Fargate runtime)
+      "software.amazon.awssdk" % "ecs" % "2.26.29",
+      "software.amazon.awssdk" % "elasticloadbalancingv2" % "2.26.29",
+      "software.amazon.awssdk" % "secretsmanager" % "2.26.29",
+      "software.amazon.awssdk" % "rds" % "2.26.29",
+      "software.amazon.awssdk" % "url-connection-client" % "2.26.29"
     )
   )

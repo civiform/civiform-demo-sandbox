@@ -97,148 +97,119 @@ STAGING_DISABLE_DEMO_MODE_LOGINS=false
 ## Sprint 2 — AWS ECS Fargate + Real Networking
 
 **Duration**: 2 weeks
-**Goal**: Replace Docker socket with ECS Fargate. Real `burlington-vt.sandbox.civiform.org` URL with TLS.
+**Goal**: Replace Docker socket with ECS Fargate. Real `burlington-vt.sandbox.civiform.dev` URL with TLS.
 
 Note: `SandboxService` interface is identical — only `DockerSandboxService` is replaced by `EcsFargateSandboxService`. No controller, view, or PIN logic changes.
+
+> ✅ **Decisions locked (Rocky, Sep 2026):**
+> - **Domain**: Use `civiform.dev` (CiviForm already owns this). Sandbox pattern: `burlington-vt.sandbox.civiform.dev`
+> - **SSL**: Request wildcard ACM cert `*.sandbox.civiform.dev` in AWS — pre-provisioned once, shared across all sandboxes
+> - **Deploy process**: Follow Rocky’s existing CiviForm deploy process (`civiform-staging-deploy`) — do not reinvent Terraform from scratch
+> - **Cloudflare**: NOT needed — `civiform.dev` handles DNS (this question is moot)
 
 ### Backend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| BE-12 | Terraform: VPC, subnets, security groups, ALB | 10 | Base networking. ALB routes by subdomain. |
-| BE-13 | Wildcard ACM cert `*.sandbox.civiform.org` | 3 | Pre-provisioned once. Shared across all sandboxes. |
-| BE-14 | Cloudflare CNAME per sandbox via Terraform | 4 | `burlington-vt.sandbox.civiform.org → ALB` |
-| BE-15 | ECS Task Definition for CiviForm image | 8 | Env vars, task role, Fargate sizing |
+| BE-12 | Terraform: VPC, subnets, security groups, ALB | 10 | Reuse/fork Rocky’s `civiform-staging-deploy` Terraform. ALB routes by subdomain. |
+| BE-13 | Wildcard ACM cert `*.sandbox.civiform.dev` | 3 | Requested in AWS once. Shared across all sandboxes. |
+| BE-14 | Route 53 CNAME per sandbox | 4 | `burlington-vt.sandbox.civiform.dev → ALB`. Coordinate with Rocky for DNS access. |
+| BE-15 | ECS Task Definition for CiviForm image | 8 | Follow Rocky’s existing task definition pattern. Env vars, task role, Fargate sizing. |
 | BE-16 | `EcsFargateSandboxService` | 14 | Replaces `DockerSandboxService`. Same interface. |
-| BE-17 | RDS Postgres: shared instance + per-sandbox schema | 8 | Same schema-per-sandbox pattern as S1 |
-| BE-18 | IAM: `CiviformControlPlaneTaskRole` + policies | 4 | No hardcoded keys. Task role only. |
+| BE-17 | RDS Postgres: shared instance + per-sandbox schema | 8 | Same schema-per-sandbox pattern as S1. |
+| BE-18 | IAM: `CiviformSandboxTaskRole` + policies | 4 | `secretsmanager:GetSecretValue` on `civiform-sandbox_*` only. No OIDC/ADFS/ESRI needed (using FAKE_IDP). Follow Rocky's existing role pattern. |
+| BE-18a | Generate + store 3 Secrets Manager secrets per sandbox | 3 | At creation: `civiform-sandbox_{id}_postgres_username`, `_postgres_password`, `_app_secret_key`. Done in `EcsFargateSandboxService.createSandbox()`. |
 | BE-19 | Inject city name env vars at launch | 2 | `WHITELABEL_CIVIC_ENTITY_SHORT_NAME`, `WHITELABEL_CIVIC_ENTITY_FULL_NAME` |
-| BE-20 | Mailpit mock email container per sandbox | 4 | Captures outgoing emails for evaluators |
-| BE-21 | Scheduled provisioning: `scheduledStartTime` | 6 | Sales rep pre-provisions before a meeting |
+| BE-20 | Mailpit mock email container per sandbox | 4 | Slides to S3 if tight. |
+| BE-21 | Scheduled provisioning: `scheduledStartTime` | 6 | Sales rep pre-provisions before a meeting. Slides to S3 if tight. |
 
-**BE Total: ~63 hrs** ⚠️ BE-20 slides to S3 if tight
+**BE Total: ~63 hrs** ⚠️ BE-20 and BE-21 slide to S3 if tight
 
 ### Frontend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| FE-6 | Show real subdomain URL on detail page | 3 | `https://burlington-vt.sandbox.civiform.org` |
+| FE-6 | Show real subdomain URL on detail page | 3 | `https://burlington-vt.sandbox.civiform.dev` |
 | FE-7 | Scheduled start datetime picker on Create form | 6 | |
 
 **FE Total: ~9 hrs**
 
 ### Definition of Done
-1. Sandbox gets `https://burlington-vt.sandbox.civiform.org` with valid TLS
+1. Sandbox gets `https://burlington-vt.sandbox.civiform.dev` with valid TLS
 2. CiviForm header shows "Burlington"
 3. PIN gate works on real HTTPS URL
 
+### Still Open (coordinate with Rocky before sprint starts)
+- [ ] Who grants Route 53 / DNS access for `sandbox.civiform.dev` subdomain delegation?
+- [ ] Which specific IAM policies does the ECS task role need? (check Rocky’s civiform-staging-deploy IAM docs)
+- [ ] Single AWS account or separate sandbox account? (TDD says single-account for MVP)
+
 ---
 
-## Sprint 3 — Seeding Engine + Two-Layer Program Strategy
+## Sprint 3 — Seeding Engine + Two Programs
 
 **Duration**: 2 weeks
-**Goal**: Every sandbox pre-loaded with programs that demonstrate CiviForm's maximum capabilities,
-PLUS 1-2 real programs specific to the demo city.
+**Goal**: Every sandbox pre-loaded with exactly 2 programs matching the Zipline prototype,
+branded with the city name the sales rep entered at creation time.
 
-### Two-Layer Seeding Design (decided Aug 2026)
+### Seeding Design (decided Sep 2026)
 
-Every sandbox gets **both layers**, always. Layer 1 is static. Layer 2 is city-specific.
+**Scope locked to what the prototype shows.** Two programs, same every sandbox.
+City name is dynamic — whatever the sales rep typed (e.g. "Burlington, VT").
 
-```
-┌─────────────────────────────────────────────────────┐
-│  LAYER 1: Evergreen Showcase Programs (always seeded)│
-│  Purpose: demonstrate the hardest CiviForm features  │
-│  Authorship: eng team authors ONCE, ships with repo  │
-│  City-specific? NO — same 3 programs every sandbox   │
-├─────────────────────────────────────────────────────┤
-│  LAYER 2: City-Specific Programs (per-city, 1–2)    │
-│  Purpose: authenticity — "this is your actual form" │
-│  Authorship: Discovery Engine (Sprint 7) or manual  │
-│  City-specific? YES — Burlington gets Burlington     │
-└─────────────────────────────────────────────────────┘
-```
+> ✅ Decisions locked:
+> - **2 programs only** — Comprehensive Sample + Minimal Sample (matching Zipline `index.html`)
+> - **City name**: dynamically from `cityName` field entered at creation → injected as
+>   `WHITELABEL_CIVIC_ENTITY_SHORT_NAME` + `WHITELABEL_CIVIC_ENTITY_FULL_NAME` env vars
+> - No city-specific Layer 2 JSONs (deferred to Sprint 7 Discovery Engine if needed)
+> - No complex enumerators, predicates, or cross-program prefill in this sprint
+>   (can add back in S4 if Tom wants them for the demo shell)
+> - No synthetic applicant profiles
 
-### Layer 1: Evergreen Showcase Programs (eng-authored, committed to repo)
+### The Two Programs (authored once, ship with repo)
 
-Three programs designed to jointly demonstrate the maximum possible CiviForm feature surface:
+#### Program 1: "Comprehensive Sample Program"
+_"A comprehensive multi-part assistance program providing support for healthcare,
+food assistance, and childcare subsidies."_
+- Public Assistance category
+- Multiple question types to demonstrate breadth
+- Store as `/server/conf/seed-data/comprehensive-sample.json`
 
-#### Program 1: "Emergency Rental Assistance"
-The anchor program — most complex configuration possible.
-- **Complex enumerator**: Household members (name, age, relationship, income source, disability
-  status per member) — the feature that impresses technical evaluators most
-- **Address question**: With autocomplete
-- **File upload**: Income verification document
-- **Income predicate rule**: Show "Emergency Assistance Block" ONLY IF household income < $50k
-- **Cross-program prefill source**: Name, DOB, address, household size exported as shared fields
+#### Program 2: "Minimal Sample Program"
+_"A streamlined quick-application program designed for emergency utility relief
+and transit voucher subsidies."_
+- Community Services category
+- Short application — demonstrates fast path
+- Store as `/server/conf/seed-data/minimal-sample.json`
 
-#### Program 2: "Utility Bill Assistance"  
-Simpler program that showcases cross-program prefill as the "wow" moment.
-- **Cross-program prefill target**: Name, DOB, address, household size auto-filled from Program 1
-  (resident sees fields pre-populated — they don't re-enter their household)
-- **Income predicate rule**: Different threshold ($30k) for a different eligibility block
-- **Currency question type**: Monthly utility bill amount
-
-#### Program 3: "Free & Reduced School Lunch"
-Demonstrates a different enumerator: children rather than adults.
-- **Child enumerator**: Children in household (name, age, school, grade)
-- **Age predicate**: Show lunch eligibility block ONLY IF child age < 18
-- **Cross-program prefill target**: Address pre-filled from Program 1
-- **Date question**: School enrollment start date
-
-**Why these three**: Together they demo cross-program prefill end-to-end (apply P1 → open P2
-pre-filled), two different predicate rule types (income AND age), two different enumerator
-types (adults AND children), and every major question type (text, date, address, currency,
-file upload, radio, checkbox). A technical evaluator sees the full CiviForm feature surface
-in one session.
-
-**Authorship**: BE team creates these as CiviForm `ProgramDefinition` JSON exports using a
-running CiviForm dev instance. Store as `/server/conf/seed-data/showcase/*.json`. One-time
-work in Sprint 3, never changes city to city. **This resolves the open "who authors templates"
-question for the showcase layer.**
-
-### Layer 2: City-Specific Programs (1–2 per sandbox)
-
-For Sprint 3 MVP: one manually curated program JSON per target city, stored in
-`/server/conf/seed-data/cities/<city-slug>.json`. Example:
-
-- `burlington-vt.json` — Burlington, VT Housing Assistance (scraped from burlingtonvt.gov)
-- `allegheny-pa.json` — Allegheny County Rental Assistance (from county.allegheny.pa.us)
-
-Sprint 7: replace manual curation with the Gemini Discovery Engine (auto-crawl `.gov` site →
-extract programs → generate CiviForm JSON). The seeding engine API doesn't change — only the
-source of the JSON changes.
+**Authorship**: BE team creates these as CiviForm `ProgramDefinition` JSON exports
+using a running CiviForm dev instance. One-time work, never changes sandbox to sandbox.
 
 ### Backend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| BE-22 | Author Layer 1 showcase programs (3 JSONs) | 16 | Requires running CiviForm dev instance to build + export. Complex enumerator + predicates. |
-| BE-23 | Author Layer 2 city programs (2 JSONs: Burlington + Allegheny) | 8 | Manual scrape/authoring from actual .gov sites |
-| BE-24 | `SeedingEngine.seedSandbox(sandboxId)` | 10 | Loads Layer 1 always; loads Layer 2 by city slug. Calls `ProgramMigrationService.saveImportedProgram()` |
-| BE-25 | Cross-program prefill wiring (4 shared fields) | 8 | Name, DOB, address, household size linked across all 3 showcase programs |
-| BE-26 | Predicate rules validation | 6 | Verify income < $50k and age < 18 predicates work correctly after seeding |
-| BE-27 | Synthetic applicant data seeder (3–5 mock profiles) | 8 | Pre-populated in Admin view. One profile per household type. |
-| BE-28 | City slug → Layer 2 JSON resolver | 4 | `cities/burlington-vt.json` based on cityName input |
-| BE-29 | Program template registry `GET /api/v1/templates` | 4 | Returns available cities + showcase programs |
+| BE-22 | Author 2 program JSONs (Comprehensive + Minimal) | 8 | Export from running CiviForm dev instance. Store in `/server/conf/seed-data/`. |
+| BE-23 | `SeedingEngine.seedSandbox(sandboxId)` | 10 | Loads both programs via `ProgramMigrationService.saveImportedProgram()`. Runs after container RUNNING. |
+| BE-24 | City name injection at container launch | 4 | Pass `WHITELABEL_CIVIC_ENTITY_SHORT_NAME` + `WHITELABEL_CIVIC_ENTITY_FULL_NAME` from `cityName` to ECS task / docker run. |
+| BE-25 | Seeding status tracking | 4 | Add `SEEDING` status to `SandboxStatus` enum. SeedingEngine sets RUNNING when complete. |
+| BE-26 | Dev tools "Reset demo" endpoint | 4 | Re-runs `SeedingEngine.seedSandbox()`. Matches prototype footer button. |
 
-**BE Total: ~64 hrs** ⚠️ BE-22 (program authoring) is the longest task — needs a CiviForm
-dev environment. Start this on Day 1 of the sprint.
+**BE Total: ~30 hrs**
 
 ### Frontend Tasks
 
 | # | Task | Hrs | Notes |
 |---|---|---|---|
-| FE-8 | Program template picker on Create form | 8 | "Standard (3 showcase programs)" always checked. City programs shown as additional options. |
-| FE-9 | Seeding progress phase | 4 | HTMX second phase: "Seeding 5 programs..." after container RUNNING |
+| FE-8 | Seeding progress phase in status view | 4 | HTMX second phase after RUNNING: "Seeding programs..." badge before final RUNNING state. |
 
-**FE Total: ~12 hrs**
+**FE Total: ~4 hrs**
 
 ### Definition of Done
-1. Create sandbox for "Burlington, VT" → 5 programs visible (3 showcase + 2 city)
-2. Apply to "Emergency Rental Assistance" with household members → enumerator works
-3. Open "Utility Bill Assistance" → Name/DOB/address/household already filled
-4. Income < $50k → extra assistance block visible; income > $50k → block hidden
-5. School lunch program shows child age predicate correctly
+1. Create sandbox for "Burlington, VT" → CiviForm header shows "Burlington, VT"
+2. Two programs visible: "Comprehensive Sample Program" + "Minimal Sample Program"
+3. Both programs are clickable and show the correct description
+4. "Reset demo" dev tools button re-seeds both programs
 
 ---
 
