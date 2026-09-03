@@ -217,13 +217,23 @@ public class SandboxController extends Controller {
 
   /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
   public CompletionStage<Result> delete(Http.Request request, String id) {
-    return sandboxService.deleteSandbox(id).thenApply(deleted -> {
-      if (isJsonRequest(request)) {
-        return ok(Json.newObject().put("deleted", deleted));
-      }
-      return redirect(controllers.routes.SandboxController.index())
-          .flashing("success", "Demo deleted.");
-    });
+    return sandboxService
+        .getSandbox(id)
+        .thenCompose(
+            maybeSandbox -> {
+              String cityName =
+                  maybeSandbox.map(s -> s.getCityName()).orElse("sandbox");
+              return sandboxService
+                  .deleteSandbox(id)
+                  .thenApply(
+                      deleted -> {
+                        if (isJsonRequest(request)) {
+                          return ok(Json.newObject().put("deleted", deleted));
+                        }
+                        return redirect(controllers.routes.SandboxController.index())
+                            .flashing("deleted", "Deleted demo for " + cityName + ".");
+                      });
+            });
   }
 
   /** GET /sandboxes/new — Create sandbox form. */

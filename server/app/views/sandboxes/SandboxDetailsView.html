@@ -179,22 +179,58 @@
         </div>
       </dl>
 
-      <div class="mt-6 pt-4 border-t border-gray-200">
-        <form
-          th:action="|/sandboxes/${model.sandbox.id}/delete|"
-          method="POST"
-          onsubmit="
-            return confirm('Destroy this sandbox? This cannot be undone.')
-          "
+      <div class="mt-6 pt-4 border-t border-gray-200 flex gap-3 flex-wrap">
+        <button
+          type="button"
+          onclick="openExtendModal()"
+          class="usa-button"
         >
-          <button
-            type="submit"
-            class="usa-button bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded"
-          >
-            Destroy Sandbox
-          </button>
-        </form>
+          Extend Demo
+        </button>
+        <button
+          type="button"
+          onclick="openDestroyModal()"
+          class="usa-button usa-button--secondary"
+        >
+          Destroy Sandbox
+        </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Destroy Modal ───────────────────────────────────────────────────── -->
+  <div
+    id="destroy-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="destroy-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+      <button
+        onclick="closeDestroyModal()"
+        aria-label="Close"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
+        ×
+      </button>
+      <h2 id="destroy-modal-title" class="text-xl font-bold text-gray-900 mb-3">
+        Delete demo?
+      </h2>
+      <p class="text-sm text-gray-700 mb-6">
+        This will permanently delete the demo for
+        <strong th:text="${model.sandbox.cityName}">Burlington, VT</strong>
+        from AWS. This cannot be undone.
+      </p>
+      <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST">
+        <button
+          type="submit"
+          class="usa-button w-full"
+          style="background-color: #c0392b; width: 100%"
+        >
+          Delete demo
+        </button>
+      </form>
     </div>
   </div>
 
@@ -260,6 +296,27 @@
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
+    function openDestroyModal() {
+      const modal = document.getElementById('destroy-modal')
+      modal.classList.remove('hidden')
+      modal.addEventListener('click', function onBackdrop(e) {
+        if (e.target === modal) {
+          closeDestroyModal()
+          modal.removeEventListener('click', onBackdrop)
+        }
+      })
+      document.addEventListener('keydown', function onEsc(e) {
+        if (e.key === 'Escape') {
+          closeDestroyModal()
+          document.removeEventListener('keydown', onEsc)
+        }
+      })
+    }
+
+    function closeDestroyModal() {
+      document.getElementById('destroy-modal').classList.add('hidden')
+    }
+
     function openExtendModal() {
       const modal = document.getElementById('extend-modal')
       modal.classList.remove('hidden')
