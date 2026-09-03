@@ -289,6 +289,23 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days) {
+    return CompletableFuture.supplyAsync(() -> {
+      Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+      if (maybeSandbox.isEmpty()) {
+        return Optional.empty();
+      }
+      SandboxInstance existing = maybeSandbox.get();
+      SandboxInstance extended = existing.toBuilder()
+          .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
+          .build();
+      repository.save(extended);
+      log.info("[{}] Sandbox extended by {} days. New expiry: {}", id, days, extended.getExpiresAt());
+      return Optional.of(extended);
+    }, provisioningPool);
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------

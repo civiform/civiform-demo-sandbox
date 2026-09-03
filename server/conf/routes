@@ -11,7 +11,7 @@ GET     /ready                      controllers.HealthCheckController.ready()
 # Home / Dashboard
 GET     /                           controllers.SandboxController.index(request: Request)
 
-# Auth (stub — real auth in Sprint 6)
+# Auth (stub — real auth in week 6?)
 GET     /logout                     controllers.SandboxController.logout(request: Request)
 
 # Sandbox Management

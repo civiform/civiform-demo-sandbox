@@ -35,7 +35,7 @@ public class InMemorySandboxService implements SandboxService {
             .cityName("Burlington, VT")
             .civiformVersion("v2.22.0")
             .status(SandboxStatus.RUNNING)
-            .url("http://localhost:10000")
+            .url("https://demo.sandbox.civiform.dev")
             .adminEmail("admin@civiform.dev")
             .notes("Default demo sandbox — seeded on startup")
             .pin("482917")

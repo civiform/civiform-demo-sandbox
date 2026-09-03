@@ -263,6 +263,32 @@ public class SandboxController extends Controller {
     });
   }
 
+  /** GET /sandboxes/new — Create sandbox form. */
+  public Result newSandbox(Http.Request request) {
+    return ok(createView.render(request, CreateSandboxViewModel.empty())).as("text/html");
+  }
+
+  /**
+   * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
+   * Redirects back to the dashboard with the updated sandbox visible.
+   */
+  public CompletionStage<Result> extend(Http.Request request, String id) {
+    DynamicForm form = formFactory.form().bindFromRequest(request);
+    String daysStr = orDefault(form.get("days"), "30");
+    int days;
+    try {
+      days = Math.max(1, Math.min(90, Integer.parseInt(daysStr)));
+    } catch (NumberFormatException e) {
+      days = 30;
+    }
+    return sandboxService.extendSandbox(id, days).thenApply(maybeExtended -> {
+      if (maybeExtended.isEmpty()) {
+        return notFound("Sandbox not found: " + id);
+      }
+      return redirect(controllers.routes.SandboxController.index());
+    });
+  }
+
   /**
    * GET /logout — clears the session and redirects to the dashboard.
    * Stub until Sprint 6 auth is wired; clears any cookies and session data.
