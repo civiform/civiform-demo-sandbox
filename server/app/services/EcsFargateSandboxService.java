@@ -153,7 +153,7 @@ public class EcsFargateSandboxService implements SandboxService {
     SandboxInstance instance =
         SandboxInstance.builder()
             .id(id)
-            .name(name)
+            .cityName(name)
             .civiformVersion(version)
             .status(SandboxStatus.PROVISIONING)
             .url(sandboxUrl)
@@ -212,14 +212,14 @@ public class EcsFargateSandboxService implements SandboxService {
               SandboxInstance updated =
                   SandboxInstance.builder()
                       .id(maybeInstance.get().getId())
-                      .name(maybeInstance.get().getName())
+                      .cityName(maybeInstance.get().getCityName())
                       .civiformVersion(maybeInstance.get().getCiviformVersion())
                       .status(maybeInstance.get().getStatus())
                       .url(maybeInstance.get().getUrl())
                       .adminEmail(maybeInstance.get().getAdminEmail())
                       .notes(maybeInstance.get().getNotes())
                       .pin(maybeInstance.get().getPin())
-                      .containerID(maybeInstance.get().getContainerID())
+                      .containerId(maybeInstance.get().getContainerId())
                       .hostPort(maybeInstance.get().getHostPort())
                       .createdAt(maybeInstance.get().getCreatedAt())
                       .expiresAt(
@@ -246,8 +246,8 @@ public class EcsFargateSandboxService implements SandboxService {
    */
   private void provisionAsync(SandboxInstance instance) {
     String id = instance.getId();
-    String slug = toSlug(instance.getName());
-    logger.info("[{}] Provisioning ECS Fargate sandbox '{}' at {}", id, instance.getName(), instance.getUrl());
+    String slug = toSlug(instance.getCityName());
+    logger.info("[{}] Provisioning ECS Fargate sandbox '{}' at {}", id, instance.getCityName(), instance.getUrl());
 
     try {
       // Step 1: Create Postgres schema + user
@@ -341,8 +341,8 @@ public class EcsFargateSandboxService implements SandboxService {
                 envVar("IDCS_DISCOVERY_URI",
                     "https://dev-oidc.sandbox.civiform.dev/.well-known/openid-configuration"),
                 // City branding — shows city name in CiviForm header
-                envVar("WHITELABEL_CIVIC_ENTITY_SHORT_NAME", instance.getName()),
-                envVar("WHITELABEL_CIVIC_ENTITY_LONG_NAME", instance.getName()),
+                envVar("WHITELABEL_CIVIC_ENTITY_SHORT_NAME", instance.getCityName()),
+                envVar("WHITELABEL_CIVIC_ENTITY_LONG_NAME", instance.getCityName()),
                 // Per-sandbox URL — each sandbox has its own subdomain
                 envVar("BASE_URL", sandboxUrl),
                 envVar("STAGING_HOSTNAME", sandboxUrl.replace("https://", "")),
@@ -545,13 +545,13 @@ public class EcsFargateSandboxService implements SandboxService {
 
   private void teardownAsync(SandboxInstance instance) {
     String id = instance.getId();
-    logger.info("[{}] Tearing down sandbox '{}'", id, instance.getName());
+    logger.info("[{}] Tearing down sandbox '{}'", id, instance.getCityName());
     try {
       // Stop ECS task
-      if (instance.getContainerID() != null) {
+      if (instance.getContainerId() != null) {
         ecs().stopTask(StopTaskRequest.builder()
             .cluster(config.getString("sandbox.ecs.cluster"))
-            .task(instance.getContainerID())
+            .task(instance.getContainerId())
             .reason("Sandbox deleted")
             .build());
         logger.info("[{}] ECS task stopped", id);
@@ -640,7 +640,7 @@ public class EcsFargateSandboxService implements SandboxService {
   // ── Secrets Manager ──────────────────────────────────────────────────────────
 
   private void storeSecret(String name, String value) {
-    secrets().createSecret(CreateSecretRequest.builder().name(name).secretString(value).build());
+    secrets().createSecret(CreateSecretRequest.builder().cityName(name).secretString(value).build());
   }
 
   private void deleteSecret(String name) {
@@ -701,7 +701,7 @@ public class EcsFargateSandboxService implements SandboxService {
   }
 
   private static KeyValuePair envVar(String name, String value) {
-    return KeyValuePair.builder().name(name).value(value).build();
+    return KeyValuePair.builder().cityName(name).value(value).build();
   }
 
   private void updateStatus(
@@ -710,14 +710,14 @@ public class EcsFargateSandboxService implements SandboxService {
       if (maybeInstance.isEmpty()) return CompletableFuture.completedFuture(null);
       SandboxInstance updated = SandboxInstance.builder()
           .id(maybeInstance.get().getId())
-          .name(maybeInstance.get().getName())
+          .cityName(maybeInstance.get().getCityName())
           .civiformVersion(maybeInstance.get().getCiviformVersion())
           .status(status)
           .url(maybeInstance.get().getUrl())
           .adminEmail(maybeInstance.get().getAdminEmail())
           .notes(maybeInstance.get().getNotes())
           .pin(maybeInstance.get().getPin())
-          .containerID(taskArn != null ? taskArn : maybeInstance.get().getContainerID())
+          .containerId(taskArn != null ? taskArn : maybeInstance.get().getContainerId())
           .targetGroupArn(targetGroupArn != null ? targetGroupArn : maybeInstance.get().getTargetGroupArn())
           .listenerRuleArn(ruleArn != null ? ruleArn : maybeInstance.get().getListenerRuleArn())
           .hostPort(maybeInstance.get().getHostPort())

@@ -32,7 +32,7 @@ public class InMemorySandboxService implements SandboxService {
         demoId,
         SandboxInstance.builder()
             .id(demoId)
-            .name("Burlington, VT")
+            .cityName("Burlington, VT")
             .civiformVersion("v2.22.0")
             .status(SandboxStatus.RUNNING)
             .url("https://burlington-vt.sandbox.civiform.dev")
@@ -40,6 +40,7 @@ public class InMemorySandboxService implements SandboxService {
             .notes("Default demo sandbox — seeded on startup")
             .pin("482917")
             .hostPort(10000)
+            .schemaName("sandbox_demo_sb_1")
             .createdAt(Instant.now().minus(Duration.ofHours(2)))
             .expiresAt(Instant.now().plus(Duration.ofDays(30)))
             .build());
