@@ -31,6 +31,21 @@ services:
       - APPLICATION_SECRET=cf-sandbox-builder-dev-secret-key-1234567890
       - DOCKER_SOCKET_PATH=unix:///var/run/docker.sock
       - SANDBOX_DB_HOST=host.docker.internal
+      # Runtime selector: "docker" (Sprint 1 local) or "fargate" (Sprint 2 AWS)
+      - SANDBOX_RUNTIME=docker
+      # ── Sprint 2 Fargate vars — only needed when SANDBOX_RUNTIME=fargate ──────
+      # Leave blank for local Docker development. Set in AWS ECS task definition.
+      - SANDBOX_DOMAIN=sandbox.civiform.dev
+      - SANDBOX_VPC_ID=
+      - AWS_REGION=us-east-1
+      - ECS_CLUSTER=civiform-sandbox-cluster
+      - ECS_SUBNETS=
+      - ECS_SECURITY_GROUP=
+      - ECS_EXECUTION_ROLE_ARN=
+      - ECS_TASK_ROLE_ARN=
+      - ALB_LISTENER_ARN=
+      - RDS_HOST=
+      - RDS_MASTER_SECRET_ARN=
     volumes:
       # Mount Docker socket so the builder can launch CiviForm containers (Sprint 1)
       - /var/run/docker.sock:/var/run/docker.sock

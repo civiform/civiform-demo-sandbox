@@ -1,22 +1,23 @@
-# ── ACM Certificate for fixed sandbox URL ─────────────────────────────────────
-# Single cert for demo.sandbox.civiform.dev — no wildcard needed.
+# ── ACM Wildcard Certificate ───────────────────────────────────────────────────
+# Single wildcard cert covers ALL sandbox subdomains: *.sandbox.civiform.dev
+# One cert, reused for every sandbox — no per-sandbox cert requests.
 # DNS validation CNAME must be added to the civiform.dev zone by Rocky / DNS owner.
 
-resource "aws_acm_certificate" "demo" {
-  domain_name       = "demo.${var.domain}"
+resource "aws_acm_certificate" "wildcard" {
+  domain_name       = "*.${var.domain}"
   validation_method = "DNS"
 
   lifecycle {
     create_before_destroy = true
   }
 
-  tags = { Name = "civiform-sandbox-demo-cert" }
+  tags = { Name = "civiform-sandbox-wildcard-cert" }
 }
 
 output "acm_validation_records" {
-  description = "Add this CNAME to the civiform.dev DNS zone to validate the cert"
+  description = "Add this CNAME to the civiform.dev DNS zone to validate the wildcard cert"
   value = {
-    for dvo in aws_acm_certificate.demo.domain_validation_options : dvo.domain_name => {
+    for dvo in aws_acm_certificate.wildcard.domain_validation_options : dvo.domain_name => {
       name  = dvo.resource_record_name
       type  = dvo.resource_record_type
       value = dvo.resource_record_value
@@ -24,7 +25,9 @@ output "acm_validation_records" {
   }
 }
 
-# ── Application Load Balancer ─────────────────────────────────────────────────
+# ── Application Load Balancer ──────────────────────────────────────────────────
+# Single shared ALB. Per-sandbox routing via host-header listener rules.
+# EcsFargateSandboxService creates/deletes listener rules dynamically in Java.
 
 resource "aws_lb" "sandbox" {
   name               = "civiform-sandbox-alb"
@@ -37,7 +40,7 @@ resource "aws_lb" "sandbox" {
   tags                       = { Name = "civiform-sandbox-alb" }
 }
 
-# HTTP → HTTPS redirect
+# HTTP → HTTPS redirect (applies to all subdomains)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.sandbox.arn
   port              = 80
@@ -53,47 +56,31 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# ── Shared target group — one per environment, updated at sandbox creation ─────
-# EcsFargateSandboxService deregisters the old task and registers the new one
-# each time a sandbox is created. No per-sandbox target groups.
-
-resource "aws_lb_target_group" "civiform" {
-  name        = "civiform-sandbox-tg"
-  port        = 9000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.sandbox.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/health"
-    protocol            = "HTTP"
-    matcher             = "200"
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    interval            = 15
-  }
-
-  tags = { Name = "civiform-sandbox-tg" }
-}
-
-# HTTPS listener — forwards everything to the single shared target group
+# HTTPS listener — default action returns 404 for unknown subdomains.
+# Per-sandbox listener rules (host-header → target group) are created by
+# EcsFargateSandboxService.registerListenerRule() at provision time.
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.sandbox.arn
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate.demo.arn
+  certificate_arn   = aws_acm_certificate.wildcard.arn
 
+  # Default: no matching sandbox found
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.civiform.arn
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Sandbox not found or expired."
+      status_code  = "404"
+    }
   }
 }
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "alb_dns_name" {
-  description = "ALB DNS name — point demo.sandbox.civiform.dev CNAME here"
+  description = "ALB DNS name — create a wildcard Route53/Cloudflare CNAME: *.sandbox.civiform.dev → this value"
   value       = aws_lb.sandbox.dns_name
 }
 
@@ -102,7 +89,7 @@ output "alb_zone_id" {
   value       = aws_lb.sandbox.zone_id
 }
 
-output "target_group_arn" {
-  description = "Shared target group ARN — set as ALB_TARGET_GROUP_ARN env var on the builder"
-  value       = aws_lb_target_group.civiform.arn
+output "alb_https_listener_arn" {
+  description = "HTTPS listener ARN — set as ALB_LISTENER_ARN env var on the builder service"
+  value       = aws_lb_listener.https.arn
 }
