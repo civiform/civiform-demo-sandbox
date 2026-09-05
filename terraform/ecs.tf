@@ -29,49 +29,32 @@ resource "aws_cloudwatch_log_group" "sandbox_tasks" {
   tags              = { Name = "civiform-sandbox-ecs-logs" }
 }
 
-# ── IAM: ECS Task Execution Role ──────────────────────────────────────────────
-# Allows ECS to pull the CiviForm image and write logs.
+# ── IAM Roles ─────────────────────────────────────────────────────────────────
+# All roles use the shared ./modules/iam_role module which provides the
+# ECS task trust policy and wires inline + managed policies. This avoids
+# repeating the assume_role_policy block for each role.
 
-resource "aws_iam_role" "ecs_execution" {
-  name = "CiviformSandboxEcsExecutionRole"
+# 1. ECS Task Execution Role — allows ECS to pull image + write logs
+module "ecs_execution_role" {
+  source      = "./modules/iam_role"
+  name        = "CiviformSandboxEcsExecutionRole"
+  description = "Allows ECS agent to pull CiviForm image from ECR and write CloudWatch logs"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
+  # No inline policy needed — use the AWS-managed ECS execution policy
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  ]
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_execution_managed" {
-  role       = aws_iam_role.ecs_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
+# 2. ECS Task Role — permissions the CiviForm app itself has at runtime
+#    Scoped to sandbox-specific secrets only. No OIDC/ADFS/ESRI secrets needed —
+#    FAKE_IDP is used for MVP (STAGING_DISABLE_DEMO_MODE_LOGINS=false).
+module "civiform_sandbox_task_role" {
+  source      = "./modules/iam_role"
+  name        = "CiviformSandboxTaskRole"
+  description = "Runtime permissions for the CiviForm app process inside sandbox containers"
 
-# ── IAM: ECS Task Role (CiviForm app permissions) ─────────────────────────────
-# Scoped to sandbox-specific secrets only. No OIDC/ADFS/ESRI secrets needed —
-# we use FAKE_IDP for MVP (STAGING_DISABLE_DEMO_MODE_LOGINS=false).
-
-resource "aws_iam_role" "civiform_sandbox_task" {
-  name = "CiviformSandboxTaskRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "sandbox_task_secrets" {
-  name = "CiviformSandboxTaskSecretsPolicy"
-  role = aws_iam_role.civiform_sandbox_task.id
-
-  policy = jsonencode({
+  policy_json = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
@@ -85,32 +68,18 @@ resource "aws_iam_role_policy" "sandbox_task_secrets" {
   })
 }
 
-# ── IAM: Builder Service Role ─────────────────────────────────────────────────
-# The cf-sandbox-builder Play app (running on the Exygy machine or its own ECS task)
-# needs these permissions to manage sandbox lifecycle.
+# 3. Builder Service Role — permissions the cf-sandbox-builder Play app needs
+#    to manage the full sandbox lifecycle (create, monitor, teardown).
+module "sandbox_builder_role" {
+  source      = "./modules/iam_role"
+  name        = "CiviformSandboxBuilderRole"
+  description = "Allows cf-sandbox-builder to manage ECS tasks, ALB rules, Secrets Manager, and RDS schemas"
 
-resource "aws_iam_role" "sandbox_builder" {
-  name = "CiviformSandboxBuilderRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "sandbox_builder_policy" {
-  name = "CiviformSandboxBuilderPolicy"
-  role = aws_iam_role.sandbox_builder.id
-
-  policy = jsonencode({
+  policy_json = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        # Register + deregister ECS task definitions per sandbox
+        # Register + run + stop ECS tasks per sandbox
         Sid    = "ECSTaskManagement"
         Effect = "Allow"
         Action = [
@@ -129,17 +98,17 @@ resource "aws_iam_role_policy" "sandbox_builder_policy" {
         }
       },
       {
-        # Pass task + execution roles to ECS
+        # Pass task + execution roles to ECS at RunTask time
         Sid    = "PassRole"
         Effect = "Allow"
         Action = "iam:PassRole"
         Resource = [
-          aws_iam_role.ecs_execution.arn,
-          aws_iam_role.civiform_sandbox_task.arn,
+          module.ecs_execution_role.arn,
+          module.civiform_sandbox_task_role.arn,
         ]
       },
       {
-        # Create/delete per-sandbox secrets
+        # Create/read/delete per-sandbox secrets
         Sid    = "SecretsManagement"
         Effect = "Allow"
         Action = [
@@ -151,25 +120,26 @@ resource "aws_iam_role_policy" "sandbox_builder_policy" {
         Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:civiform-sandbox_*"
       },
       {
-        # Read the RDS master password to create per-sandbox schemas
+        # Read the RDS master password to CREATE/DROP per-sandbox schemas
         Sid    = "RdsMasterSecret"
         Effect = "Allow"
         Action = ["secretsmanager:GetSecretValue"]
         Resource = aws_secretsmanager_secret.rds_master_password.arn
       },
       {
-        # Add/remove ALB listener rules for per-sandbox subdomains
+        # Create/delete per-sandbox ALB target groups + listener rules (wildcard routing)
         Sid    = "AlbRuleManagement"
         Effect = "Allow"
         Action = [
           "elasticloadbalancing:CreateRule",
           "elasticloadbalancing:DeleteRule",
+          "elasticloadbalancing:DescribeRules",
           "elasticloadbalancing:CreateTargetGroup",
           "elasticloadbalancing:DeleteTargetGroup",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetHealth",
           "elasticloadbalancing:RegisterTargets",
           "elasticloadbalancing:DeregisterTargets",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeRules",
         ]
         Resource = "*"
       },
@@ -184,15 +154,15 @@ output "ecs_cluster_arn" {
 }
 
 output "ecs_execution_role_arn" {
-  value = aws_iam_role.ecs_execution.arn
+  value = module.ecs_execution_role.arn
 }
 
 output "civiform_sandbox_task_role_arn" {
-  value = aws_iam_role.civiform_sandbox_task.arn
+  value = module.civiform_sandbox_task_role.arn
 }
 
 output "sandbox_builder_role_arn" {
-  value = aws_iam_role.sandbox_builder.arn
+  value = module.sandbox_builder_role.arn
 }
 
 output "cloudwatch_log_group" {
