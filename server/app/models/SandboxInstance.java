@@ -12,7 +12,7 @@ public class SandboxInstance {
   private String id;
 
   /** Human-readable city name (e.g. "Burlington, VT"). */
-  private String cityName;
+  private String name;
 
   /** CiviForm image tag (e.g. "latest" or "v2.22.0"). */
   private String civiformVersion;
@@ -20,7 +20,10 @@ public class SandboxInstance {
   /** Current lifecycle status. */
   private SandboxStatus status;
 
-  /** URL prospects use to reach the CiviForm instance. */
+  /**
+   * Sandbox URL — per-sandbox subdomain under wildcard cert.
+   * e.g. "https://burlington-vt.sandbox.civiform.dev"
+   */
   private String url;
 
   /** Email of the sales rep / admin who created this sandbox. */
@@ -32,16 +35,28 @@ public class SandboxInstance {
   /** 6-digit PIN gate code — generated at creation, shown on detail page. */
   private String pin;
 
-  /** Docker container ID set once the container is launched (null while PROVISIONING). */
-  private String containerId;
+  /** ECS task ARN set once the Fargate task is launched (null while PROVISIONING). */
+  private String containerID;
 
-  /** Host port bound to CiviForm's internal 9000 (allocated from sandbox_port_seq). */
+  /** Host port (Sprint 1 Docker only — unused in ECS Fargate path). */
   private int hostPort;
 
-  /** Postgres schema name for this sandbox (e.g. "sandbox_sb_a1b2c3d4"). */
-  private String schemaName;
+  /**
+   * ARN of the per-sandbox ALB target group.
+   * Created at provision time, deleted at teardown.
+   * Null for Docker-socket (Sprint 1) sandboxes.
+   */
+  private String targetGroupArn;
+
+  /**
+   * ARN of the per-sandbox ALB listener rule (host-header → target group).
+   * Created at provision time, deleted at teardown.
+   * Null for Docker-socket (Sprint 1) sandboxes.
+   */
+  private String listenerRuleArn;
 
   private Instant createdAt;
   private Instant expiresAt;
 }
+
 

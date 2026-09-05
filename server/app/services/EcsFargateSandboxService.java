@@ -8,6 +8,7 @@ import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.text.Normalizer;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -41,14 +42,26 @@ import software.amazon.awssdk.services.ecs.model.RunTaskResponse;
 import software.amazon.awssdk.services.ecs.model.StopTaskRequest;
 import software.amazon.awssdk.services.ecs.model.Task;
 import software.amazon.awssdk.services.elasticloadbalancingv2.ElasticLoadBalancingV2Client;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.Action;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.ActionTypeEnum;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.Condition;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.CreateRuleRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.CreateTargetGroupRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.CreateTargetGroupResponse;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.DeleteRuleRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.DeleteTargetGroupRequest;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.DeregisterTargetsRequest;
-import software.amazon.awssdk.services.elasticloadbalancingv2.model.DescribeTargetGroupsRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.DescribeRulesRequest;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.DescribeTargetHealthRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.ForwardActionConfig;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.HostHeaderConditionConfig;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.IpAddressType;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.Matcher;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.Protocol;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.RegisterTargetsRequest;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.Rule;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetDescription;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetGroupTuple;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetType;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest;
@@ -62,40 +75,42 @@ import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueReques
  * The {@link SandboxService} interface, all controller logic, PIN gate, and DB schema are
  * identical — only the runtime call changes.
  *
- * <p><b>Single fixed URL design</b>: All sandboxes share one URL:
- * {@code https://demo.sandbox.civiform.dev}. The active sandbox's ECS task IP is registered
- * in the ALB target group. When a new sandbox is created, the old task is stopped and the
- * target group is updated to point to the new task. City branding is applied via
- * {@code WHITELABEL_CIVIC_ENTITY_SHORT_NAME} env var — so "Burlington" still appears in the
- * CiviForm header even though the URL is fixed.
+ * <p><b>Wildcard subdomain design</b>: Each sandbox gets its own subdomain under the wildcard
+ * cert {@code *.sandbox.civiform.dev}. "Burlington, VT" → {@code burlington-vt.sandbox.civiform.dev}.
+ * Multiple sandboxes can be active concurrently — each has a unique ALB listener rule (host-header
+ * match) routing to its own target group and ECS task.
  *
- * <p>This eliminates per-sandbox ALB listener rules, Route 53 CNAME records, slug generation,
- * and wildcard cert management. One cert, one URL, one target group.
+ * <p>This matches Rocky's architecture: one wildcard ACM cert, one ALB, per-sandbox listener
+ * rules created/deleted dynamically by this service.
  *
  * <p>Required config keys (application.conf / env vars):
  * <pre>
- *   sandbox.url                = "https://demo.sandbox.civiform.dev"  (SANDBOX_URL)
- *   sandbox.aws.region         = "us-east-1"                          (AWS_REGION)
- *   sandbox.ecs.cluster        = "civiform-sandbox-cluster"           (ECS_CLUSTER)
- *   sandbox.ecs.subnets        = ["subnet-xxx","subnet-yyy"]          (ECS_SUBNETS)
- *   sandbox.ecs.security_group = "sg-xxx"                             (ECS_SECURITY_GROUP)
- *   sandbox.ecs.execution_role = "arn:aws:iam::...ExecutionRole"      (ECS_EXECUTION_ROLE_ARN)
- *   sandbox.ecs.task_role      = "arn:aws:iam::...TaskRole"           (ECS_TASK_ROLE_ARN)
- *   sandbox.ecs.log_group      = "/ecs/civiform-sandbox"              (ECS_LOG_GROUP)
+ *   sandbox.domain             = "sandbox.civiform.dev"          (SANDBOX_DOMAIN)
+ *   sandbox.aws.region         = "us-east-1"                     (AWS_REGION)
+ *   sandbox.ecs.cluster        = "civiform-sandbox-cluster"      (ECS_CLUSTER)
+ *   sandbox.ecs.subnets        = ["subnet-xxx","subnet-yyy"]     (ECS_SUBNETS)
+ *   sandbox.ecs.security_group = "sg-xxx"                        (ECS_SECURITY_GROUP)
+ *   sandbox.ecs.execution_role = "arn:aws:iam::...ExecutionRole" (ECS_EXECUTION_ROLE_ARN)
+ *   sandbox.ecs.task_role      = "arn:aws:iam::...TaskRole"      (ECS_TASK_ROLE_ARN)
+ *   sandbox.ecs.log_group      = "/ecs/civiform-sandbox"         (ECS_LOG_GROUP)
  *   sandbox.ecs.task_cpu       = 512
  *   sandbox.ecs.task_memory    = 1024
- *   sandbox.alb.target_group   = "arn:aws:elasticloadbalancing:...targetgroup/..." (ALB_TARGET_GROUP_ARN)
+ *   sandbox.alb.listener_arn   = "arn:aws:elasticloadbalancing:...listener/..." (ALB_LISTENER_ARN)
  *   sandbox.rds.host           = "civiform-sandbox-postgres.xxx.rds.amazonaws.com" (RDS_HOST)
  *   sandbox.rds.port           = 5432
- *   sandbox.rds.dbname         = "civiform_sandbox"                   (RDS_DBNAME)
- *   sandbox.rds.master_secret  = "arn:aws:secretsmanager:..."         (RDS_MASTER_SECRET_ARN)
- *   sandbox.civiform_image     = "civiform/civiform:latest"           (CIVIFORM_IMAGE)
+ *   sandbox.rds.dbname         = "civiform_sandbox"              (RDS_DBNAME)
+ *   sandbox.rds.master_secret  = "arn:aws:secretsmanager:..."   (RDS_MASTER_SECRET_ARN)
+ *   sandbox.civiform_image     = "civiform/civiform:latest"      (CIVIFORM_IMAGE)
  * </pre>
  */
 @Singleton
 public class EcsFargateSandboxService implements SandboxService {
 
   private static final Logger logger = LoggerFactory.getLogger(EcsFargateSandboxService.class);
+
+  // ALB listener rules use priority 1–50000. We use 100–49900 for sandbox rules,
+  // leaving headroom at both ends for future static rules.
+  private static final int LISTENER_RULE_PRIORITY_BASE = 100;
 
   private final SandboxRepository repository;
   private final Config config;
@@ -131,8 +146,8 @@ public class EcsFargateSandboxService implements SandboxService {
 
     String id = "sb-" + UUID.randomUUID().toString().substring(0, 8);
     String pin = generatePin();
-    // All sandboxes share a single fixed URL — city branding via env var, not subdomain
-    String sandboxUrl = config.getString("sandbox.url");
+    String slug = toSlug(name);
+    String sandboxUrl = "https://" + slug + "." + config.getString("sandbox.domain");
     Instant now = Instant.now();
 
     SandboxInstance instance =
@@ -221,16 +236,18 @@ public class EcsFargateSandboxService implements SandboxService {
    *
    * <ol>
    *   <li>Create per-sandbox Postgres schema + user on shared sandbox RDS
-   *   <li>Store 3 Secrets Manager secrets (postgres password, app secret key)
-   *   <li>Stop the previous active ECS task (if any) and deregister from target group
-   *   <li>Register new ECS task definition + run task
-   *   <li>Wait for task private IP, register in the shared ALB target group
+   *   <li>Store Secrets Manager secrets (postgres password, app secret key)
+   *   <li>Register ECS task definition + run task
+   *   <li>Wait for task private IP
+   *   <li>Create per-sandbox ALB target group + register task IP
+   *   <li>Create ALB listener rule: host-header {slug}.sandbox.civiform.dev → target group
    *   <li>Mark sandbox RUNNING
    * </ol>
    */
   private void provisionAsync(SandboxInstance instance) {
     String id = instance.getId();
-    logger.info("[{}] Provisioning ECS Fargate sandbox for '{}' at {}", id, instance.getName(), instance.getUrl());
+    String slug = toSlug(instance.getName());
+    logger.info("[{}] Provisioning ECS Fargate sandbox '{}' at {}", id, instance.getName(), instance.getUrl());
 
     try {
       // Step 1: Create Postgres schema + user
@@ -240,33 +257,37 @@ public class EcsFargateSandboxService implements SandboxService {
       createDatabaseSchema(masterCreds, dbUser, dbPassword);
       logger.info("[{}] Postgres schema created: {}", id, dbUser);
 
-      // Step 2: Store Secrets Manager secrets (3 per sandbox)
+      // Step 2: Store Secrets Manager secrets
       String appSecret = generateSecret(32);
       storeSecret("civiform-sandbox_" + id + "_postgres_password", dbPassword);
       storeSecret("civiform-sandbox_" + id + "_app_secret_key", appSecret);
       logger.info("[{}] Secrets stored", id);
 
-      // Step 3: Stop previous active task + deregister from target group
-      stopPreviousActiveTask();
-      logger.info("[{}] Previous task stopped (if any)", id);
-
-      // Step 4: Register task definition + run task
-      String taskDefArn = registerTaskDefinition(instance, id, dbUser, dbPassword, appSecret, masterCreds);
+      // Step 3: Register task definition + run task
+      String taskDefArn = registerTaskDefinition(instance, id, slug, dbUser, dbPassword, appSecret, masterCreds);
       String taskArn = runEcsTask(taskDefArn, id);
       logger.info("[{}] ECS task started: {}", id, taskArn);
 
-      // Step 5: Wait for IP and register in shared target group
+      // Step 4: Wait for private IP
       String privateIp = waitForTaskIp(taskArn);
-      registerInTargetGroup(privateIp);
-      logger.info("[{}] Registered in ALB target group at {}", id, privateIp);
+      logger.info("[{}] Task IP: {}", id, privateIp);
 
-      // Step 6: Mark RUNNING
-      updateStatus(id, SandboxStatus.RUNNING, taskArn);
+      // Step 5: Create per-sandbox target group + register task IP
+      String targetGroupArn = createTargetGroup(id);
+      registerInTargetGroup(targetGroupArn, privateIp);
+      logger.info("[{}] Registered in target group {}", id, targetGroupArn);
+
+      // Step 6: Create ALB listener rule routing slug.sandbox.civiform.dev → this TG
+      String ruleArn = createListenerRule(id, slug, targetGroupArn);
+      logger.info("[{}] Listener rule created: {} → {}", id, slug + "." + config.getString("sandbox.domain"), ruleArn);
+
+      // Step 7: Mark RUNNING
+      updateStatus(id, SandboxStatus.RUNNING, taskArn, targetGroupArn, ruleArn);
       logger.info("[{}] Sandbox RUNNING at {}", id, instance.getUrl());
 
     } catch (Exception e) {
       logger.error("[{}] Provisioning failed: {}", id, e.getMessage(), e);
-      updateStatus(id, SandboxStatus.FAILED, null);
+      updateStatus(id, SandboxStatus.FAILED, null, null, null);
     }
   }
 
@@ -275,6 +296,7 @@ public class EcsFargateSandboxService implements SandboxService {
   private String registerTaskDefinition(
       SandboxInstance instance,
       String id,
+      String slug,
       String dbUser,
       String dbPassword,
       String appSecret,
@@ -290,7 +312,7 @@ public class EcsFargateSandboxService implements SandboxService {
     int memory = config.getInt("sandbox.ecs.task_memory");
     String execRoleArn = config.getString("sandbox.ecs.execution_role");
     String taskRoleArn = config.getString("sandbox.ecs.task_role");
-    String sandboxUrl = config.getString("sandbox.url");
+    String sandboxUrl = instance.getUrl(); // already computed as https://{slug}.sandbox.civiform.dev
 
     String jdbcUrl = String.format(
         "jdbc:postgresql://%s:%d/%s?currentSchema=%s",
@@ -318,10 +340,10 @@ public class EcsFargateSandboxService implements SandboxService {
                 envVar("IDCS_SECRET", "idcs-fake-oidc-secret"),
                 envVar("IDCS_DISCOVERY_URI",
                     "https://dev-oidc.sandbox.civiform.dev/.well-known/openid-configuration"),
-                // City branding — URL is fixed but header still shows city name
+                // City branding — shows city name in CiviForm header
                 envVar("WHITELABEL_CIVIC_ENTITY_SHORT_NAME", instance.getName()),
                 envVar("WHITELABEL_CIVIC_ENTITY_LONG_NAME", instance.getName()),
-                // Fixed shared URL for all sandboxes
+                // Per-sandbox URL — each sandbox has its own subdomain
                 envVar("BASE_URL", sandboxUrl),
                 envVar("STAGING_HOSTNAME", sandboxUrl.replace("https://", "")),
                 envVar("PORT", "9000"))
@@ -408,33 +430,41 @@ public class EcsFargateSandboxService implements SandboxService {
     throw new RuntimeException("Timed out waiting for ECS task private IP");
   }
 
-  // ── ALB Target Group — shared, single fixed URL ────────────────────────────
+  // ── ALB: Per-sandbox target group + listener rule ─────────────────────────
 
   /**
-   * Deregisters all current targets from the shared target group, then registers
-   * the new task's private IP. This atomically swaps the active sandbox.
+   * Creates a dedicated target group for this sandbox. Named {@code civiform-sb-{id}} (max 32 chars).
+   *
+   * @return the ARN of the new target group
    */
-  private void registerInTargetGroup(String privateIp) {
-    String targetGroupArn = config.getString("sandbox.alb.target_group");
+  private String createTargetGroup(String id) {
+    String vpcId = config.getString("sandbox.vpc_id"); // needed for TG creation
+    // TG name max 32 chars: "civiform-sb-" (12) + 8-char sandbox id suffix
+    String tgName = "civiform-sb-" + id.replace("sb-", "");
 
-    // Deregister any existing targets first
-    var healthResp = elb().describeTargetHealth(
-        DescribeTargetHealthRequest.builder().targetGroupArn(targetGroupArn).build());
-    if (!healthResp.targetHealthDescriptions().isEmpty()) {
-      var oldTargets = healthResp.targetHealthDescriptions().stream()
-          .map(t -> TargetDescription.builder()
-              .id(t.target().id())
-              .port(t.target().port())
-              .build())
-          .toList();
-      elb().deregisterTargets(DeregisterTargetsRequest.builder()
-          .targetGroupArn(targetGroupArn)
-          .targets(oldTargets)
-          .build());
-      logger.info("Deregistered {} old target(s) from shared target group", oldTargets.size());
-    }
+    CreateTargetGroupResponse resp = elb().createTargetGroup(
+        CreateTargetGroupRequest.builder()
+            .name(tgName)
+            .protocol(Protocol.HTTP)
+            .port(9000)
+            .vpcId(vpcId)
+            .targetType(TargetType.IP)
+            .ipAddressType(IpAddressType.IPV4)
+            .healthCheckPath("/health")
+            .healthCheckProtocol(Protocol.HTTP)
+            .matcher(Matcher.builder().httpCode("200").build())
+            .healthyThresholdCount(2)
+            .unhealthyThresholdCount(3)
+            .healthCheckIntervalSeconds(15)
+            .build());
 
-    // Register new task
+    return resp.targetGroups().get(0).targetGroupArn();
+  }
+
+  /**
+   * Registers the ECS task's private IP in the sandbox's dedicated target group.
+   */
+  private void registerInTargetGroup(String targetGroupArn, String privateIp) {
     elb().registerTargets(
         RegisterTargetsRequest.builder()
             .targetGroupArn(targetGroupArn)
@@ -443,27 +473,72 @@ public class EcsFargateSandboxService implements SandboxService {
   }
 
   /**
-   * Finds and stops any currently RUNNING sandbox's ECS task before launching a new one.
-   * Single-URL design means only one sandbox is active at a time.
+   * Creates an ALB listener rule on the shared HTTPS listener that routes
+   * {@code {slug}.sandbox.civiform.dev} to this sandbox's target group.
+   *
+   * <p>Priority is assigned by scanning existing rules and using the next available slot
+   * starting from {@link #LISTENER_RULE_PRIORITY_BASE}.
+   *
+   * @return the ARN of the created listener rule
    */
-  private void stopPreviousActiveTask() {
-    repository.listAll().thenAccept(sandboxes ->
-        sandboxes.stream()
-            .filter(s -> s.getStatus() == SandboxStatus.RUNNING && s.getContainerID() != null)
-            .forEach(s -> {
-              try {
-                ecs().stopTask(StopTaskRequest.builder()
-                    .cluster(config.getString("sandbox.ecs.cluster"))
-                    .task(s.getContainerID())
-                    .reason("Replaced by new sandbox")
-                    .build());
-                updateStatus(s.getId(), SandboxStatus.STOPPED, s.getContainerID());
-                logger.info("Stopped previous active sandbox task: {}", s.getContainerID());
-              } catch (Exception e) {
-                logger.warn("Could not stop previous task {}: {}", s.getContainerID(), e.getMessage());
-              }
-            })
-    ).toCompletableFuture().join();
+  private String createListenerRule(String id, String slug, String targetGroupArn) {
+    String listenerArn = config.getString("sandbox.alb.listener_arn");
+    String domain = config.getString("sandbox.domain");
+    String hostHeader = slug + "." + domain;
+
+    int priority = nextAvailableRulePriority(listenerArn);
+
+    var response = elb().createRule(
+        CreateRuleRequest.builder()
+            .listenerArn(listenerArn)
+            .priority(priority)
+            .conditions(
+                Condition.builder()
+                    .field("host-header")
+                    .hostHeaderConfig(
+                        HostHeaderConditionConfig.builder()
+                            .values(hostHeader)
+                            .build())
+                    .build())
+            .actions(
+                Action.builder()
+                    .type(ActionTypeEnum.FORWARD)
+                    .forwardConfig(
+                        ForwardActionConfig.builder()
+                            .targetGroups(
+                                TargetGroupTuple.builder()
+                                    .targetGroupArn(targetGroupArn)
+                                    .build())
+                            .build())
+                    .build())
+            .tags(
+                software.amazon.awssdk.services.elasticloadbalancingv2.model.Tag.builder()
+                    .key("SandboxId").value(id).build())
+            .build());
+
+    return response.rules().get(0).ruleArn();
+  }
+
+  /** Returns the next unused listener rule priority >= {@link #LISTENER_RULE_PRIORITY_BASE}. */
+  private int nextAvailableRulePriority(String listenerArn) {
+    var existingRules = elb().describeRules(
+        DescribeRulesRequest.builder().listenerArn(listenerArn).build()).rules();
+
+    java.util.Set<Integer> usedPriorities = new java.util.HashSet<>();
+    for (Rule rule : existingRules) {
+      try {
+        if (!"default".equals(rule.priority())) {
+          usedPriorities.add(Integer.parseInt(rule.priority()));
+        }
+      } catch (NumberFormatException ignored) {
+      }
+    }
+
+    int priority = LISTENER_RULE_PRIORITY_BASE;
+    while (usedPriorities.contains(priority)) {
+      priority++;
+    }
+    return priority;
   }
 
   // ── Teardown ─────────────────────────────────────────────────────────────────
@@ -482,17 +557,36 @@ public class EcsFargateSandboxService implements SandboxService {
         logger.info("[{}] ECS task stopped", id);
       }
 
-      // Deregister from shared target group
-      String targetGroupArn = config.getString("sandbox.alb.target_group");
-      var healthResp = elb().describeTargetHealth(
-          DescribeTargetHealthRequest.builder().targetGroupArn(targetGroupArn).build());
-      if (!healthResp.targetHealthDescriptions().isEmpty()) {
-        elb().deregisterTargets(DeregisterTargetsRequest.builder()
-            .targetGroupArn(targetGroupArn)
-            .targets(healthResp.targetHealthDescriptions().stream()
-                .map(t -> TargetDescription.builder().id(t.target().id()).port(t.target().port()).build())
-                .toList())
+      // Delete ALB listener rule
+      if (instance.getListenerRuleArn() != null) {
+        elb().deleteRule(DeleteRuleRequest.builder()
+            .ruleArn(instance.getListenerRuleArn())
             .build());
+        logger.info("[{}] Listener rule deleted", id);
+      }
+
+      // Deregister from target group and delete it
+      if (instance.getTargetGroupArn() != null) {
+        try {
+          var healthResp = elb().describeTargetHealth(
+              DescribeTargetHealthRequest.builder()
+                  .targetGroupArn(instance.getTargetGroupArn()).build());
+          if (!healthResp.targetHealthDescriptions().isEmpty()) {
+            elb().deregisterTargets(DeregisterTargetsRequest.builder()
+                .targetGroupArn(instance.getTargetGroupArn())
+                .targets(healthResp.targetHealthDescriptions().stream()
+                    .map(t -> TargetDescription.builder()
+                        .id(t.target().id()).port(t.target().port()).build())
+                    .toList())
+                .build());
+          }
+        } catch (Exception e) {
+          logger.warn("[{}] Could not deregister from TG: {}", id, e.getMessage());
+        }
+        elb().deleteTargetGroup(DeleteTargetGroupRequest.builder()
+            .targetGroupArn(instance.getTargetGroupArn())
+            .build());
+        logger.info("[{}] Target group deleted", id);
       }
 
       // Drop Postgres schema
@@ -506,12 +600,12 @@ public class EcsFargateSandboxService implements SandboxService {
       deleteSecret("civiform-sandbox_" + id + "_app_secret_key");
       logger.info("[{}] Secrets deleted", id);
 
-      updateStatus(id, SandboxStatus.DESTROYED, null);
+      updateStatus(id, SandboxStatus.DESTROYED, null, null, null);
       logger.info("[{}] Teardown complete", id);
 
     } catch (Exception e) {
       logger.error("[{}] Teardown failed: {}", id, e.getMessage(), e);
-      updateStatus(id, SandboxStatus.FAILED, null);
+      updateStatus(id, SandboxStatus.FAILED, null, null, null);
     }
   }
 
@@ -567,6 +661,27 @@ public class EcsFargateSandboxService implements SandboxService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Converts a city name to a URL-safe slug.
+   *
+   * <p>Examples:
+   * <ul>
+   *   <li>"Burlington, VT" → "burlington-vt"
+   *   <li>"San Francisco, CA" → "san-francisco-ca"
+   *   <li>"St. Louis, MO" → "st-louis-mo"
+   * </ul>
+   */
+  static String toSlug(String cityName) {
+    // Normalize accents and decompose (é → e + combining accent)
+    String normalized = Normalizer.normalize(cityName, Normalizer.Form.NFD);
+    return normalized
+        .toLowerCase()
+        .replaceAll("[^a-z0-9\\s-]", "") // strip non-alphanumeric except spaces/hyphens
+        .trim()
+        .replaceAll("\\s+", "-")         // spaces → hyphens
+        .replaceAll("-+", "-");           // collapse consecutive hyphens
+  }
+
   private static String generatePin() {
     return String.format("%06d", new SecureRandom().nextInt(1_000_000));
   }
@@ -589,7 +704,8 @@ public class EcsFargateSandboxService implements SandboxService {
     return KeyValuePair.builder().name(name).value(value).build();
   }
 
-  private void updateStatus(String id, SandboxStatus status, String taskArn) {
+  private void updateStatus(
+      String id, SandboxStatus status, String taskArn, String targetGroupArn, String ruleArn) {
     repository.findById(id).thenCompose(maybeInstance -> {
       if (maybeInstance.isEmpty()) return CompletableFuture.completedFuture(null);
       SandboxInstance updated = SandboxInstance.builder()
@@ -602,6 +718,8 @@ public class EcsFargateSandboxService implements SandboxService {
           .notes(maybeInstance.get().getNotes())
           .pin(maybeInstance.get().getPin())
           .containerID(taskArn != null ? taskArn : maybeInstance.get().getContainerID())
+          .targetGroupArn(targetGroupArn != null ? targetGroupArn : maybeInstance.get().getTargetGroupArn())
+          .listenerRuleArn(ruleArn != null ? ruleArn : maybeInstance.get().getListenerRuleArn())
           .hostPort(maybeInstance.get().getHostPort())
           .createdAt(maybeInstance.get().getCreatedAt())
           .expiresAt(maybeInstance.get().getExpiresAt())
