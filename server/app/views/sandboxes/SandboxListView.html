@@ -6,12 +6,12 @@
     <div>
       <h1 class="text-3xl font-bold text-gray-900">CiviForm Demo Portal</h1>
     </div>
-    <a href="/sandboxes/new" class="usa-button flex items-center gap-2 w-fit">
+    <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
       <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
         <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
       </svg>
       Create new demo
-    </a>
+    </button>
   </div>
 
   <!-- Flash: success (create / extend) -->
@@ -272,6 +272,288 @@
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- ── Create Modal (3-step wizard) ──────────────────────────────────── -->
+  <div id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title"
+       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4 py-8">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col max-h-full overflow-y-auto">
+      <!-- Close X -->
+      <button onclick="closeModal('create-modal')" aria-label="Close"
+              class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+
+      <div class="px-6 pt-6 pb-6">
+        <h2 id="create-modal-title" class="text-xl font-bold text-gray-900 mb-1">Create New Demo</h2>
+        <p class="text-sm text-gray-500 mb-6">Spin up an isolated CiviForm instance. Live in under 30 minutes.</p>
+
+        <!-- Step Indicator -->
+        <div class="mb-6" aria-label="Form progress" role="navigation">
+          <ol class="flex items-center gap-0" id="create-step-indicator">
+            <!-- Step 1 -->
+            <li class="flex items-center flex-1" id="create-step-ind-1">
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span
+                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white"
+                  aria-current="step"
+                  >1</span
+                >
+                <span
+                  class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
+                  >Civic Entity</span
+                >
+              </div>
+              <div
+                class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
+                id="create-connector-1-2"
+              ></div>
+            </li>
+
+            <!-- Step 2 -->
+            <li class="flex items-center flex-1" id="create-step-ind-2">
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span
+                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
+                  >2</span
+                >
+                <span
+                  class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+                  >AWS Setup</span
+                >
+              </div>
+              <div
+                class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
+                id="create-connector-2-3"
+              ></div>
+            </li>
+
+            <!-- Step 3 -->
+            <li class="flex items-center" id="create-step-ind-3">
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span
+                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
+                  >3</span
+                >
+                <span
+                  class="step-label text-sm font-medium text-gray-400 hidden sm:block"
+                  >Program Setup</span
+                >
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <!-- Inline validation error -->
+        <div
+          id="create-wizard-error"
+          role="alert"
+          aria-live="polite"
+          class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+        ></div>
+
+        <!-- Wizard Form -->
+        <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
+
+          <!-- Step 1: Civic Entity -->
+          <div id="create-step-panel-1" class="wizard-panel">
+            <!-- City / Civic Entity Name -->
+            <div class="usa-form-group mb-5" id="fg-cityName">
+              <label for="cityName" class="usa-label font-semibold">
+                City / Civic entity name
+                <span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="cityName"
+                name="cityName"
+                type="text"
+                class="usa-input"
+                placeholder="e.g. Bloomington"
+                autocomplete="off"
+                aria-required="true"
+              />
+            </div>
+
+            <!-- Expiration Days -->
+            <div class="usa-form-group mb-6" id="fg-expirationDays">
+              <label for="expirationDays" class="usa-label font-semibold">
+                Expiration (days)
+              </label>
+              <input
+                id="expirationDays"
+                name="expirationDays"
+                type="number"
+                class="usa-input"
+                value="30"
+                min="1"
+                max="365"
+                aria-label="Demo expiration in days"
+              />
+            </div>
+
+            <!-- Step 1 footer -->
+            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+              <a href="#" onclick="closeModal('create-modal'); return false;"
+                 class="text-sm text-gray-500 hover:text-gray-800 no-underline">Cancel</a>
+              <button
+                type="button"
+                class="usa-button px-8"
+                onclick="wizardNext(1)"
+                aria-label="Continue to Step 2: AWS Setup"
+              >
+                Next &#x2192;
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: AWS Setup -->
+          <div id="create-step-panel-2" class="wizard-panel hidden">
+            <!-- Admin Notification Email -->
+            <div class="usa-form-group mb-5" id="fg-adminEmail">
+              <label for="adminEmail" class="usa-label font-semibold">
+                Admin Notification Email
+                <span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="adminEmail"
+                name="adminEmail"
+                type="email"
+                class="usa-input"
+                placeholder="e.g. civiform-dev@exygy.com"
+                autocomplete="email"
+                aria-required="true"
+              />
+            </div>
+
+            <!-- Subdomain -->
+            <div class="usa-form-group mb-5" id="fg-subdomain">
+              <label for="subdomain" class="usa-label font-semibold">
+                Demo instance subdomain
+                <span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <p class="usa-hint text-xs text-gray-500 mt-0.5 mb-1">Auto-filled from city name — editable.</p>
+              <div class="flex items-center gap-0">
+                <input
+                  id="subdomain"
+                  name="subdomain"
+                  type="text"
+                  class="usa-input rounded-r-none"
+                  placeholder="e.g. bloomington"
+                  autocomplete="off"
+                  aria-required="true"
+                />
+                <span class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap">.sandbox.civiform.dev</span>
+              </div>
+            </div>
+
+            <!-- PIN -->
+            <div class="usa-form-group mb-5" id="fg-pin">
+              <label for="pin" class="usa-label font-semibold">
+                Demo instance access PIN
+                <span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="pin"
+                name="pin"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                class="usa-input"
+                placeholder="e.g. 123456"
+                autocomplete="off"
+                aria-required="true"
+              />
+            </div>
+
+            <!-- Google Analytics ID (optional) -->
+            <div class="usa-form-group mb-6" id="fg-googleAnalyticsId">
+              <label for="googleAnalyticsId" class="usa-label font-semibold">
+                Google Analytics ID <span class="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="googleAnalyticsId"
+                name="googleAnalyticsId"
+                type="text"
+                class="usa-input"
+                placeholder="G-ABC123XYZ"
+                autocomplete="off"
+              />
+            </div>
+
+            <!-- Step 2 footer -->
+            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
+                onclick="wizardBack(2)"
+                aria-label="Back to Step 1: Civic Entity"
+              >
+                &#x2190; Back
+              </button>
+              <button
+                type="button"
+                class="usa-button px-8"
+                onclick="wizardNext(2)"
+                aria-label="Continue to Step 3: Program Setup"
+              >
+                Next &#x2192;
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: Program Setup -->
+          <div id="create-step-panel-3" class="wizard-panel hidden">
+            <!-- Pre-loaded programs info block -->
+            <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+              <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true">&#x2139;</span>
+              <p class="text-sm text-blue-800 leading-relaxed">
+                Demos are pre-loaded with a generic set of programs designed to
+                demonstrate the range of CiviForm features for different user roles.
+              </p>
+            </div>
+
+            <!-- Import from PDF (stub, disabled) -->
+            <div class="mb-6">
+              <button type="button" disabled aria-disabled="true"
+                      class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed">
+                Import from PDF
+              </button>
+            </div>
+
+            <!--
+              Hidden inputs carry Step 1 + Step 2 values into the POST when the user is
+              on Step 3 and the live inputs in earlier panels are disabled.
+              JS keeps these in sync on every keystroke.
+            -->
+            <input type="hidden" id="hidden-cityName"          name="cityName"          value="" />
+            <input type="hidden" id="hidden-adminEmail"        name="adminEmail"        value="" />
+            <input type="hidden" id="hidden-subdomain"         name="subdomain"         value="" />
+            <input type="hidden" id="hidden-pin"               name="pin"               value="" />
+            <input type="hidden" id="hidden-expirationDays"    name="expirationDays"    value="30" />
+            <input type="hidden" id="hidden-googleAnalyticsId" name="googleAnalyticsId" value="" />
+
+            <!-- Step 3 footer -->
+            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
+                onclick="wizardBack(3)"
+                aria-label="Back to Step 2: AWS Setup"
+              >
+                &#x2190; Back
+              </button>
+              <button
+                type="submit"
+                class="usa-button px-8"
+                aria-label="Provision demo"
+                onclick="syncHiddenInputs()"
+              >
+                Provision demo &#x2192;
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- ── Info Modal ──────────────────────────────────────────────────────── -->
@@ -557,6 +839,10 @@
           document.removeEventListener('keydown', onEsc)
         }
       })
+      // reset wizard when opening create-modal
+      if (id === 'create-modal') {
+        createWizardReset()
+      }
     }
 
     function closeModal(id) {
@@ -587,5 +873,247 @@
         setTimeout(() => (btn.textContent = 'Copy All'), 1800)
       })
     }
+  </script>
+
+  <!-- ── Create Wizard JS ────────────────────────────────────────────────── -->
+  <script>
+    ;(function () {
+      'use strict'
+
+      var TOTAL_STEPS = 3
+      var subdomainDirty = false
+
+      // Convert a city name string to a URL-safe slug
+      function toSlug(str) {
+        return str
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      }
+
+      // Auto-fill subdomain from cityName if subdomain hasn't been manually edited
+      var cityNameEl = document.getElementById('cityName')
+      var subdomainEl = document.getElementById('subdomain')
+
+      if (cityNameEl) {
+        cityNameEl.addEventListener('input', function () {
+          if (!subdomainDirty && subdomainEl) {
+            subdomainEl.value = toSlug(cityNameEl.value)
+          }
+          syncHiddenInputs()
+        })
+      }
+
+      if (subdomainEl) {
+        subdomainEl.addEventListener('input', function () {
+          subdomainDirty = subdomainEl.value.length > 0
+          syncHiddenInputs()
+        })
+      }
+
+      ;['adminEmail', 'pin', 'expirationDays', 'googleAnalyticsId'].forEach(function (id) {
+        var el = document.getElementById(id)
+        if (el) el.addEventListener('input', syncHiddenInputs)
+      })
+
+      // Mirror live inputs into hidden inputs for the Step 3 POST
+      window.syncHiddenInputs = function () {
+        function val(id) {
+          var el = document.getElementById(id)
+          return el ? (el.value || '').trim() : ''
+        }
+        document.getElementById('hidden-cityName').value          = val('cityName')
+        document.getElementById('hidden-adminEmail').value        = val('adminEmail')
+        document.getElementById('hidden-subdomain').value         = val('subdomain')
+        document.getElementById('hidden-pin').value               = val('pin')
+        document.getElementById('hidden-expirationDays').value    = val('expirationDays') || '30'
+        document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
+      }
+
+      // Update step indicator circles, labels, and connector lines
+      function showStep(targetStep) {
+        for (var i = 1; i <= TOTAL_STEPS; i++) {
+          var panel = document.getElementById('create-step-panel-' + i)
+          if (panel) {
+            if (i === targetStep) {
+              panel.classList.remove('hidden')
+            } else {
+              panel.classList.add('hidden')
+            }
+          }
+        }
+        for (var s = 1; s <= TOTAL_STEPS; s++) {
+          var circle = document.querySelector('#create-step-ind-' + s + ' .step-circle')
+          var label  = document.querySelector('#create-step-ind-' + s + ' .step-label')
+          if (!circle) continue
+          if (s < targetStep) {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
+            circle.textContent = '\u2713'
+            circle.removeAttribute('aria-current')
+            if (label)
+              label.className =
+                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+          } else if (s === targetStep) {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
+            circle.textContent = String(s)
+            circle.setAttribute('aria-current', 'step')
+            if (label)
+              label.className =
+                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
+          } else {
+            circle.className =
+              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400'
+            circle.textContent = String(s)
+            circle.removeAttribute('aria-current')
+            if (label)
+              label.className =
+                'step-label text-sm font-medium text-gray-400 hidden sm:block'
+          }
+        }
+        var c12 = document.getElementById('create-connector-1-2')
+        var c23 = document.getElementById('create-connector-2-3')
+        if (c12)
+          c12.className =
+            'step-connector flex-1 h-0.5 mx-3 ' +
+            (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200')
+        if (c23)
+          c23.className =
+            'step-connector flex-1 h-0.5 mx-3 ' +
+            (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200')
+      }
+
+      function showError(msg) {
+        var el = document.getElementById('create-wizard-error')
+        el.textContent = msg
+        el.classList.remove('hidden')
+      }
+
+      function clearError() {
+        var el = document.getElementById('create-wizard-error')
+        el.textContent = ''
+        el.classList.add('hidden')
+      }
+
+      function markFieldError(fieldId, hasError) {
+        var input = document.getElementById(fieldId)
+        var fg    = document.getElementById('fg-' + fieldId)
+        if (!input) return
+        if (hasError) {
+          input.classList.add('border-red-500')
+          input.setAttribute('aria-invalid', 'true')
+          if (fg) fg.classList.add('usa-form-group--error')
+        } else {
+          input.classList.remove('border-red-500')
+          input.removeAttribute('aria-invalid')
+          if (fg) fg.classList.remove('usa-form-group--error')
+        }
+      }
+
+      function validateStep1() {
+        var cityVal = (document.getElementById('cityName').value || '').trim()
+        var daysVal = parseInt(document.getElementById('expirationDays').value, 10)
+        var cityOk  = cityVal.length > 0
+        var daysOk  = !isNaN(daysVal) && daysVal > 0
+        markFieldError('cityName', !cityOk)
+        markFieldError('expirationDays', !daysOk)
+        if (!cityOk) {
+          showError('City / Civic entity name is required.')
+          return false
+        }
+        if (!daysOk) {
+          showError('Expiration must be at least 1 day.')
+          return false
+        }
+        return true
+      }
+
+      function validateStep2() {
+        var emailVal  = (document.getElementById('adminEmail').value || '').trim()
+        var subVal    = (document.getElementById('subdomain').value || '').trim()
+        var pinVal    = (document.getElementById('pin').value || '').trim()
+        var emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var pinRe     = /^[0-9]{6}$/
+
+        var emailOk = emailVal.length > 0 && emailRe.test(emailVal)
+        var subOk   = subVal.length > 0
+        var pinOk   = pinRe.test(pinVal)
+
+        markFieldError('adminEmail', !emailOk)
+        markFieldError('subdomain',  !subOk)
+        markFieldError('pin',        !pinOk)
+
+        if (!emailOk) {
+          showError(emailVal.length === 0 ? 'Admin Notification Email is required.' : 'Please enter a valid email address.')
+          return false
+        }
+        if (!subOk) {
+          showError('Demo instance subdomain is required.')
+          return false
+        }
+        if (!pinOk) {
+          showError('Access PIN must be exactly 6 digits.')
+          return false
+        }
+        return true
+      }
+
+      function setStepInputsDisabled(stepNum, disabled) {
+        var panel = document.getElementById('create-step-panel-' + stepNum)
+        if (!panel) return
+        panel
+          .querySelectorAll('input:not([type=hidden]), textarea, select')
+          .forEach(function (el) {
+            el.disabled = disabled
+          })
+      }
+
+      window.wizardNext = function (currentStep) {
+        clearError()
+        if (currentStep === 1 && !validateStep1()) {
+          document.getElementById('cityName').focus()
+          return
+        }
+        if (currentStep === 2 && !validateStep2()) {
+          document.getElementById('adminEmail').focus()
+          return
+        }
+        var nextStep = currentStep + 1
+        if (nextStep > TOTAL_STEPS) return
+        syncHiddenInputs()
+        setStepInputsDisabled(currentStep, true)
+        setStepInputsDisabled(nextStep, false)
+        showStep(nextStep)
+      }
+
+      window.wizardBack = function (currentStep) {
+        clearError()
+        var prevStep = currentStep - 1
+        if (prevStep < 1) return
+        setStepInputsDisabled(prevStep, false)
+        setStepInputsDisabled(currentStep, true)
+        showStep(prevStep)
+      }
+
+      // Reset wizard to step 1 (called whenever the create-modal opens)
+      window.createWizardReset = function () {
+        subdomainDirty = false
+        clearError()
+        // Re-enable all panels' inputs before clearing
+        for (var i = 1; i <= TOTAL_STEPS; i++) {
+          setStepInputsDisabled(i, false)
+        }
+        // Clear all field values
+        ;['cityName', 'adminEmail', 'subdomain', 'pin', 'googleAnalyticsId'].forEach(function (id) {
+          var el = document.getElementById(id)
+          if (el) el.value = ''
+        })
+        var daysEl = document.getElementById('expirationDays')
+        if (daysEl) daysEl.value = '30'
+        syncHiddenInputs()
+        showStep(1)
+      }
+    })()
   </script>
 </div>
