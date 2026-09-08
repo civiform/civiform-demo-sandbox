@@ -392,13 +392,28 @@ public class SandboxControllerTest extends WithApplication {
   // ── GET /sandboxes — list ─────────────────────────────────────────────────
 
   @Test
-  public void index_returnsHtmlListPage() {
+  public void index_withoutAuth_redirectsToLogin() {
+    // No portal session → must redirect to /login, not render the dashboard
+    Http.RequestBuilder request = Helpers.fakeRequest()
+        .method("GET")
+        .uri("/sandboxes");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).isPresent();
+    assertThat(result.redirectLocation().get()).isEqualTo("/login");
+  }
+
+  @Test
+  public void index_withAuth_returnsHtmlListPage() {
     when(sandboxService.listSandboxes())
         .thenReturn(CompletableFuture.completedFuture(ImmutableList.of()));
 
     Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
-        .uri("/sandboxes");
+        .uri("/sandboxes")
+        .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -406,13 +421,14 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
-  public void index_jsonRequest_returnsJson() {
+  public void index_withAuth_jsonRequest_returnsJson() {
     when(sandboxService.listSandboxes())
         .thenReturn(CompletableFuture.completedFuture(ImmutableList.of()));
 
     Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
         .uri("/sandboxes")
+        .session(AuthController.SESSION_KEY, "true")
         .header("Accept", "application/json");
 
     Result result = Helpers.route(app, request);

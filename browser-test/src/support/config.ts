@@ -6,3 +6,7 @@ export const SEEDED_SANDBOX_ID = 'sb-demo0001'
 
 /** The PIN for the seeded demo sandbox. */
 export const SEEDED_SANDBOX_PIN = '482917'
+
+/** Portal admin credentials (MVP: single shared account). */
+export const PORTAL_EMAIL = 'admin@civiform.dev'
+export const PORTAL_PASSWORD = process.env.DEMO_PORTAL_PASSWORD ?? 'test-secret-pw'

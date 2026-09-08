@@ -11,10 +11,11 @@
  */
 
 import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility} from '../support'
+import {validateScreenshot, validateAccessibility, loginAsAdmin} from '../support'
 
 test.describe('Sandbox Dashboard', () => {
   test.beforeEach(async ({page}) => {
+    await loginAsAdmin(page)
     await page.goto('/sandboxes')
     // Wait for the table to be present (InMemorySandboxService seeds at least 1 row)
     await page.waitForSelector('table')

@@ -11,6 +11,7 @@
 
 import {expect, Page} from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import {PORTAL_EMAIL, PORTAL_PASSWORD} from './config'
 
 /**
  * Takes a screenshot of the full page (or a specific locator) and compares it
@@ -56,6 +57,20 @@ export async function validateAccessibility(
  */
 export async function waitForPath(page: Page, pathFragment: string): Promise<void> {
   await page.waitForURL(`**${pathFragment}**`)
+}
+
+/**
+ * Logs into the portal as the shared admin account.
+ * Call this at the start of any test that requires portal auth.
+ */
+export async function loginAsAdmin(page: Page): Promise<void> {
+  await page.goto('/login')
+  await page.waitForSelector('input[name="email"]')
+  await page.fill('input[name="email"]', PORTAL_EMAIL)
+  await page.fill('input[name="password"]', PORTAL_PASSWORD)
+  await page.click('button[type="submit"]')
+  // Wait until we're redirected to /sandboxes
+  await page.waitForURL('**/sandboxes**')
 }
 
 /**
