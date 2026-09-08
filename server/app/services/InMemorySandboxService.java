@@ -35,7 +35,7 @@ public class InMemorySandboxService implements SandboxService {
             .cityName("Burlington, VT")
             .civiformVersion("v2.22.0")
             .status(SandboxStatus.RUNNING)
-            .url("https://demo.sandbox.civiform.dev")
+            .url("https://burlington-vt.sandbox.civiform.dev")
             .adminEmail("admin@civiform.dev")
             .notes("Default demo sandbox — seeded on startup")
             .pin("482917")
@@ -57,22 +57,24 @@ public class InMemorySandboxService implements SandboxService {
   }
 
   @Override
-  public CompletionStage<SandboxInstance> createSandbox(
-      String cityName, String version, String adminEmail, String notes) {
+  public CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request) {
     String id = "sb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    String subdomain = request.getSubdomain() != null ? request.getSubdomain() : "demo";
     SandboxInstance instance = SandboxInstance.builder()
         .id(id)
-        .cityName(cityName)
-        .civiformVersion(version != null && !version.isBlank() ? version : "latest")
+        .cityName(request.getCityName())
+        .subdomain(subdomain)
+        .civiformVersion("latest")
         .status(SandboxStatus.PROVISIONING) // stays PROVISIONING — real impl updates async
-        .url("http://localhost:10001")
-        .adminEmail(adminEmail != null ? adminEmail : "")
-        .notes(notes != null ? notes : "")
-        .pin(String.format("%06d", (int) (Math.random() * 1_000_000)))
+        .url("https://" + subdomain + ".sandbox.civiform.dev")
+        .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
+        .pin(request.getPin() != null ? request.getPin() : "000000")
+        .googleAnalyticsId(request.getGoogleAnalyticsId())
+        .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
         .hostPort(10001)
         .schemaName("sandbox_" + id.replace("-", "_"))
         .createdAt(Instant.now())
-        .expiresAt(Instant.now().plus(Duration.ofDays(30)))
+        .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
         .build();
     sandboxes.put(id, instance);
     return CompletableFuture.completedFuture(instance);

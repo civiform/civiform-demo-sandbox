@@ -110,42 +110,56 @@ public class DockerSandboxServiceTest {
 
   // ── createSandbox() ────────────────────────────────────────────────────────
 
+  /** Builds a minimal CreateSandboxRequest for tests. */
+  private static services.CreateSandboxRequest makeRequest(String cityName) {
+    return services.CreateSandboxRequest.builder()
+        .cityName(cityName)
+        .subdomain(cityName.toLowerCase().replaceAll("[^a-z0-9]+", "-"))
+        .pin("482917")
+        .adminEmail("")
+        .expirationDays(30)
+        .build();
+  }
+
   @Test
   public void createSandbox_returnsProvisioningStatusImmediately()
       throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service
-            .createSandbox("Burlington, VT", "latest", "admin@test.com", "")
-            .toCompletableFuture()
-            .get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     assertThat(result.getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
   }
 
   @Test
-  public void createSandbox_pinIsExactlySixDigits()
+  public void createSandbox_storesSuppliedPin()
       throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
-    assertThat(result.getPin()).isNotNull();
-    assertThat(result.getPin()).hasSize(6);
-    assertThat(result.getPin()).matches("\\d{6}");
+    // PIN is set by the caller — verify it is stored as-is
+    assertThat(result.getPin()).isEqualTo("482917");
   }
 
   @Test
-  public void createSandbox_pinIsNumericOnly() throws ExecutionException, InterruptedException {
-    // Run 20 times to catch any non-numeric output from SecureRandom formatting
+  public void createSandbox_storesSubdomain()
+      throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
-    for (int i = 0; i < 20; i++) {
-      SandboxInstance result =
-          service.createSandbox("Test City", "latest", "", "").toCompletableFuture().get();
-      assertThat(result.getPin()).matches("\\d{6}");
-    }
+
+    services.CreateSandboxRequest request = services.CreateSandboxRequest.builder()
+        .cityName("Burlington, VT")
+        .subdomain("burlington-vt")
+        .pin("482917")
+        .adminEmail("")
+        .expirationDays(30)
+        .build();
+
+    SandboxInstance result = service.createSandbox(request).toCompletableFuture().get();
+
+    assertThat(result.getSubdomain()).isEqualTo("burlington-vt");
   }
 
   @Test
@@ -153,7 +167,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     assertThat(result.getCityName()).isEqualTo("Burlington, VT");
   }
@@ -164,7 +178,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     assertThat(result.getSchemaName()).startsWith("sandbox_");
     assertThat(result.getHostPort()).isGreaterThanOrEqualTo(10000);
@@ -176,7 +190,7 @@ public class DockerSandboxServiceTest {
       throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
-    service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+    service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     // repository.save() must be called synchronously before the future completes
     verify(repository).save(any(SandboxInstance.class));
@@ -188,7 +202,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     assertThat(result.getId()).startsWith("sb-");
   }
@@ -199,10 +213,29 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
-        service.createSandbox("Burlington, VT", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
     Duration lifetime = Duration.between(result.getCreatedAt(), result.getExpiresAt());
     assertThat(lifetime.toDays()).isEqualTo(30);
+  }
+
+  @Test
+  public void createSandbox_customExpirationDays()
+      throws ExecutionException, InterruptedException {
+    stubSuccessfulContainerLaunch("container-abc");
+
+    services.CreateSandboxRequest request = services.CreateSandboxRequest.builder()
+        .cityName("Test City")
+        .subdomain("test-city")
+        .pin("000000")
+        .adminEmail("")
+        .expirationDays(14)
+        .build();
+
+    SandboxInstance result = service.createSandbox(request).toCompletableFuture().get();
+
+    Duration lifetime = Duration.between(result.getCreatedAt(), result.getExpiresAt());
+    assertThat(lifetime.toDays()).isEqualTo(14);
   }
 
   // ── concurrent port allocation (thread-safety) ────────────────────────────
@@ -217,7 +250,7 @@ public class DockerSandboxServiceTest {
 
     List<CompletableFuture<SandboxInstance>> futures = new ArrayList<>();
     for (int i = 0; i < concurrency; i++) {
-      futures.add(service.createSandbox("City " + i, "latest", "", "").toCompletableFuture());
+      futures.add(service.createSandbox(makeRequest("City " + i)).toCompletableFuture());
     }
 
     List<Integer> ports = new ArrayList<>();
@@ -381,7 +414,7 @@ public class DockerSandboxServiceTest {
     stubSuccessfulContainerLaunch("container-port-test");
 
     SandboxInstance result =
-        service.createSandbox("Portland, OR", "latest", "", "").toCompletableFuture().get();
+        service.createSandbox(makeRequest("Portland, OR")).toCompletableFuture().get();
 
     assertThat(result.getUrl()).contains("10042");
   }
