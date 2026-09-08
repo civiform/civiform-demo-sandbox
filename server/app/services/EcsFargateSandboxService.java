@@ -209,22 +209,10 @@ public class EcsFargateSandboxService implements SandboxService {
         .thenComposeAsync(
             maybeInstance -> {
               if (maybeInstance.isEmpty()) return CompletableFuture.completedFuture(Optional.empty());
-              SandboxInstance updated =
-                  SandboxInstance.builder()
-                      .id(maybeInstance.get().getId())
-                      .cityName(maybeInstance.get().getCityName())
-                      .civiformVersion(maybeInstance.get().getCiviformVersion())
-                      .status(maybeInstance.get().getStatus())
-                      .url(maybeInstance.get().getUrl())
-                      .adminEmail(maybeInstance.get().getAdminEmail())
-                      .notes(maybeInstance.get().getNotes())
-                      .pin(maybeInstance.get().getPin())
-                      .containerId(maybeInstance.get().getContainerId())
-                      .hostPort(maybeInstance.get().getHostPort())
-                      .createdAt(maybeInstance.get().getCreatedAt())
-                      .expiresAt(
-                          maybeInstance.get().getExpiresAt().plusSeconds((long) days * 24 * 3600))
-                      .build();
+              // toBuilder() carries over ALL fields — avoids silent omissions when new fields are added.
+              SandboxInstance updated = maybeInstance.get().toBuilder()
+                  .expiresAt(maybeInstance.get().getExpiresAt().plusSeconds((long) days * 24 * 3600))
+                  .build();
               return repository.save(updated).thenApply(Optional::of);
             });
   }

@@ -290,7 +290,6 @@ public class SandboxController extends Controller {
     });
   }
 
-  // (duplicate newSandbox and extend removed — see above for the canonical implementations)
 
   private boolean isJsonRequest(Http.Request request) {
     return request.accepts("application/json") && !request.accepts("text/html");
