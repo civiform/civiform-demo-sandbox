@@ -682,10 +682,6 @@ public class EcsFargateSandboxService implements SandboxService {
         .replaceAll("-+", "-");           // collapse consecutive hyphens
   }
 
-  private static String generatePin() {
-    return String.format("%06d", new SecureRandom().nextInt(1_000_000));
-  }
-
   private static String generateSecret(int length) {
     SecureRandom rng = new SecureRandom();
     byte[] bytes = new byte[length];

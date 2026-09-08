@@ -412,13 +412,11 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
-   * Polls CiviForm's /programs endpoint until it returns 200, or throws after max attempts. Uses
+   * Polls CiviForm's /health endpoint until it returns 200, or throws after max attempts. Uses
    * WSClient so the HTTP call is non-blocking relative to Play's pool.
    */
   private void waitForHealthy(String sandboxId, int hostPort) throws Exception {
-    // Use host.docker.internal to refer to the host machine from inside the container.
-    // There's no /health endpoint in CiviForm, so we use /programs instead.
-    String healthUrl = "http://host.docker.internal:" + hostPort + "/programs";
+    String healthUrl = "http://host.docker.internal:" + hostPort + "/health";
     for (int attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
       try {
         int status =
@@ -438,12 +436,6 @@ public class DockerSandboxService implements SandboxService {
       Thread.sleep(HEALTH_CHECK_INTERVAL_MS);
     }
     throw new RuntimeException("CiviForm container never became healthy for sandbox " + sandboxId);
-  }
-
-  /** Generates a cryptographically random 6-digit PIN. */
-  private String generatePin() {
-    SecureRandom rng = new SecureRandom();
-    return String.format("%06d", rng.nextInt(1_000_000));
   }
 
   /** Generates a cryptographically random alphanumeric secret of the given length. */

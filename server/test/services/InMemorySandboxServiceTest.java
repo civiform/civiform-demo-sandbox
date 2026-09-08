@@ -31,6 +31,7 @@ public class InMemorySandboxServiceTest {
   public void listSandboxes_returnsInitialDemoSandbox() throws ExecutionException, InterruptedException {
     var sandboxes = service.listSandboxes().toCompletableFuture().get();
     assertThat(sandboxes).isNotEmpty();
+    assertThat(sandboxes.get(0).getId()).isEqualTo("sb-demo0001");
     assertThat(sandboxes.get(0).getCityName()).isEqualTo("Burlington, VT");
     assertThat(sandboxes.get(0).getStatus()).isEqualTo(SandboxStatus.RUNNING);
   }
@@ -52,7 +53,7 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void deleteSandbox_removesInstance() throws ExecutionException, InterruptedException {
+  public void deleteSandbox_softDeletesInstance() throws ExecutionException, InterruptedException {
     SandboxInstance created = service.createSandbox(
         makeRequest("To Delete", "to-delete", "000000")
     ).toCompletableFuture().get();
@@ -60,8 +61,17 @@ public class InMemorySandboxServiceTest {
     Boolean deleted = service.deleteSandbox(created.getId()).toCompletableFuture().get();
     assertThat(deleted).isTrue();
 
+    // Soft-delete: sandbox still exists but has DELETED status and a deletedAt timestamp
     var retrieved = service.getSandbox(created.getId()).toCompletableFuture().get();
-    assertThat(retrieved).isEmpty();
+    assertThat(retrieved).isPresent();
+    assertThat(retrieved.get().getStatus()).isEqualTo(SandboxStatus.DELETED);
+    assertThat(retrieved.get().getDeletedAt()).isNotNull();
+  }
+
+  @Test
+  public void deleteSandbox_returnsFalseForMissingId() throws ExecutionException, InterruptedException {
+    Boolean deleted = service.deleteSandbox("does-not-exist").toCompletableFuture().get();
+    assertThat(deleted).isFalse();
   }
 }
 

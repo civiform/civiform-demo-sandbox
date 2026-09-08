@@ -66,40 +66,7 @@ public class SandboxController extends Controller {
    * Redirects back to the dashboard list with a flash banner (spec: "Demo provisioning initiated").
    */
   public CompletionStage<Result> create(Http.Request request) {
-    CreateSandboxRequest sandboxRequest;
-
-    if (request.hasBody() && request.body().asJson() != null) {
-      JsonNode json = request.body().asJson();
-      sandboxRequest = CreateSandboxRequest.builder()
-          .cityName(json.has("cityName")           ? json.get("cityName").asText()           : "Demo City")
-          .subdomain(json.has("subdomain")         ? json.get("subdomain").asText()          : "demo")
-          .pin(json.has("pin")                     ? json.get("pin").asText()                : "000000")
-          .adminEmail(json.has("adminEmail")       ? json.get("adminEmail").asText()         : "")
-          .expirationDays(json.has("expirationDays") ? json.get("expirationDays").asInt(30) : 30)
-          .googleAnalyticsId(json.has("googleAnalyticsId")   ? json.get("googleAnalyticsId").asText()  : null)
-          .googleAnalyticsUrl(json.has("googleAnalyticsUrl") ? json.get("googleAnalyticsUrl").asText() : null)
-          .build();
-    } else {
-      DynamicForm form = formFactory.form().bindFromRequest(request);
-      String gaId  = form.get("googleAnalyticsId");
-      String gaUrl = form.get("googleAnalyticsUrl");
-      String daysStr = form.get("expirationDays");
-      int expirationDays = 30;
-      try {
-        if (daysStr != null && !daysStr.isBlank()) expirationDays = Integer.parseInt(daysStr.trim());
-      } catch (NumberFormatException ignored) { /* keep default 30 */ }
-
-      sandboxRequest = CreateSandboxRequest.builder()
-          .cityName(orDefault(form.get("cityName"),   "Demo City"))
-          .subdomain(orDefault(form.get("subdomain"), "demo"))
-          .pin(orDefault(form.get("pin"),             "000000"))
-          .adminEmail(orDefault(form.get("adminEmail"), ""))
-          .expirationDays(expirationDays)
-          .googleAnalyticsId(gaId  != null && !gaId.isBlank()  ? gaId  : null)
-          .googleAnalyticsUrl(gaUrl != null && !gaUrl.isBlank() ? gaUrl : null)
-          .build();
-    }
-
+    CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
     return sandboxService.createSandbox(sandboxRequest)
         .thenApply(instance -> {
           if (isJsonRequest(request)) {
@@ -110,6 +77,47 @@ public class SandboxController extends Controller {
               .flashing("success", "Demo provisioning initiated. You'll be notified when the demo instance is ready.");
         });
   }
+
+  /**
+   * Parses a {@link CreateSandboxRequest} from either a JSON body or an HTML form POST.
+   * Centralises all field extraction and default-value logic in one place.
+   */
+  private CreateSandboxRequest parseCreateRequest(Http.Request request) {
+    if (request.hasBody() && request.body().asJson() != null) {
+      JsonNode json = request.body().asJson();
+      String gaId  = json.has("googleAnalyticsId")  ? json.get("googleAnalyticsId").asText()  : null;
+      String gaUrl = json.has("googleAnalyticsUrl") ? json.get("googleAnalyticsUrl").asText() : null;
+      return CreateSandboxRequest.builder()
+          .cityName(json.has("cityName")       ? json.get("cityName").asText()       : "Demo City")
+          .subdomain(json.has("subdomain")     ? json.get("subdomain").asText()      : "demo")
+          .pin(json.has("pin")                 ? json.get("pin").asText()            : "000000")
+          .adminEmail(json.has("adminEmail")   ? json.get("adminEmail").asText()     : "")
+          .expirationDays(json.has("expirationDays") ? json.get("expirationDays").asInt(30) : 30)
+          .googleAnalyticsId(gaId  != null  && !gaId.isBlank()  ? gaId  : null)
+          .googleAnalyticsUrl(gaUrl != null && !gaUrl.isBlank() ? gaUrl : null)
+          .build();
+    }
+
+    DynamicForm form = formFactory.form().bindFromRequest(request);
+    String gaId  = form.get("googleAnalyticsId");
+    String gaUrl = form.get("googleAnalyticsUrl");
+    String daysStr = form.get("expirationDays");
+    int expirationDays = 30;
+    try {
+      if (daysStr != null && !daysStr.isBlank()) expirationDays = Integer.parseInt(daysStr.trim());
+    } catch (NumberFormatException ignored) { /* keep default 30 */ }
+
+    return CreateSandboxRequest.builder()
+        .cityName(orDefault(form.get("cityName"),   "Demo City"))
+        .subdomain(orDefault(form.get("subdomain"), "demo"))
+        .pin(orDefault(form.get("pin"),             "000000"))
+        .adminEmail(orDefault(form.get("adminEmail"), ""))
+        .expirationDays(expirationDays)
+        .googleAnalyticsId(gaId  != null && !gaId.isBlank()  ? gaId  : null)
+        .googleAnalyticsUrl(gaUrl != null && !gaUrl.isBlank() ? gaUrl : null)
+        .build();
+  }
+
 
   /** GET /sandboxes/:id — detail page or JSON. */
   public CompletionStage<Result> show(Http.Request request, String id) {
@@ -278,31 +286,7 @@ public class SandboxController extends Controller {
     });
   }
 
-  /** GET /sandboxes/new — Create sandbox form. */
-  public Result newSandbox(Http.Request request) {
-    return ok(createView.render(request, CreateSandboxViewModel.empty())).as("text/html");
-  }
-
-  /**
-   * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
-   * Redirects back to the dashboard with the updated sandbox visible.
-   */
-  public CompletionStage<Result> extend(Http.Request request, String id) {
-    DynamicForm form = formFactory.form().bindFromRequest(request);
-    String daysStr = orDefault(form.get("days"), "30");
-    int days;
-    try {
-      days = Math.max(1, Math.min(90, Integer.parseInt(daysStr)));
-    } catch (NumberFormatException e) {
-      days = 30;
-    }
-    return sandboxService.extendSandbox(id, days).thenApply(maybeExtended -> {
-      if (maybeExtended.isEmpty()) {
-        return notFound("Sandbox not found: " + id);
-      }
-      return redirect(controllers.routes.SandboxController.index());
-    });
-  }
+  // (duplicate newSandbox and extend removed — see above for the canonical implementations)
 
   /**
    * GET /logout — clears the session and redirects to the dashboard.
