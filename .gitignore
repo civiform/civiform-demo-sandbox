@@ -36,3 +36,8 @@ RUNNING_PID
 
 # Docker
 .docker/
+
+# Browser tests
+browser-test/node_modules/
+browser-test/tmp/
+browser-test/dist/

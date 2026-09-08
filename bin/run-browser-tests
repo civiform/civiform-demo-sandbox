@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# bin/run-browser-tests
+# Run Playwright browser tests against the local dev server.
+# Usage:
+#   ./bin/run-browser-tests              # run all tests headless
+#   ./bin/run-browser-tests --headed     # show browser window
+#   ./bin/run-browser-tests --ui         # Playwright UI mode
+#   ./bin/run-browser-tests --update-snapshots  # update screenshot baselines
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BROWSER_TEST_DIR="$REPO_ROOT/browser-test"
+
+echo "📸 cf-sandbox-builder browser tests"
+echo ""
+
+# Check that node is available
+if ! command -v node &>/dev/null; then
+  echo "❌ node not found. Install Node.js >= 20 from https://nodejs.org"
+  exit 1
+fi
+
+# Install deps if node_modules missing
+if [ ! -d "$BROWSER_TEST_DIR/node_modules" ]; then
+  echo "📦 Installing browser-test dependencies..."
+  npm install --prefix "$BROWSER_TEST_DIR"
+  npx --prefix "$BROWSER_TEST_DIR" playwright install chromium
+  echo ""
+fi
+
+# Verify server is reachable before running
+echo "🔍 Checking server health at http://localhost:9001/health ..."
+if ! curl -sf http://localhost:9001/health > /dev/null; then
+  echo ""
+  echo "❌ Server is not running. Start it first:"
+  echo "   ./bin/run-dev"
+  echo ""
+  exit 1
+fi
+echo "✅ Server is up"
+echo ""
+
+# Run Playwright
+cd "$BROWSER_TEST_DIR"
+npm run test -- "$@"
