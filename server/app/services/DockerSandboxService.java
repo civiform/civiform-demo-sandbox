@@ -186,7 +186,7 @@ public class DockerSandboxService implements SandboxService {
             // 3. Launch the CiviForm Docker container
             String containerId =
                 launchContainer(
-                    id, imageTag, hostPort, dbUrl, dbUser, dbPassword, appSecret, cityName);
+                    id, instance.getCiviformVersion(), hostPort, dbUrl, dbUser, dbPassword, appSecret, instance.getCityName());
             repository.updateContainerId(id, containerId);
             log.info("[{}] Container launched: {}", id, containerId);
 
@@ -290,22 +290,8 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
-  @Override
-  public CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days) {
-    return CompletableFuture.supplyAsync(() -> {
-      Optional<SandboxInstance> maybeSandbox = repository.findById(id);
-      if (maybeSandbox.isEmpty()) {
-        return Optional.empty();
-      }
-      SandboxInstance existing = maybeSandbox.get();
-      SandboxInstance extended = existing.toBuilder()
-          .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
-          .build();
-      repository.save(extended);
-      log.info("[{}] Sandbox extended by {} days. New expiry: {}", id, days, extended.getExpiresAt());
-      return Optional.of(extended);
-    }, provisioningPool);
-  }
+
+
 
   // ---------------------------------------------------------------------------
   // Private helpers

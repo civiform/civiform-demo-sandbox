@@ -5,7 +5,7 @@ lazy val root = (project in file("."))
   .settings(
     name := """cf-sandbox-builder""",
     version := "0.0.1",
-    scalaVersion := "2.13.16",
+    scalaVersion := "2.13.15",
     maintainer := "civiform-dev@google.com",
     javacOptions ++= Seq(
       "-encoding", "UTF-8",

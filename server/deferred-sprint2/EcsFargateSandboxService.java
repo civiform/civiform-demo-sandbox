@@ -57,12 +57,12 @@ import software.amazon.awssdk.services.elasticloadbalancingv2.model.ForwardActio
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.HostHeaderConditionConfig;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.IpAddressType;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.Matcher;
-import software.amazon.awssdk.services.elasticloadbalancingv2.model.Protocol;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.ProtocolEnum;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.RegisterTargetsRequest;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.Rule;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetDescription;
 import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetGroupTuple;
-import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetType;
+import software.amazon.awssdk.services.elasticloadbalancingv2.model.TargetTypeEnum;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.secretsmanager.model.CreateSecretRequest;
 import software.amazon.awssdk.services.secretsmanager.model.DeleteSecretRequest;
@@ -132,12 +132,12 @@ public class EcsFargateSandboxService implements SandboxService {
 
   @Override
   public CompletionStage<ImmutableList<SandboxInstance>> listSandboxes() {
-    return repository.listAll();
+    return CompletableFuture.supplyAsync(() -> repository.findAll(), provisioner);
   }
 
   @Override
   public CompletionStage<Optional<SandboxInstance>> getSandbox(String id) {
-    return repository.findById(id);
+    return CompletableFuture.supplyAsync(() -> repository.findById(id), provisioner);
   }
 
   @Override
@@ -164,20 +164,16 @@ public class EcsFargateSandboxService implements SandboxService {
             .expiresAt(now.plusSeconds((long) request.getExpirationDays() * 24 * 3600))
             .build();
 
-    return repository
-        .save(instance)
-        .thenComposeAsync(
-            saved -> {
-              // Kick off async provisioning — returns immediately with PROVISIONING status
-              CompletableFuture.runAsync(() -> provisionAsync(saved), provisioner);
-              return CompletableFuture.completedFuture(saved);
-            });
+    return CompletableFuture.supplyAsync(() -> {
+      repository.save(instance);
+      CompletableFuture.runAsync(() -> provisionAsync(instance), provisioner);
+      return instance;
+    }, provisioner);
   }
 
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
-    return repository
-        .findById(id)
+    return CompletableFuture.supplyAsync(() -> repository.findById(id), provisioner)
         .thenComposeAsync(
             maybeInstance -> {
               if (maybeInstance.isEmpty()) {
@@ -194,8 +190,7 @@ public class EcsFargateSandboxService implements SandboxService {
 
   @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
-    return repository
-        .findById(sandboxId)
+    return CompletableFuture.supplyAsync(() -> repository.findById(sandboxId), provisioner)
         .thenApply(
             maybeInstance ->
                 maybeInstance.filter(
@@ -204,8 +199,7 @@ public class EcsFargateSandboxService implements SandboxService {
 
   @Override
   public CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days) {
-    return repository
-        .findById(id)
+    return CompletableFuture.supplyAsync(() -> repository.findById(id), provisioner)
         .thenComposeAsync(
             maybeInstance -> {
               if (maybeInstance.isEmpty()) return CompletableFuture.completedFuture(Optional.empty());
@@ -213,8 +207,9 @@ public class EcsFargateSandboxService implements SandboxService {
               SandboxInstance updated = maybeInstance.get().toBuilder()
                   .expiresAt(maybeInstance.get().getExpiresAt().plusSeconds((long) days * 24 * 3600))
                   .build();
-              return repository.save(updated).thenApply(Optional::of);
-            });
+              repository.save(updated);
+              return CompletableFuture.completedFuture(Optional.of(updated));
+            }, provisioner);
   }
 
   // ── Provisioning ────────────────────────────────────────────────────────────
@@ -433,13 +428,13 @@ public class EcsFargateSandboxService implements SandboxService {
     CreateTargetGroupResponse resp = elb().createTargetGroup(
         CreateTargetGroupRequest.builder()
             .name(tgName)
-            .protocol(Protocol.HTTP)
+            .protocol(ProtocolEnum.HTTP)
             .port(9000)
             .vpcId(vpcId)
-            .targetType(TargetType.IP)
+            .targetType(TargetTypeEnum.IP)
             .ipAddressType(IpAddressType.IPV4)
             .healthCheckPath("/health")
-            .healthCheckProtocol(Protocol.HTTP)
+            .healthCheckProtocol(ProtocolEnum.HTTP)
             .matcher(Matcher.builder().httpCode("200").build())
             .healthyThresholdCount(2)
             .unhealthyThresholdCount(3)
@@ -690,26 +685,16 @@ public class EcsFargateSandboxService implements SandboxService {
 
   private void updateStatus(
       String id, SandboxStatus status, String taskArn, String targetGroupArn, String ruleArn) {
-    repository.findById(id).thenCompose(maybeInstance -> {
-      if (maybeInstance.isEmpty()) return CompletableFuture.completedFuture(null);
-      SandboxInstance updated = SandboxInstance.builder()
-          .id(maybeInstance.get().getId())
-          .cityName(maybeInstance.get().getCityName())
-          .civiformVersion(maybeInstance.get().getCiviformVersion())
+    CompletableFuture.supplyAsync(() -> repository.findById(id), provisioner).thenAccept(maybeInstance -> {
+      if (maybeInstance.isEmpty()) return;
+      SandboxInstance updated = maybeInstance.get().toBuilder()
           .status(status)
-          .url(maybeInstance.get().getUrl())
-          .adminEmail(maybeInstance.get().getAdminEmail())
-          .notes(maybeInstance.get().getNotes())
-          .pin(maybeInstance.get().getPin())
           .containerId(taskArn != null ? taskArn : maybeInstance.get().getContainerId())
           .targetGroupArn(targetGroupArn != null ? targetGroupArn : maybeInstance.get().getTargetGroupArn())
           .listenerRuleArn(ruleArn != null ? ruleArn : maybeInstance.get().getListenerRuleArn())
-          .hostPort(maybeInstance.get().getHostPort())
-          .createdAt(maybeInstance.get().getCreatedAt())
-          .expiresAt(maybeInstance.get().getExpiresAt())
           .build();
-      return repository.save(updated);
-    }).toCompletableFuture().join();
+      repository.save(updated);
+    }).join();
   }
 
   // ── Lazy AWS client accessors (overridable in tests) ─────────────────────────

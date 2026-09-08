@@ -16,8 +16,6 @@ import play.mvc.Http;
 import play.mvc.Result;
 import services.CreateSandboxRequest;
 import services.SandboxService;
-import views.sandboxes.CreateSandboxView;
-import views.sandboxes.CreateSandboxViewModel;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
 import views.sandboxes.SandboxDetailsView;
@@ -31,7 +29,6 @@ public class SandboxController extends Controller {
   private final SandboxListView listView;
   private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
-  private final CreateSandboxView createView;
   private final FormFactory formFactory;
 
   @Inject
@@ -40,13 +37,11 @@ public class SandboxController extends Controller {
       SandboxListView listView,
       SandboxDetailsView detailsView,
       PinGateView pinGateView,
-      CreateSandboxView createView,
       FormFactory formFactory) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
-    this.createView = checkNotNull(createView);
     this.formFactory = checkNotNull(formFactory);
   }
 
@@ -263,10 +258,6 @@ public class SandboxController extends Controller {
             });
   }
 
-  /** GET /sandboxes/new — Create sandbox form. */
-  public Result newSandbox(Http.Request request) {
-    return ok(createView.render(request, CreateSandboxViewModel.empty())).as("text/html");
-  }
 
   /**
    * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
