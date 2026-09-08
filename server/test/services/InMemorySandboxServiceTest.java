@@ -17,6 +17,16 @@ public class InMemorySandboxServiceTest {
     service = new InMemorySandboxService();
   }
 
+  private static CreateSandboxRequest makeRequest(String cityName, String subdomain, String pin) {
+    return CreateSandboxRequest.builder()
+        .cityName(cityName)
+        .subdomain(subdomain)
+        .pin(pin)
+        .adminEmail("tester@civiform.dev")
+        .expirationDays(30)
+        .build();
+  }
+
   @Test
   public void listSandboxes_returnsInitialDemoSandbox() throws ExecutionException, InterruptedException {
     var sandboxes = service.listSandboxes().toCompletableFuture().get();
@@ -28,12 +38,13 @@ public class InMemorySandboxServiceTest {
   @Test
   public void createSandbox_createsAndRetrievesInstance() throws ExecutionException, InterruptedException {
     SandboxInstance created = service.createSandbox(
-        "Test Sandbox", "v2.22.0", "tester@civiform.dev", "Integration test instance"
+        makeRequest("Test Sandbox", "test-sandbox", "482917")
     ).toCompletableFuture().get();
 
     assertThat(created.getId()).isNotNull();
     assertThat(created.getCityName()).isEqualTo("Test Sandbox");
-    assertThat(created.getCiviformVersion()).isEqualTo("v2.22.0");
+    assertThat(created.getSubdomain()).isEqualTo("test-sandbox");
+    assertThat(created.getPin()).isEqualTo("482917");
 
     var retrieved = service.getSandbox(created.getId()).toCompletableFuture().get();
     assertThat(retrieved).isPresent();
@@ -43,7 +54,7 @@ public class InMemorySandboxServiceTest {
   @Test
   public void deleteSandbox_removesInstance() throws ExecutionException, InterruptedException {
     SandboxInstance created = service.createSandbox(
-        "To Delete", "latest", "admin@civiform.dev", ""
+        makeRequest("To Delete", "to-delete", "000000")
     ).toCompletableFuture().get();
 
     Boolean deleted = service.deleteSandbox(created.getId()).toCompletableFuture().get();
@@ -53,3 +64,4 @@ public class InMemorySandboxServiceTest {
     assertThat(retrieved).isEmpty();
   }
 }
+

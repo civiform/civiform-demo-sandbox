@@ -14,6 +14,7 @@ import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import services.CreateSandboxRequest;
 import services.SandboxService;
 import views.sandboxes.CreateSandboxView;
 import views.sandboxes.CreateSandboxViewModel;
@@ -62,37 +63,51 @@ public class SandboxController extends Controller {
 
   /**
    * POST /sandboxes — create a new sandbox.
-   * Redirects to the sandbox detail page (BE-10: was incorrectly redirecting to home).
+   * Redirects back to the dashboard list with a flash banner (spec: "Demo provisioning initiated").
    */
   public CompletionStage<Result> create(Http.Request request) {
-    String cityName;
-    String version;
-    String adminEmail;
-    String notes;
+    CreateSandboxRequest sandboxRequest;
 
     if (request.hasBody() && request.body().asJson() != null) {
       JsonNode json = request.body().asJson();
-      cityName   = json.has("cityName")   ? json.get("cityName").asText()   : "Burlington, VT";
-      version    = json.has("version")    ? json.get("version").asText()    : "latest";
-      adminEmail = json.has("adminEmail") ? json.get("adminEmail").asText() : "";
-      notes      = json.has("notes")      ? json.get("notes").asText()      : "";
+      sandboxRequest = CreateSandboxRequest.builder()
+          .cityName(json.has("cityName")           ? json.get("cityName").asText()           : "Demo City")
+          .subdomain(json.has("subdomain")         ? json.get("subdomain").asText()          : "demo")
+          .pin(json.has("pin")                     ? json.get("pin").asText()                : "000000")
+          .adminEmail(json.has("adminEmail")       ? json.get("adminEmail").asText()         : "")
+          .expirationDays(json.has("expirationDays") ? json.get("expirationDays").asInt(30) : 30)
+          .googleAnalyticsId(json.has("googleAnalyticsId")   ? json.get("googleAnalyticsId").asText()  : null)
+          .googleAnalyticsUrl(json.has("googleAnalyticsUrl") ? json.get("googleAnalyticsUrl").asText() : null)
+          .build();
     } else {
       DynamicForm form = formFactory.form().bindFromRequest(request);
-      cityName   = orDefault(form.get("cityName"),   "Burlington, VT");
-      version    = orDefault(form.get("version"),    "latest");
-      adminEmail = orDefault(form.get("adminEmail"), "");
-      notes      = orDefault(form.get("notes"),      "");
+      String gaId  = form.get("googleAnalyticsId");
+      String gaUrl = form.get("googleAnalyticsUrl");
+      String daysStr = form.get("expirationDays");
+      int expirationDays = 30;
+      try {
+        if (daysStr != null && !daysStr.isBlank()) expirationDays = Integer.parseInt(daysStr.trim());
+      } catch (NumberFormatException ignored) { /* keep default 30 */ }
+
+      sandboxRequest = CreateSandboxRequest.builder()
+          .cityName(orDefault(form.get("cityName"),   "Demo City"))
+          .subdomain(orDefault(form.get("subdomain"), "demo"))
+          .pin(orDefault(form.get("pin"),             "000000"))
+          .adminEmail(orDefault(form.get("adminEmail"), ""))
+          .expirationDays(expirationDays)
+          .googleAnalyticsId(gaId  != null && !gaId.isBlank()  ? gaId  : null)
+          .googleAnalyticsUrl(gaUrl != null && !gaUrl.isBlank() ? gaUrl : null)
+          .build();
     }
 
-    return sandboxService.createSandbox(cityName, version, adminEmail, notes)
+    return sandboxService.createSandbox(sandboxRequest)
         .thenApply(instance -> {
           if (isJsonRequest(request)) {
             return created(Json.toJson(instance));
           }
-          // Redirect to detail page — PIN is immediately visible there
-          // Note: Request param NOT included in reverse route call
-          return redirect(controllers.routes.SandboxController.show(instance.getId()))
-              .flashing("success", "Demo created! PIN: " + instance.getPin());
+          // Spec: redirect back to dashboard list with success flash
+          return redirect(controllers.routes.SandboxController.index())
+              .flashing("success", "Demo provisioning initiated. You'll be notified when the demo instance is ready.");
         });
   }
 

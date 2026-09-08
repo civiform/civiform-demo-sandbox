@@ -14,6 +14,12 @@ public class SandboxInstance {
   /** Human-readable city name (e.g. "Burlington, VT"). */
   private String cityName;
 
+  /**
+   * URL subdomain slug chosen by the sales rep (e.g. "burlington-vt").
+   * Full URL = {@code https://{subdomain}.sandbox.civiform.dev}.
+   */
+  private String subdomain;
+
   /** CiviForm image tag (e.g. "latest" or "v2.22.0"). */
   private String civiformVersion;
 
@@ -32,7 +38,7 @@ public class SandboxInstance {
   /** Optional notes from the creator. */
   private String notes;
 
-  /** 6-digit PIN gate code — generated at creation, shown on detail page. */
+  /** 6-digit PIN gate code — set by the sales rep at creation time. */
   private String pin;
 
   /** Docker container ID or ECS task ARN — set once provisioning starts. */
@@ -57,6 +63,27 @@ public class SandboxInstance {
    */
   private String listenerRuleArn;
 
+  /**
+   * Google Analytics measurement ID (e.g. "G-ABC123XYZ"). Optional.
+   * Injected as GOOGLE_ANALYTICS_ID env var into the sandbox container.
+   * Null if GA not configured.
+   */
+  private String googleAnalyticsId;
+
+  /**
+   * Full GA property console deep-link URL for the "View in GA" button. Optional.
+   * e.g. "https://analytics.google.com/analytics/web/#/a12345p678/reports/intelligenthome"
+   * Null if rep has not set it; falls back to GA home in the UI.
+   */
+  private String googleAnalyticsUrl;
+
   private Instant createdAt;
   private Instant expiresAt;
+
+  /**
+   * Timestamp when the sandbox was soft-deleted (status = DELETED).
+   * Null for all other statuses.
+   */
+  private Instant deletedAt;
 }
+

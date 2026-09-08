@@ -11,11 +11,10 @@ public interface SandboxService {
   CompletionStage<Optional<SandboxInstance>> getSandbox(String id);
 
   /**
-   * Creates a new sandbox for the given city. Returns immediately with a PROVISIONING instance.
-   * PIN is generated and stored before async container launch begins.
+   * Creates a new sandbox from the given request. Returns immediately with a PROVISIONING instance.
+   * Subdomain and PIN are provided by the sales rep (no auto-generation).
    */
-  CompletionStage<SandboxInstance> createSandbox(
-      String cityName, String version, String adminEmail, String notes);
+  CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request);
 
   CompletionStage<Boolean> deleteSandbox(String id);
 

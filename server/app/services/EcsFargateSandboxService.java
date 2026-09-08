@@ -141,27 +141,27 @@ public class EcsFargateSandboxService implements SandboxService {
   }
 
   @Override
-  public CompletionStage<SandboxInstance> createSandbox(
-      String name, String version, String adminEmail, String notes) {
+  public CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request) {
 
     String id = "sb-" + UUID.randomUUID().toString().substring(0, 8);
-    String pin = generatePin();
-    String slug = toSlug(name);
-    String sandboxUrl = "https://" + slug + "." + config.getString("sandbox.domain");
+    String subdomain = request.getSubdomain();
+    String sandboxUrl = "https://" + subdomain + "." + config.getString("sandbox.domain");
     Instant now = Instant.now();
 
     SandboxInstance instance =
         SandboxInstance.builder()
             .id(id)
-            .cityName(name)
-            .civiformVersion(version)
+            .cityName(request.getCityName())
+            .subdomain(subdomain)
+            .civiformVersion("latest")
             .status(SandboxStatus.PROVISIONING)
             .url(sandboxUrl)
-            .adminEmail(adminEmail)
-            .notes(notes)
-            .pin(pin)
+            .adminEmail(request.getAdminEmail())
+            .pin(request.getPin())
+            .googleAnalyticsId(request.getGoogleAnalyticsId())
+            .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .createdAt(now)
-            .expiresAt(now.plusSeconds(30L * 24 * 3600))
+            .expiresAt(now.plusSeconds((long) request.getExpirationDays() * 24 * 3600))
             .build();
 
     return repository

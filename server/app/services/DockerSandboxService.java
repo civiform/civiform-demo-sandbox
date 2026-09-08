@@ -133,16 +133,15 @@ public class DockerSandboxService implements SandboxService {
    * returned instance — show it to the sales rep now.
    */
   @Override
-  public CompletionStage<SandboxInstance> createSandbox(
-      String cityName, String version, String adminEmail, String notes) {
+  public CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request) {
 
     String id = "sb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     String schemaName = "sandbox_" + id.replace("-", "_");
-    String pin = generatePin();
+    String pin = request.getPin();
+    String subdomain = request.getSubdomain();
     String dbUser = schemaName;
     String dbPassword = generateSecret(20);
     String appSecret = generateSecret(32);
-    String imageTag = (version != null && !version.isBlank()) ? version : "latest";
 
     // Allocate port atomically via Postgres sequence (thread-safe)
     int hostPort = repository.nextPort();
@@ -150,17 +149,19 @@ public class DockerSandboxService implements SandboxService {
     SandboxInstance instance =
         SandboxInstance.builder()
             .id(id)
-            .cityName(cityName)
-            .civiformVersion(imageTag)
+            .cityName(request.getCityName())
+            .subdomain(subdomain)
+            .civiformVersion("latest")
             .status(SandboxStatus.PROVISIONING)
             .url("http://localhost:" + hostPort)
-            .adminEmail(adminEmail != null ? adminEmail : "")
-            .notes(notes != null ? notes : "")
+            .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
             .pin(pin)
+            .googleAnalyticsId(request.getGoogleAnalyticsId())
+            .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .hostPort(hostPort)
             .schemaName(schemaName)
             .createdAt(Instant.now())
-            .expiresAt(Instant.now().plus(Duration.ofDays(30)))
+            .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
             .build();
 
     // Persist before async work — PIN is visible immediately

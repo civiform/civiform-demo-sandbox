@@ -5,5 +5,7 @@ public enum SandboxStatus {
   RUNNING,
   STOPPED,
   FAILED,
-  DESTROYED
+  DESTROYED,
+  /** Soft-delete tombstone: sandbox is gone from AWS but kept in the list with "Deleted [date]". */
+  DELETED
 }

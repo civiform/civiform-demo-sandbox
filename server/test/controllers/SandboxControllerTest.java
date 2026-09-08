@@ -66,47 +66,48 @@ public class SandboxControllerTest extends WithApplication {
   // ── POST /sandboxes — create sandbox ──────────────────────────────────────
 
   @Test
-  public void create_redirectsToSandboxDetailPage() {
+  public void create_redirectsToDashboardListWithFlash() {
     SandboxInstance created = makeSandbox("sb-abc123", SandboxStatus.PROVISIONING);
-    when(sandboxService.createSandbox(anyString(), anyString(), anyString(), anyString()))
+    when(sandboxService.createSandbox(any(services.CreateSandboxRequest.class)))
         .thenReturn(CompletableFuture.completedFuture(created));
 
     Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes")
         .bodyForm(com.google.common.collect.ImmutableMap.of(
-            "cityName", "Burlington, VT",
-            "version", "latest",
-            "adminEmail", "admin@test.com",
-            "notes", ""));
+            "cityName",  "Burlington, VT",
+            "subdomain", "burlington-vt",
+            "pin",       "482917",
+            "adminEmail", "admin@test.com"));
 
     Result result = Helpers.route(app, request);
 
-    // Must be a 303 redirect, not 200 or redirect to home
+    // Must be a 303 redirect to the list page (not detail page, not home)
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes/sb-abc123");
+    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes");
   }
 
   @Test
-  public void create_notRedirectingToHome() {
+  public void create_flashContainsProvisioningMessage() {
     SandboxInstance created = makeSandbox("sb-xyz999", SandboxStatus.PROVISIONING);
-    when(sandboxService.createSandbox(anyString(), anyString(), anyString(), anyString()))
+    when(sandboxService.createSandbox(any(services.CreateSandboxRequest.class)))
         .thenReturn(CompletableFuture.completedFuture(created));
 
     Http.RequestBuilder request = Helpers.fakeRequest()
         .method("POST")
         .uri("/sandboxes")
         .bodyForm(com.google.common.collect.ImmutableMap.of(
-            "cityName", "Portland, OR",
-            "version", "latest",
-            "adminEmail", "",
-            "notes", ""));
+            "cityName",  "Portland, OR",
+            "subdomain", "portland-or",
+            "pin",       "123456",
+            "adminEmail", ""));
 
     Result result = Helpers.route(app, request);
 
-    assertThat(result.redirectLocation().orElse("")).isNotEqualTo("/");
-    assertThat(result.redirectLocation().orElse("")).isNotEqualTo("/sandboxes");
+    assertThat(result.flash().get("success")).isPresent();
+    assertThat(result.flash().get("success").get())
+        .contains("Demo provisioning initiated");
   }
 
   // ── POST /sandboxes/:id/access — PIN validation ───────────────────────────
