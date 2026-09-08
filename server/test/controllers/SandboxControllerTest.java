@@ -434,7 +434,6 @@ public class SandboxControllerTest extends WithApplication {
         .hostPort(10001)
         .schemaName("sandbox_" + id.replace("-", "_"))
         .adminEmail("admin@test.com")
-        .notes("")
         .createdAt(Instant.now())
         .expiresAt(Instant.now().plus(Duration.ofDays(30)))
         .build();

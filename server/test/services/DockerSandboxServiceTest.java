@@ -472,7 +472,6 @@ public class DockerSandboxServiceTest {
         .hostPort(10001)
         .schemaName("sandbox_" + id.replace("-", "_"))
         .adminEmail("")
-        .notes("")
         .createdAt(java.time.Instant.now())
         .expiresAt(java.time.Instant.now().plus(Duration.ofDays(30)))
         .build();

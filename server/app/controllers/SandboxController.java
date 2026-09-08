@@ -286,7 +286,6 @@ public class SandboxController extends Controller {
     });
   }
 
-  // (duplicate newSandbox and extend removed — see above for the canonical implementations)
 
   /**
    * GET /logout — clears the session and redirects to the dashboard.
