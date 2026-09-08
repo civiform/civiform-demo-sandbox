@@ -3,7 +3,7 @@ package controllers;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.inject.Inject;
-import play.Configuration;
+import com.typesafe.config.Config;
 import play.data.DynamicForm;
 import play.data.FormFactory;
 import play.mvc.Controller;
@@ -34,11 +34,11 @@ public final class AuthController extends Controller {
   private final String portalPassword;
 
   @Inject
-  public AuthController(LoginView loginView, FormFactory formFactory, Configuration config) {
+  public AuthController(LoginView loginView, FormFactory formFactory, Config config) {
     this.loginView = checkNotNull(loginView);
     this.formFactory = checkNotNull(formFactory);
     // Falls back to empty string if env var is unset — login will always fail
-    this.portalPassword = config.getString("portal.password", "");
+    this.portalPassword = config.hasPath("portal.password") ? config.getString("portal.password") : "";
   }
 
   /** GET /login — show the login page. Redirects to dashboard if already authenticated. */

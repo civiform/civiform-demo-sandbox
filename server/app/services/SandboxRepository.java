@@ -46,21 +46,29 @@ public class SandboxRepository {
     db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "INSERT INTO sandbox_instances "
-              + "(id, city_name, civiform_version, status, url, admin_email, notes, "
-              + " pin, host_port, schema_name, created_at, expires_at) "
-              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")) {
+              + "(id, city_name, subdomain, civiform_version, status, url, admin_email, "
+              + " pin, container_id, host_port, schema_name, target_group_arn, "
+              + " listener_rule_arn, google_analytics_id, google_analytics_url, "
+              + " created_at, expires_at, deleted_at) "
+              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
         ps.setString(1, instance.getId());
         ps.setString(2, instance.getCityName());
-        ps.setString(3, instance.getCiviformVersion());
-        ps.setString(4, instance.getStatus().name());
-        ps.setString(5, instance.getUrl());
-        ps.setString(6, instance.getAdminEmail());
-        ps.setString(7, instance.getNotes());
+        ps.setString(3, instance.getSubdomain());
+        ps.setString(4, instance.getCiviformVersion());
+        ps.setString(5, instance.getStatus().name());
+        ps.setString(6, instance.getUrl());
+        ps.setString(7, instance.getAdminEmail());
         ps.setString(8, instance.getPin());
-        ps.setInt(9, instance.getHostPort());
-        ps.setString(10, instance.getSchemaName());
-        ps.setTimestamp(11, Timestamp.from(instance.getCreatedAt()));
-        ps.setTimestamp(12, Timestamp.from(instance.getExpiresAt()));
+        ps.setString(9, instance.getContainerId());
+        ps.setInt(10, instance.getHostPort());
+        ps.setString(11, instance.getSchemaName());
+        ps.setString(12, instance.getTargetGroupArn());
+        ps.setString(13, instance.getListenerRuleArn());
+        ps.setString(14, instance.getGoogleAnalyticsId());
+        ps.setString(15, instance.getGoogleAnalyticsUrl());
+        ps.setTimestamp(16, instance.getCreatedAt() != null ? Timestamp.from(instance.getCreatedAt()) : null);
+        ps.setTimestamp(17, instance.getExpiresAt() != null ? Timestamp.from(instance.getExpiresAt()) : null);
+        ps.setTimestamp(18, instance.getDeletedAt() != null ? Timestamp.from(instance.getDeletedAt()) : null);
         ps.executeUpdate();
       }
       return null;
@@ -136,17 +144,22 @@ public class SandboxRepository {
     return SandboxInstance.builder()
         .id(rs.getString("id"))
         .cityName(rs.getString("city_name"))
+        .subdomain(rs.getString("subdomain"))
         .civiformVersion(rs.getString("civiform_version"))
         .status(SandboxStatus.valueOf(rs.getString("status")))
         .url(rs.getString("url"))
         .adminEmail(rs.getString("admin_email"))
-        .notes(rs.getString("notes"))
         .pin(rs.getString("pin"))
         .containerId(rs.getString("container_id"))
         .hostPort(rs.getInt("host_port"))
         .schemaName(rs.getString("schema_name"))
-        .createdAt(rs.getTimestamp("created_at").toInstant())
-        .expiresAt(rs.getTimestamp("expires_at").toInstant())
+        .targetGroupArn(rs.getString("target_group_arn"))
+        .listenerRuleArn(rs.getString("listener_rule_arn"))
+        .googleAnalyticsId(rs.getString("google_analytics_id"))
+        .googleAnalyticsUrl(rs.getString("google_analytics_url"))
+        .createdAt(rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null)
+        .expiresAt(rs.getTimestamp("expires_at") != null ? rs.getTimestamp("expires_at").toInstant() : null)
+        .deletedAt(rs.getTimestamp("deleted_at") != null ? rs.getTimestamp("deleted_at").toInstant() : null)
         .build();
   }
 }
