@@ -36,10 +36,13 @@ public class SandboxListViewModel implements BaseViewModel {
     int total    = rows.size();
     int active   = (int) rows.stream()
         .filter(r -> r.getDaysRemaining() > 0
-            && "RUNNING".equals(r.getSandbox().getStatus().name()))
+            && "RUNNING".equals(r.getSandbox().getStatus().name())
+            && !"DELETED".equals(r.getSandbox().getStatus().name()))
         .count();
     int expiring = (int) rows.stream()
-        .filter(r -> r.getDaysRemaining() > 0 && r.getDaysRemaining() <= 5)
+        .filter(r -> r.getDaysRemaining() > 0
+            && r.getDaysRemaining() <= 5
+            && !"DELETED".equals(r.getSandbox().getStatus().name()))
         .count();
 
     return SandboxListViewModel.builder()

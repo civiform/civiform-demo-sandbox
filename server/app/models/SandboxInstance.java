@@ -35,9 +35,6 @@ public class SandboxInstance {
   /** Email of the sales rep / admin who created this sandbox. */
   private String adminEmail;
 
-  /** Optional notes from the creator. */
-  private String notes;
-
   /** 6-digit PIN gate code — set by the sales rep at creation time. */
   private String pin;
 

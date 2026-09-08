@@ -26,18 +26,19 @@ public class InMemorySandboxService implements SandboxService {
   private final Map<String, SandboxInstance> sandboxes = new ConcurrentHashMap<>();
 
   public InMemorySandboxService() {
-    // Seed one demo sandbox for UI development
-    String demoId = "demo-sb-1";
+    // Seed one demo sandbox for UI development.
+    // ID matches SEEDED_SANDBOX_ID in browser-test/src/support/config.ts.
+    String demoId = "sb-demo0001";
     sandboxes.put(
         demoId,
         SandboxInstance.builder()
             .id(demoId)
             .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
             .civiformVersion("v2.22.0")
             .status(SandboxStatus.RUNNING)
             .url("https://burlington-vt.sandbox.civiform.dev")
             .adminEmail("admin@civiform.dev")
-            .notes("Default demo sandbox — seeded on startup")
             .pin("482917")
             .hostPort(10000)
             .schemaName("sandbox_demo_sb_1")
@@ -82,7 +83,17 @@ public class InMemorySandboxService implements SandboxService {
 
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
-    return CompletableFuture.completedFuture(sandboxes.remove(id) != null);
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null) {
+      return CompletableFuture.completedFuture(false);
+    }
+    // Soft-delete: mark as DELETED with timestamp so the dashboard can show the tombstone row.
+    SandboxInstance deleted = existing.toBuilder()
+        .status(SandboxStatus.DELETED)
+        .deletedAt(Instant.now())
+        .build();
+    sandboxes.put(id, deleted);
+    return CompletableFuture.completedFuture(true);
   }
 
   @Override
@@ -102,7 +113,7 @@ public class InMemorySandboxService implements SandboxService {
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.completedFuture(
         Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
-          // Constant-time comparison
+          // Constant-time comparison to prevent timing attacks
           return MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
         }));
   }
