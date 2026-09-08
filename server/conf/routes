@@ -8,11 +8,13 @@ GET     /assets/*file               controllers.Assets.versioned(path="/public",
 GET     /health                     controllers.HealthCheckController.health()
 GET     /ready                      controllers.HealthCheckController.ready()
 
+# Auth
+GET     /login                      controllers.AuthController.login(request: Request)
+POST    /login                      controllers.AuthController.authenticate(request: Request)
+GET     /logout                     controllers.AuthController.logout(request: Request)
+
 # Home / Dashboard
 GET     /                           controllers.SandboxController.index(request: Request)
-
-# Auth (stub — real auth in week 6?)
-GET     /logout                     controllers.SandboxController.logout(request: Request)
 
 # Sandbox Management
 # NOTE: /sandboxes/new MUST be declared before /sandboxes/:id or the router

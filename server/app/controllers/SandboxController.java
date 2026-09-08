@@ -50,8 +50,12 @@ public class SandboxController extends Controller {
     this.formFactory = checkNotNull(formFactory);
   }
 
-  /** GET /sandboxes — list all sandboxes (JSON or HTML). */
+  /** GET /sandboxes — list all sandboxes (JSON or HTML). Requires portal auth. */
   public CompletionStage<Result> index(Http.Request request) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
     return sandboxService.listSandboxes().thenApply(sandboxes -> {
       if (isJsonRequest(request)) {
         return ok(Json.toJson(sandboxes));
@@ -287,15 +291,6 @@ public class SandboxController extends Controller {
   }
 
   // (duplicate newSandbox and extend removed — see above for the canonical implementations)
-
-  /**
-   * GET /logout — clears the session and redirects to the dashboard.
-   * Stub until Sprint 6 auth is wired; clears any cookies and session data.
-   */
-  public Result logout(Http.Request request) {
-    return redirect(controllers.routes.SandboxController.index())
-        .withNewSession();
-  }
 
   private boolean isJsonRequest(Http.Request request) {
     return request.accepts("application/json") && !request.accepts("text/html");

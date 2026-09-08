@@ -1,7 +1,8 @@
 package views;
 
 public enum LayoutTemplate {
-  MAIN_LAYOUT("layout/MainLayout");
+  MAIN_LAYOUT("layout/MainLayout"),
+  LOGIN_LAYOUT("layout/LoginLayout");
 
   private final String path;
 

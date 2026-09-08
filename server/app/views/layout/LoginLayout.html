@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="${templateGlobals.pageTitle()}">CiviForm Demo Portal</title>
+    <link rel="icon" th:href="${layoutParams.favicon()}" />
+
+    <!-- Stylesheets -->
+    <link
+      th:each="stylesheet : ${layoutParams.stylesheets()}"
+      th:href="${stylesheet}"
+      rel="stylesheet"
+      type="text/css"
+    />
+
+    <!-- Head Scripts -->
+    <script
+      th:each="script : ${layoutParams.headScripts()}"
+      th:src="${script.src()}"
+      th:type="${script.type()}"
+    ></script>
+  </head>
+  <!-- Full-page dark navy background — no USWDS banner, header, or footer -->
+  <body class="min-h-screen" style="background-color: #0d1b3e;">
+    <th:block th:insert="~{${layoutParams.pageTemplate()} :: content}"></th:block>
+
+    <!-- Body Scripts -->
+    <script
+      th:each="script : ${layoutParams.bodyScripts()}"
+      th:src="${script.src()}"
+      th:type="${script.type()}"
+    ></script>
+  </body>
+</html>
