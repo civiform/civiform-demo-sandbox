@@ -20,9 +20,57 @@
       th:src="${script.src()}"
       th:type="${script.type()}"
     ></script>
+
+    <style>
+      /* Login Screen — scoped to LoginLayout */
+      body { margin: 0; }
+      #login-view {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background-color: #162e51;
+        box-sizing: border-box;
+        padding: 2rem;
+        margin: 0;
+      }
+      .login-card {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border: 1px solid #d8d8d8;
+      }
+      .btn-google {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        width: 100%;
+        height: 2.75rem;
+        background-color: #ffffff;
+        border: 1px solid #c2c8d0;
+        border-radius: 4px;
+        color: #1a1a1a;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        box-sizing: border-box;
+        transition: background-color 0.1s ease;
+      }
+      .btn-google:hover {
+        background-color: #f9fafb;
+      }
+    </style>
   </head>
   <!-- Full-page dark navy background — no USWDS banner, header, or footer -->
-  <body class="min-h-screen" style="background-color: #0d1b3e;">
+  <body style="background-color: #162e51; margin: 0;">
     <th:block th:insert="~{${layoutParams.pageTemplate()} :: content}"></th:block>
 
     <!-- Body Scripts -->
