@@ -1,7 +1,7 @@
-<div th:fragment="content" class="flex items-center justify-center min-h-screen px-4 py-12">
+<div th:fragment="content" id="login-view">
 
   <!-- White card -->
-  <div class="bg-white rounded-lg shadow-lg w-full max-w-md px-8 py-10">
+  <div class="login-card">
 
     <!-- CiviForm logo (falls back to text if image missing) -->
     <div class="flex justify-center mb-6">
@@ -20,12 +20,12 @@
     <!-- Error banner -->
     <div th:if="${model.error != null}"
          role="alert"
-         class="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+         class="w-full mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
          th:text="${model.error}">
     </div>
 
     <!-- Login form -->
-    <form action="/login" method="POST">
+    <form action="/login" method="POST" class="w-full">
 
       <div class="mb-4">
         <label for="email" class="usa-label font-medium text-gray-700">
@@ -68,7 +68,7 @@
     </p>
 
     <!-- OR divider -->
-    <div class="flex items-center my-6">
+    <div class="flex items-center my-6 w-full">
       <div class="flex-grow border-t border-gray-200"></div>
       <span class="mx-3 text-xs text-gray-400 font-medium tracking-widest">OR</span>
       <div class="flex-grow border-t border-gray-200"></div>
@@ -80,7 +80,7 @@
       disabled
       aria-disabled="true"
       aria-label="Continue with Google — not available"
-      class="w-full flex items-center justify-center gap-3 border border-gray-300 rounded px-4 py-3 text-sm font-medium text-gray-500 bg-white cursor-not-allowed opacity-60"
+      class="btn-google w-full opacity-60 cursor-not-allowed"
     >
       <!-- Google G icon -->
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">

@@ -33,6 +33,7 @@ services:
       - SANDBOX_DB_HOST=host.docker.internal
       # Runtime selector: "docker" (Sprint 1 local) or "fargate" (Sprint 2 AWS)
       - SANDBOX_RUNTIME=docker
+      - DEMO_PORTAL_PASSWORD=demo
       # ── Sprint 2 Fargate vars — only needed when SANDBOX_RUNTIME=fargate ──────
       # Leave blank for local Docker development. Set in AWS ECS task definition.
       - SANDBOX_DOMAIN=sandbox.civiform.dev

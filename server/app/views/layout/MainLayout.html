@@ -23,6 +23,206 @@
 
     <!-- HTMX (status polling, progressive enhancement) -->
     <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+    <style>
+      /* ── Dashboard Portal Styles ─────────────────────────────── */
+
+      /* Header overrides matching Figma */
+      .usa-header--basic {
+        background-color: #ffffff;
+        height: 128px;
+        box-sizing: border-box;
+        padding-bottom: 16px;
+      }
+      .cf-header-container {
+        max-width: 1024px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        height: 112px !important;
+      }
+      .cf-header-logo-container {
+        height: 100px !important;
+        display: flex !important;
+        align-items: center !important;
+        border: none !important;
+        margin: 0 !important;
+      }
+      .cf-header-logo-img {
+        height: 100px;
+        width: 170px;
+        object-fit: contain;
+      }
+      .cf-heading-group {
+        margin-left: -2rem !important;
+        margin-right: -2rem !important;
+        margin-bottom: 2rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        background-color: #ffffff;
+        border-bottom: 1px solid #dfe1e2 !important;
+      }
+
+      /* Table & Row Styling */
+      .table-action-btn { margin: 0 !important; }
+      #demos-table tbody td, #demos-table tbody th {
+        border: none !important;
+        border-bottom: 2px solid #ffffff !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+      }
+      .demo-name {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        word-break: normal !important;
+        line-height: 1.3 !important;
+      }
+      #main-content { border-top: none !important; }
+
+      /* Deleted / disabled row styling */
+      tr[data-status="deleted"] td,
+      tr[data-status="deleted"] th {
+        background-color: #f0f0f0 !important;
+      }
+      tr[data-status="deleted"] .demo-name {
+        font-weight: normal !important;
+        color: #1b1b1b !important;
+      }
+      .demo-row-disabled .days-remaining { color: #1b1b1b !important; }
+
+      /* Actions Layout */
+      .cf-action-cell {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      /* Disabled launch button */
+      .cf-launch-btn:disabled,
+      .cf-launch-btn.usa-button--disabled {
+        background-color: #005ea2 !important;
+        color: #ffffff !important;
+        opacity: 0.5;
+      }
+
+      /* Segmented Button Group */
+      .cf-segmented-group {
+        display: inline-flex;
+        align-items: center;
+        vertical-align: middle;
+      }
+      .cf-segmented-group .usa-button {
+        margin: 0 !important;
+        border-radius: 0 !important;
+      }
+      .cf-segmented-group .usa-button:first-child {
+        border-top-left-radius: 4px !important;
+        border-bottom-left-radius: 4px !important;
+      }
+      .cf-segmented-group .usa-button:last-child {
+        border-top-right-radius: 4px !important;
+        border-bottom-right-radius: 4px !important;
+      }
+      .cf-segmented-group .usa-button--outline {
+        margin-right: -2px !important;
+      }
+      .cf-segmented-group .usa-button--outline:last-child {
+        margin-right: 0 !important;
+      }
+
+      /* Stats Banner */
+      .stats-banner {
+        background-color: #f0f0f0;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+      }
+      .stats-card {
+        background: #ffffff;
+        border: 1px solid #dfe1e2;
+        border-radius: 4px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .stats-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1b1b1b;
+        margin: 0;
+        line-height: 1;
+      }
+      .stats-label {
+        font-size: 1rem;
+        color: #1b1b1b;
+        margin: 0;
+      }
+
+      /* Create Wizard (modal) — high contrast text */
+      .create-wizard-step p,
+      .create-wizard-step span,
+      .create-wizard-step .usa-hint,
+      .create-wizard-step label {
+        color: #1b1b1b !important;
+      }
+
+      /* USWDS Step Indicator Overrides */
+      #modal-create-demo .usa-step-indicator { box-shadow: none; }
+      #modal-create-demo .usa-step-indicator__heading {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 0 !important;
+        font-family: 'Public Sans Web', -apple-system, sans-serif !important;
+        font-size: 1.25rem !important;
+      }
+      #modal-create-demo .usa-step-indicator__current-step {
+        background-color: #005ea2 !important;
+        color: #ffffff !important;
+        border-radius: 50% !important;
+        width: 2.25rem !important;
+        height: 2.25rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-weight: 700 !important;
+        font-size: 1.05rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #modal-create-demo .usa-step-indicator__heading-counter {
+        color: #005ea2 !important;
+        font-weight: 600 !important;
+        font-size: 1.05rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.35rem !important;
+        margin-right: 0.5rem !important;
+      }
+      #modal-create-demo .usa-step-indicator__heading-text {
+        color: #1b1b1b !important;
+        font-family: 'Public Sans Web', -apple-system, sans-serif !important;
+        font-size: 1.25rem !important;
+        font-weight: 700 !important;
+        display: inline-block !important;
+      }
+
+      /* Animations */
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body class="bg-gray-50 flex flex-col min-h-screen">
     <!-- USWDS Banner -->
