@@ -4,7 +4,7 @@
     class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
   >
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">CiviForm Demo Portal</h1>
+      <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
     </div>
     <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
       <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
@@ -299,7 +299,7 @@
                 >
                 <span
                   class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
-                  >Civic Entity</span
+                  >CiviForm setup</span
                 >
               </div>
               <div
@@ -317,7 +317,7 @@
                 >
                 <span
                   class="step-label text-sm font-medium text-gray-400 hidden sm:block"
-                  >AWS Setup</span
+                  >AWS setup</span
                 >
               </div>
               <div
@@ -335,7 +335,7 @@
                 >
                 <span
                   class="step-label text-sm font-medium text-gray-400 hidden sm:block"
-                  >Program Setup</span
+                  >Program setup</span
                 >
               </div>
             </li>
@@ -353,8 +353,10 @@
         <!-- Wizard Form -->
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
 
-          <!-- Step 1: Civic Entity -->
+          <!-- Step 1: CiviForm setup -->
           <div id="create-step-panel-1" class="wizard-panel">
+            <p class="text-sm text-gray-600 mb-5">Configure general demo and banner information. This is visible to all demo users.</p>
+
             <!-- City / Civic Entity Name -->
             <div class="usa-form-group mb-5" id="fg-cityName">
               <label for="cityName" class="usa-label font-semibold">
@@ -397,15 +399,17 @@
                 type="button"
                 class="usa-button px-8"
                 onclick="wizardNext(1)"
-                aria-label="Continue to Step 2: AWS Setup"
+                aria-label="Continue to Step 2: AWS setup"
               >
                 Next &#x2192;
               </button>
             </div>
           </div>
 
-          <!-- Step 2: AWS Setup -->
+          <!-- Step 2: AWS setup -->
           <div id="create-step-panel-2" class="wizard-panel hidden">
+            <p class="text-sm text-gray-600 mb-5">Configure setup details for the AWS deployment.</p>
+
             <!-- Admin Notification Email -->
             <div class="usa-form-group mb-5" id="fg-adminEmail">
               <label for="adminEmail" class="usa-label font-semibold">
@@ -485,7 +489,7 @@
                 type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
                 onclick="wizardBack(2)"
-                aria-label="Back to Step 1: Civic Entity"
+                aria-label="Back to Step 1: CiviForm setup"
               >
                 &#x2190; Back
               </button>
@@ -493,14 +497,14 @@
                 type="button"
                 class="usa-button px-8"
                 onclick="wizardNext(2)"
-                aria-label="Continue to Step 3: Program Setup"
+                aria-label="Continue to Step 3: Program setup"
               >
                 Next &#x2192;
               </button>
             </div>
           </div>
 
-          <!-- Step 3: Program Setup -->
+          <!-- Step 3: Program setup -->
           <div id="create-step-panel-3" class="wizard-panel hidden">
             <!-- Pre-loaded programs info block -->
             <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
@@ -517,6 +521,7 @@
                       class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed">
                 Import from PDF
               </button>
+              <p class="text-xs text-gray-500 mt-2">Upload PDF forms to automatically extract and generate additional custom programs in the demo. Imported programs are editable after the demo is provisioned.</p>
             </div>
 
             <!--
@@ -537,7 +542,7 @@
                 type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
                 onclick="wizardBack(3)"
-                aria-label="Back to Step 2: AWS Setup"
+                aria-label="Back to Step 2: AWS setup"
               >
                 &#x2190; Back
               </button>
