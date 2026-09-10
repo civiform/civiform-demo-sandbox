@@ -40,6 +40,12 @@ This provides credential-level isolation: a misconfigured sandbox cannot access 
 CiviForm assumes database ownership for Play evolutions, and `DROP DATABASE` at expiry is an
 atomic, provable teardown. See [#16](https://github.com/civiform/civiform-demo-sandbox/issues/16).
 
+**Upgrading an existing environment**: `init_postgres.sql` only runs on a fresh Postgres volume,
+so environments created before this change need a one-time column rename, and any sandboxes
+provisioned as schemas need manual cleanup. Both are covered in
+[`migrations/2026-09-database-per-sandbox.sql`](migrations/2026-09-database-per-sandbox.sql).
+For a disposable local environment, recreating the Postgres volume is simpler.
+
 ---
 
 ## Directory Structure
@@ -51,6 +57,7 @@ cf-sandbox-builder/
 ├── docker-compose.yml          # Postgres 16 + builder service (ports 9001, 5174)
 ├── docker-compose.dev.yml      # Dev overrides (volume mounts, hot reload)
 ├── init_postgres.sql           # DB init: sandbox_instances table + port sequence
+├── migrations/                 # One-time SQL for pre-existing environments
 ├── bin/                        # Developer CLI scripts
 │   ├── run-dev                 # Start full dev stack (Postgres + builder)
 │   ├── stop-dev                # Stop all containers
