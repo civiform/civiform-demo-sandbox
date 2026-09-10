@@ -320,6 +320,12 @@ public class DockerSandboxService implements SandboxService {
         conn -> {
           try (Statement st = conn.createStatement()) {
             st.execute(String.format("CREATE USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
+            // CREATE DATABASE ... OWNER requires the creating role to be a member of the owner
+            // role. A true superuser (local docker-compose connects as postgres) passes that
+            // check implicitly, but on RDS the builder connects as sandbox_master, which is
+            // only rds_superuser, so grant membership explicitly. Redundant but harmless when
+            // the builder really is a superuser.
+            st.execute(String.format("GRANT %s TO CURRENT_USER", dbUser));
             st.execute(String.format("CREATE DATABASE %s OWNER %s", databaseName, dbUser));
           }
           return null;
