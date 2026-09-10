@@ -44,8 +44,8 @@ public class SandboxInstance {
   /** Host port bound to CiviForm's internal 9000 (Sprint 1 Docker only). */
   private int hostPort;
 
-  /** Postgres schema name for this sandbox (e.g. "sandbox_sb_a1b2c3d4"). */
-  private String schemaName;
+  /** Postgres database name for this sandbox (e.g. "sandbox_sb_a1b2c3d4"). */
+  private String databaseName;
 
   /**
    * ARN of the per-sandbox ALB target group (Sprint 2 ECS Fargate only).

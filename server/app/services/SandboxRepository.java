@@ -47,7 +47,7 @@ public class SandboxRepository {
       try (PreparedStatement ps = conn.prepareStatement(
           "INSERT INTO sandbox_instances "
               + "(id, city_name, subdomain, civiform_version, status, url, admin_email, "
-              + " pin, container_id, host_port, schema_name, target_group_arn, "
+              + " pin, container_id, host_port, database_name, target_group_arn, "
               + " listener_rule_arn, google_analytics_id, google_analytics_url, "
               + " created_at, expires_at, deleted_at) "
               + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
@@ -61,7 +61,7 @@ public class SandboxRepository {
         ps.setString(8, instance.getPin());
         ps.setString(9, instance.getContainerId());
         ps.setInt(10, instance.getHostPort());
-        ps.setString(11, instance.getSchemaName());
+        ps.setString(11, instance.getDatabaseName());
         ps.setString(12, instance.getTargetGroupArn());
         ps.setString(13, instance.getListenerRuleArn());
         ps.setString(14, instance.getGoogleAnalyticsId());
@@ -152,7 +152,7 @@ public class SandboxRepository {
         .pin(rs.getString("pin"))
         .containerId(rs.getString("container_id"))
         .hostPort(rs.getInt("host_port"))
-        .schemaName(rs.getString("schema_name"))
+        .databaseName(rs.getString("database_name"))
         .targetGroupArn(rs.getString("target_group_arn"))
         .listenerRuleArn(rs.getString("listener_rule_arn"))
         .googleAnalyticsId(rs.getString("google_analytics_id"))

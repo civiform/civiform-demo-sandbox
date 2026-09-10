@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
   pin             VARCHAR(6)    NOT NULL,
   container_id    VARCHAR(128),          -- Docker container ID (set after launch)
   host_port       INTEGER       NOT NULL,
-  schema_name     VARCHAR(128)  NOT NULL, -- Per-sandbox Postgres schema name
+  database_name   VARCHAR(128)  NOT NULL, -- Per-sandbox Postgres database name
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   expires_at      TIMESTAMPTZ   NOT NULL
 );
