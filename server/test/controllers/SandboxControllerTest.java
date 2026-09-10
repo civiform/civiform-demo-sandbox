@@ -448,7 +448,7 @@ public class SandboxControllerTest extends WithApplication {
         .url("http://localhost:10001")
         .pin("482917")
         .hostPort(10001)
-        .schemaName("sandbox_" + id.replace("-", "_"))
+        .databaseName("sandbox_" + id.replace("-", "_"))
         .adminEmail("admin@test.com")
         .createdAt(Instant.now())
         .expiresAt(Instant.now().plus(Duration.ofDays(30)))
