@@ -184,7 +184,7 @@
             <div class="flex items-center gap-2 flex-wrap">
               <!-- Launch → opens CiviForm in new tab -->
               <a
-                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/access| : '#'"
+                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/view| : '#'"
                 target="_blank"
                 rel="noopener"
                 th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
@@ -276,70 +276,26 @@
 
   <!-- ── Create Modal (3-step wizard) ──────────────────────────────────── -->
   <div id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title"
-       class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4 py-8">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col max-h-full overflow-y-auto">
+       class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
+       style="display: none; background: rgba(0,0,0,0.4);">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
+         style="max-height: 85vh; overflow-y: auto; margin: auto;">
       <!-- Close X -->
       <button onclick="closeModal('create-modal')" aria-label="Close"
-              class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer" style="font-size: 24px;">×</button>
 
       <div class="px-6 pt-6 pb-6">
-        <h2 id="create-modal-title" class="text-xl font-bold text-gray-900 mb-1">Create New Demo</h2>
-        <p class="text-sm text-gray-500 mb-6">Spin up an isolated CiviForm instance. Live in under 30 minutes.</p>
-
-        <!-- Step Indicator -->
-        <div class="mb-6" aria-label="Form progress" role="navigation">
-          <ol class="flex items-center gap-0" id="create-step-indicator">
-            <!-- Step 1 -->
-            <li class="flex items-center flex-1" id="create-step-ind-1">
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <span
-                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white"
-                  aria-current="step"
-                  >1</span
-                >
-                <span
-                  class="step-label text-sm font-semibold text-blue-700 hidden sm:block"
-                  >CiviForm setup</span
-                >
-              </div>
-              <div
-                class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
-                id="create-connector-1-2"
-              ></div>
-            </li>
-
-            <!-- Step 2 -->
-            <li class="flex items-center flex-1" id="create-step-ind-2">
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <span
-                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
-                  >2</span
-                >
-                <span
-                  class="step-label text-sm font-medium text-gray-400 hidden sm:block"
-                  >AWS setup</span
-                >
-              </div>
-              <div
-                class="step-connector flex-1 h-0.5 mx-3 bg-gray-200"
-                id="create-connector-2-3"
-              ></div>
-            </li>
-
-            <!-- Step 3 -->
-            <li class="flex items-center" id="create-step-ind-3">
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <span
-                  class="step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400"
-                  >3</span
-                >
-                <span
-                  class="step-label text-sm font-medium text-gray-400 hidden sm:block"
-                  >Program setup</span
-                >
-              </div>
-            </li>
-          </ol>
+        <!-- Tab Navigation -->
+        <div class="flex border-b-2 border-gray-200 mb-5" role="tablist" aria-label="Wizard steps">
+          <button type="button" role="tab" id="wizard-tab-1" aria-selected="true" aria-controls="create-step-panel-1"
+                  class="wizard-tab wizard-tab--active"
+                  onclick="wizardGoTo(1)">CiviForm setup</button>
+          <button type="button" role="tab" id="wizard-tab-2" aria-selected="false" aria-controls="create-step-panel-2"
+                  class="wizard-tab"
+                  onclick="wizardGoTo(2)">AWS setup</button>
+          <button type="button" role="tab" id="wizard-tab-3" aria-selected="false" aria-controls="create-step-panel-3"
+                  class="wizard-tab"
+                  onclick="wizardGoTo(3)">Program setup</button>
         </div>
 
         <!-- Inline validation error -->
@@ -354,36 +310,59 @@
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
 
           <!-- Step 1: CiviForm setup -->
-          <div id="create-step-panel-1" class="wizard-panel">
+          <div id="create-step-panel-1" class="wizard-panel" role="tabpanel" aria-labelledby="wizard-tab-1">
+            <!-- Step heading -->
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">1</span>
+              <span class="text-sm text-gray-500">of 3</span>
+              <span class="text-lg font-bold text-gray-900">CiviForm setup</span>
+            </div>
             <p class="text-sm text-gray-600 mb-5">Configure general demo and banner information. This is visible to all demo users.</p>
 
-            <!-- City / Civic Entity Name -->
-            <div class="usa-form-group mb-5" id="fg-cityName">
-              <label for="cityName" class="usa-label font-semibold">
-                City / Civic entity name
-                <span class="text-red-600" aria-hidden="true">*</span>
+            <!-- Civic entity -->
+            <div class="mb-5" id="fg-cityName">
+              <label for="cityName" class="block text-sm font-bold text-gray-900 mb-1">
+                Civic entity<span class="text-red-600" aria-hidden="true">*</span>
               </label>
               <input
                 id="cityName"
                 name="cityName"
                 type="text"
-                class="usa-input"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 placeholder="e.g. Bloomington"
                 autocomplete="off"
                 aria-required="true"
               />
             </div>
 
-            <!-- Expiration Days -->
-            <div class="usa-form-group mb-6" id="fg-expirationDays">
-              <label for="expirationDays" class="usa-label font-semibold">
-                Expiration (days)
+            <!-- Logo / seal -->
+            <div class="mb-5">
+              <p class="text-sm font-bold text-gray-900 mb-2">
+                Logo / seal<span class="text-red-600" aria-hidden="true">*</span>
+              </p>
+              <div class="flex flex-col gap-2">
+                <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+                  <input type="radio" name="logoType" value="default" checked class="accent-blue-700" />
+                  Default (Preview:
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">C</span>)
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+                  <input type="radio" name="logoType" value="custom" class="accent-blue-700" />
+                  Custom
+                </label>
+              </div>
+            </div>
+
+            <!-- Expiration limit (days) -->
+            <div class="mb-6" id="fg-expirationDays">
+              <label for="expirationDays" class="block text-sm font-bold text-gray-900 mb-1">
+                Expiration limit (days)<span class="text-red-600" aria-hidden="true">*</span>
               </label>
               <input
                 id="expirationDays"
                 name="expirationDays"
                 type="number"
-                class="usa-input"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 value="30"
                 min="1"
                 max="365"
@@ -392,35 +371,38 @@
             </div>
 
             <!-- Step 1 footer -->
-            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
-              <a href="#" onclick="closeModal('create-modal'); return false;"
-                 class="text-sm text-gray-500 hover:text-gray-800 no-underline">Cancel</a>
+            <div class="flex items-center justify-end">
               <button
                 type="button"
                 class="usa-button px-8"
                 onclick="wizardNext(1)"
                 aria-label="Continue to Step 2: AWS setup"
               >
-                Next &#x2192;
+                Next
               </button>
             </div>
           </div>
 
           <!-- Step 2: AWS setup -->
-          <div id="create-step-panel-2" class="wizard-panel hidden">
+          <div id="create-step-panel-2" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-2">
+            <!-- Step heading -->
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">2</span>
+              <span class="text-sm text-gray-500">of 3</span>
+              <span class="text-lg font-bold text-gray-900">AWS setup</span>
+            </div>
             <p class="text-sm text-gray-600 mb-5">Configure setup details for the AWS deployment.</p>
 
             <!-- Admin Notification Email -->
-            <div class="usa-form-group mb-5" id="fg-adminEmail">
-              <label for="adminEmail" class="usa-label font-semibold">
-                Admin Notification Email
-                <span class="text-red-600" aria-hidden="true">*</span>
+            <div class="mb-5" id="fg-adminEmail">
+              <label for="adminEmail" class="block text-sm font-bold text-gray-900 mb-1">
+                Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
               </label>
               <input
                 id="adminEmail"
                 name="adminEmail"
                 type="email"
-                class="usa-input"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 placeholder="e.g. civiform-dev@exygy.com"
                 autocomplete="email"
                 aria-required="true"
@@ -428,18 +410,17 @@
             </div>
 
             <!-- Subdomain -->
-            <div class="usa-form-group mb-5" id="fg-subdomain">
-              <label for="subdomain" class="usa-label font-semibold">
-                Demo instance subdomain
-                <span class="text-red-600" aria-hidden="true">*</span>
+            <div class="mb-5" id="fg-subdomain">
+              <label for="subdomain" class="block text-sm font-bold text-gray-900 mb-1">
+                Demo instance subdomain<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <p class="usa-hint text-xs text-gray-500 mt-0.5 mb-1">Auto-filled from city name — editable.</p>
+              <p class="text-xs text-gray-500 mt-0.5 mb-1">Auto-filled from city name — editable.</p>
               <div class="flex items-center gap-0">
                 <input
                   id="subdomain"
                   name="subdomain"
                   type="text"
-                  class="usa-input rounded-r-none"
+                  class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm"
                   placeholder="e.g. bloomington"
                   autocomplete="off"
                   aria-required="true"
@@ -449,10 +430,9 @@
             </div>
 
             <!-- PIN -->
-            <div class="usa-form-group mb-5" id="fg-pin">
-              <label for="pin" class="usa-label font-semibold">
-                Demo instance access PIN
-                <span class="text-red-600" aria-hidden="true">*</span>
+            <div class="mb-5" id="fg-pin">
+              <label for="pin" class="block text-sm font-bold text-gray-900 mb-1">
+                Demo instance access PIN<span class="text-red-600" aria-hidden="true">*</span>
               </label>
               <input
                 id="pin"
@@ -461,7 +441,7 @@
                 inputmode="numeric"
                 maxlength="6"
                 pattern="[0-9]{6}"
-                class="usa-input"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 placeholder="e.g. 123456"
                 autocomplete="off"
                 aria-required="true"
@@ -469,22 +449,22 @@
             </div>
 
             <!-- Google Analytics ID (optional) -->
-            <div class="usa-form-group mb-6" id="fg-googleAnalyticsId">
-              <label for="googleAnalyticsId" class="usa-label font-semibold">
+            <div class="mb-6" id="fg-googleAnalyticsId">
+              <label for="googleAnalyticsId" class="block text-sm font-bold text-gray-900 mb-1">
                 Google Analytics ID <span class="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
                 id="googleAnalyticsId"
                 name="googleAnalyticsId"
                 type="text"
-                class="usa-input"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                 placeholder="G-ABC123XYZ"
                 autocomplete="off"
               />
             </div>
 
             <!-- Step 2 footer -->
-            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+            <div class="flex items-center justify-between gap-4">
               <button
                 type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
@@ -499,13 +479,20 @@
                 onclick="wizardNext(2)"
                 aria-label="Continue to Step 3: Program setup"
               >
-                Next &#x2192;
+                Next
               </button>
             </div>
           </div>
 
           <!-- Step 3: Program setup -->
-          <div id="create-step-panel-3" class="wizard-panel hidden">
+          <div id="create-step-panel-3" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-3">
+            <!-- Step heading -->
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">3</span>
+              <span class="text-sm text-gray-500">of 3</span>
+              <span class="text-lg font-bold text-gray-900">Program setup</span>
+            </div>
+
             <!-- Pre-loaded programs info block -->
             <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
               <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true">&#x2139;</span>
@@ -524,11 +511,6 @@
               <p class="text-xs text-gray-500 mt-2">Upload PDF forms to automatically extract and generate additional custom programs in the demo. Imported programs are editable after the demo is provisioned.</p>
             </div>
 
-            <!--
-              Hidden inputs carry Step 1 + Step 2 values into the POST when the user is
-              on Step 3 and the live inputs in earlier panels are disabled.
-              JS keeps these in sync on every keystroke.
-            -->
             <input type="hidden" id="hidden-cityName"          name="cityName"          value="" />
             <input type="hidden" id="hidden-adminEmail"        name="adminEmail"        value="" />
             <input type="hidden" id="hidden-subdomain"         name="subdomain"         value="" />
@@ -537,7 +519,7 @@
             <input type="hidden" id="hidden-googleAnalyticsId" name="googleAnalyticsId" value="" />
 
             <!-- Step 3 footer -->
-            <div class="border-t border-gray-100 pt-5 flex items-center justify-between gap-4">
+            <div class="flex items-center justify-between gap-4">
               <button
                 type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
@@ -552,7 +534,7 @@
                 aria-label="Provision demo"
                 onclick="syncHiddenInputs()"
               >
-                Provision demo &#x2192;
+                Provision demo
               </button>
             </div>
           </div>
@@ -830,6 +812,7 @@
     function openModal(id) {
       const modal = document.getElementById(id)
       modal.classList.remove('hidden')
+      modal.style.display = 'flex'
       // trap focus — close on backdrop click
       modal.addEventListener('click', function onBackdrop(e) {
         if (e.target === modal) {
@@ -851,7 +834,9 @@
     }
 
     function closeModal(id) {
-      document.getElementById(id).classList.add('hidden')
+      const modal = document.getElementById(id)
+      modal.classList.add('hidden')
+      modal.style.display = 'none'
     }
 
     function togglePinVisibility() {
@@ -935,7 +920,7 @@
         document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
       }
 
-      // Update step indicator circles, labels, and connector lines
+      // Update tab states and show the correct panel
       function showStep(targetStep) {
         for (var i = 1; i <= TOTAL_STEPS; i++) {
           var panel = document.getElementById('create-step-panel-' + i)
@@ -946,47 +931,24 @@
               panel.classList.add('hidden')
             }
           }
-        }
-        for (var s = 1; s <= TOTAL_STEPS; s++) {
-          var circle = document.querySelector('#create-step-ind-' + s + ' .step-circle')
-          var label  = document.querySelector('#create-step-ind-' + s + ' .step-label')
-          if (!circle) continue
-          if (s < targetStep) {
-            circle.className =
-              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
-            circle.textContent = '\u2713'
-            circle.removeAttribute('aria-current')
-            if (label)
-              label.className =
-                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
-          } else if (s === targetStep) {
-            circle.className =
-              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-blue-700 bg-blue-700 text-white'
-            circle.textContent = String(s)
-            circle.setAttribute('aria-current', 'step')
-            if (label)
-              label.className =
-                'step-label text-sm font-semibold text-blue-700 hidden sm:block'
-          } else {
-            circle.className =
-              'step-circle w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-gray-300 bg-white text-gray-400'
-            circle.textContent = String(s)
-            circle.removeAttribute('aria-current')
-            if (label)
-              label.className =
-                'step-label text-sm font-medium text-gray-400 hidden sm:block'
+          // Update tab active state
+          var tab = document.getElementById('wizard-tab-' + i)
+          if (tab) {
+            if (i === targetStep) {
+              tab.classList.add('wizard-tab--active')
+              tab.setAttribute('aria-selected', 'true')
+            } else {
+              tab.classList.remove('wizard-tab--active')
+              tab.setAttribute('aria-selected', 'false')
+            }
           }
         }
-        var c12 = document.getElementById('create-connector-1-2')
-        var c23 = document.getElementById('create-connector-2-3')
-        if (c12)
-          c12.className =
-            'step-connector flex-1 h-0.5 mx-3 ' +
-            (targetStep > 1 ? 'bg-blue-700' : 'bg-gray-200')
-        if (c23)
-          c23.className =
-            'step-connector flex-1 h-0.5 mx-3 ' +
-            (targetStep > 2 ? 'bg-blue-700' : 'bg-gray-200')
+        // Update step number in panel heading
+        var panel = document.getElementById('create-step-panel-' + targetStep)
+        if (panel) {
+          var circle = panel.querySelector('.rounded-full')
+          if (circle) circle.textContent = String(targetStep)
+        }
       }
 
       function showError(msg) {
@@ -1099,6 +1061,16 @@
         setStepInputsDisabled(prevStep, false)
         setStepInputsDisabled(currentStep, true)
         showStep(prevStep)
+      }
+
+      // Navigate directly to a step via tab click
+      window.wizardGoTo = function(targetStep) {
+        clearError()
+        syncHiddenInputs()
+        for (var i = 1; i <= TOTAL_STEPS; i++) {
+          setStepInputsDisabled(i, i !== targetStep)
+        }
+        showStep(targetStep)
       }
 
       // Reset wizard to step 1 (called whenever the create-modal opens)

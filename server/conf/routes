@@ -28,6 +28,9 @@ POST    /sandboxes/:id/extend       controllers.SandboxController.extend(request
 GET     /sandboxes/:id/access       controllers.SandboxController.pinGate(request: Request, id: String)
 POST    /sandboxes/:id/access       controllers.SandboxController.validateAccess(request: Request, id: String)
 
+# Demo Wrapper (iframe view with banner + role switcher — shown after PIN)
+GET     /sandboxes/:id/view         controllers.SandboxController.demoView(request: Request, id: String)
+
 # Trailing slash handler
 GET     /*path/                     controllers.UntrailingController.untrail(path: String)
 

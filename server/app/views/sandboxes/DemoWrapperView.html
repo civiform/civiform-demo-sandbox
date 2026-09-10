@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="'DEMO: ' + ${model.cityName}">DEMO: Santa Cruz, CA</title>
+    <link rel="icon" href="/assets/images/favicon.ico" />
+    <style>
+      /* ── Reset ──────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; overflow: hidden; font-family: 'Public Sans Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+      /* ── Demo Banner Bar ────────────────────────────────────── */
+      .demo-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #1b2a3d;
+        color: #ffffff;
+        padding: 0 20px;
+        height: 44px;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .demo-banner-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .demo-label {
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+
+      .demo-days-badge {
+        display: inline-flex;
+        align-items: center;
+        background-color: #2e7d32;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        line-height: 1.4;
+      }
+
+      .demo-days-badge--expired {
+        background-color: #c62828;
+      }
+
+      /* ── Role Switcher ──────────────────────────────────────── */
+      .demo-banner-center {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .role-label {
+        font-size: 13px;
+        color: #b0bec5;
+        margin-right: 4px;
+      }
+
+      .role-btn {
+        background: transparent;
+        color: #ffffff;
+        border: 1.5px solid #ffffff;
+        padding: 4px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+        font-family: inherit;
+        line-height: 1.4;
+      }
+
+      .role-btn:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .role-btn.active {
+        background-color: #005ea2;
+        border-color: #005ea2;
+        color: #ffffff;
+      }
+
+      /* ── Settings Button ────────────────────────────────────── */
+      .demo-banner-right {
+        display: flex;
+        align-items: center;
+      }
+
+      .settings-btn {
+        background: transparent;
+        border: 1.5px solid #ffffff;
+        color: #ffffff;
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: background-color 0.15s;
+      }
+
+      .settings-btn:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+      }
+
+      /* ── Iframe ─────────────────────────────────────────────── */
+      .demo-iframe-container {
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
+      }
+
+      .demo-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+
+      /* ── Settings Dropdown ──────────────────────────────────── */
+      .settings-dropdown {
+        display: none;
+        position: absolute;
+        top: 44px;
+        right: 12px;
+        background: #ffffff;
+        border: 1px solid #dfe1e2;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        min-width: 220px;
+        z-index: 100;
+        padding: 8px 0;
+      }
+
+      .settings-dropdown.open { display: block; }
+
+      .settings-dropdown a,
+      .settings-dropdown button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 10px 16px;
+        font-size: 14px;
+        color: #1b1b1b;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        font-family: inherit;
+      }
+
+      .settings-dropdown a:hover,
+      .settings-dropdown button:hover {
+        background-color: #f0f0f0;
+      }
+
+      .settings-dropdown .divider {
+        border-top: 1px solid #dfe1e2;
+        margin: 4px 0;
+      }
+
+      /* ── Expired Overlay ────────────────────────────────────── */
+      .expired-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+
+      .expired-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 32px 40px;
+        text-align: center;
+        max-width: 420px;
+      }
+
+      .expired-card h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1b1b1b;
+        margin-bottom: 8px;
+      }
+
+      .expired-card p {
+        font-size: 14px;
+        color: #71767a;
+        margin-bottom: 20px;
+      }
+
+      .expired-card a {
+        display: inline-block;
+        background: #005ea2;
+        color: #ffffff;
+        padding: 10px 24px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      /* ── Fullscreen layout ──────────────────────────────────── */
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Demo Banner ───────────────────────────────────────── -->
+    <div class="demo-banner" role="banner">
+      <!-- Left: City name + days remaining -->
+      <div class="demo-banner-left">
+        <span class="demo-label" th:text="'DEMO: ' + ${model.cityName}">DEMO: Santa Cruz, CA</span>
+        <span
+          th:if="!${model.expired}"
+          class="demo-days-badge"
+          th:text="${model.daysRemaining} + ' days remaining'"
+        >26 days remaining</span>
+        <span
+          th:if="${model.expired}"
+          class="demo-days-badge demo-days-badge--expired"
+        >Expired</span>
+      </div>
+
+      <!-- Center: Role switcher -->
+      <div class="demo-banner-center">
+        <span class="role-label">View as:</span>
+        <button
+          class="role-btn active"
+          data-role="resident"
+          onclick="switchRole('resident', this)"
+          aria-label="Switch to Resident view"
+        >Resident</button>
+        <button
+          class="role-btn"
+          data-role="civiform-admin"
+          onclick="switchRole('civiform-admin', this)"
+          aria-label="Switch to CiviForm Admin view"
+        >CiviForm Admin</button>
+        <button
+          class="role-btn"
+          data-role="program-admin"
+          onclick="switchRole('program-admin', this)"
+          aria-label="Switch to Program Admin view"
+        >Program Admin</button>
+        <button
+          class="role-btn"
+          data-role="trusted-intermediary"
+          onclick="switchRole('trusted-intermediary', this)"
+          aria-label="Switch to Trusted Intermediary view"
+        >Trusted Intermediary</button>
+      </div>
+
+      <!-- Right: Settings gear -->
+      <div class="demo-banner-right" style="position: relative;">
+        <button
+          class="settings-btn"
+          onclick="toggleSettings()"
+          aria-label="Demo settings"
+          aria-expanded="false"
+          aria-controls="settings-dropdown"
+        >⚙</button>
+
+        <div id="settings-dropdown" class="settings-dropdown" role="menu">
+          <a th:href="'/' + ${model.sandboxUrl}" target="_blank" role="menuitem">
+            Open CiviForm in new tab ↗
+          </a>
+          <div class="divider"></div>
+          <button
+            role="menuitem"
+            onclick="copyShareLink()"
+          >Copy share link + PIN</button>
+          <div class="divider"></div>
+          <a th:href="'/sandboxes/' + ${model.sandboxId}" role="menuitem">
+            ← Back to portal
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CiviForm Iframe ───────────────────────────────────── -->
+    <div class="demo-iframe-container" style="position: relative;">
+      <iframe
+        id="civiform-iframe"
+        class="demo-iframe"
+        th:src="${model.sandboxUrl}"
+        title="CiviForm Demo Instance"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+        referrerpolicy="no-referrer"
+      ></iframe>
+
+      <!-- Expired overlay (covers iframe when sandbox is expired) -->
+      <div th:if="${model.expired}" class="expired-overlay">
+        <div class="expired-card">
+          <h2>Demo Expired</h2>
+          <p>This demo sandbox has expired. Contact your Exygy representative to extend it.</p>
+          <a th:href="'/sandboxes/' + ${model.sandboxId}">Back to Portal</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── JavaScript ────────────────────────────────────────── -->
+    <script th:inline="javascript">
+      /*<![CDATA[*/
+      const SANDBOX_URL = /*[[${model.sandboxUrl}]]*/ 'http://localhost:10001';
+      const SANDBOX_ID  = /*[[${model.sandboxId}]]*/ 'sb-demo';
+
+      /**
+       * Role switching: navigates the iframe to a CiviForm FAKE_IDP
+       * login URL for the selected persona. CiviForm's demo mode
+       * (STAGING_DISABLE_DEMO_MODE_LOGINS=false) provides these auto-login paths.
+       *
+       * The demo mode login page at /loginForm shows persona buttons.
+       * Clicking a role here loads that page in the iframe.
+       */
+      function switchRole(role, btn) {
+        // Update active button state
+        document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const iframe = document.getElementById('civiform-iframe');
+
+        // CiviForm demo mode login paths by role
+        const roleUrls = {
+          'resident':             SANDBOX_URL + '/loginForm',
+          'civiform-admin':       SANDBOX_URL + '/loginForm',
+          'program-admin':        SANDBOX_URL + '/loginForm',
+          'trusted-intermediary': SANDBOX_URL + '/loginForm'
+        };
+
+        // First logout to clear current session, then navigate to login form
+        // The iframe will show the demo login page where the user picks a persona
+        iframe.src = SANDBOX_URL + '/logout?redirectTo=' + encodeURIComponent('/loginForm');
+      }
+
+      /** Toggle settings dropdown */
+      function toggleSettings() {
+        const dropdown = document.getElementById('settings-dropdown');
+        const btn = dropdown.previousElementSibling;
+        const isOpen = dropdown.classList.toggle('open');
+        btn.setAttribute('aria-expanded', isOpen);
+      }
+
+      /** Close settings dropdown on outside click */
+      document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('settings-dropdown');
+        const settingsArea = dropdown.parentElement;
+        if (!settingsArea.contains(e.target)) {
+          dropdown.classList.remove('open');
+          settingsArea.querySelector('.settings-btn').setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      /** Close settings dropdown on Escape */
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          const dropdown = document.getElementById('settings-dropdown');
+          dropdown.classList.remove('open');
+          dropdown.parentElement.querySelector('.settings-btn').setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      /** Copy share link (PIN gate URL) to clipboard */
+      function copyShareLink() {
+        const shareUrl = window.location.origin + '/sandboxes/' + SANDBOX_ID + '/access';
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          alert('Share link copied to clipboard!');
+        });
+        toggleSettings();
+      }
+      /*]]>*/
+    </script>
+  </body>
+</html>
