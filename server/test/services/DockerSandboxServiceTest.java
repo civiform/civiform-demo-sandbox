@@ -353,6 +353,23 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
+  public void deleteSandbox_keepsRecordWhenDatabaseDropFails()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance sandbox = makeSandboxWithContainer("sb-del3", "container-xyz3");
+    when(repository.findById("sb-del3")).thenReturn(Optional.of(sandbox));
+    stubDockerStop("container-xyz3");
+    when(db.withConnection(any(ConnectionCallable.class)))
+        .thenThrow(new RuntimeException("connection refused"));
+
+    Boolean deleted = service.deleteSandbox("sb-del3").toCompletableFuture().get();
+
+    // The row is the only record of the database name; a failed drop must not delete it.
+    assertThat(deleted).isFalse();
+    verify(repository, never()).delete("sb-del3");
+    verify(repository).updateStatus("sb-del3", SandboxStatus.DELETE_FAILED);
+  }
+
+  @Test
   public void deleteSandbox_returnsFalseWhenSandboxNotFound()
       throws ExecutionException, InterruptedException {
     when(repository.findById("missing")).thenReturn(Optional.empty());

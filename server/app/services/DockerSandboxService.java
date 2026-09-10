@@ -235,12 +235,20 @@ public class DockerSandboxService implements SandboxService {
             }
           }
 
-          // Drop the per-sandbox database
+          // Drop the per-sandbox database. On failure, keep the metadata row: it is the only
+          // record of the database name, and deleting it would orphan a database that still
+          // holds whatever people typed into the demo.
           try {
             dropDatabase(sandbox.getDatabaseName());
             log.info("[{}] Database dropped", id);
           } catch (Exception e) {
-            log.warn("[{}] Could not drop database: {}", id, e.getMessage());
+            log.error(
+                "[{}] Could not drop database, keeping record for retry: {}",
+                id,
+                e.getMessage(),
+                e);
+            repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
+            return false;
           }
 
           return repository.delete(id);
@@ -334,18 +342,15 @@ public class DockerSandboxService implements SandboxService {
   /**
    * Drops the database and user for a deleted sandbox.
    *
-   * <p>Terminates all active connections to the database first (required by Postgres before
-   * DROP DATABASE), then drops the database and its owner user.
+   * <p>{@code WITH (FORCE)} (Postgres 13+) terminates any remaining connections and drops the
+   * database in one statement, closing the window where a client could reconnect between a
+   * separate pg_terminate_backend call and the drop.
    */
   private void dropDatabase(String databaseName) {
     db.withConnection(
         conn -> {
           try (Statement st = conn.createStatement()) {
-            // Terminate any active connections to the sandbox database
-            st.execute(String.format(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '%s'",
-                databaseName));
-            st.execute(String.format("DROP DATABASE IF EXISTS %s", databaseName));
+            st.execute(String.format("DROP DATABASE IF EXISTS %s WITH (FORCE)", databaseName));
             st.execute(String.format("DROP USER IF EXISTS %s", databaseName));
           }
           return null;
