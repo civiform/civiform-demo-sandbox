@@ -4,6 +4,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -16,6 +18,8 @@ import play.mvc.Http;
 import play.mvc.Result;
 import services.CreateSandboxRequest;
 import services.SandboxService;
+import views.sandboxes.DemoWrapperView;
+import views.sandboxes.DemoWrapperViewModel;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
 import views.sandboxes.SandboxDetailsView;
@@ -28,6 +32,7 @@ public class SandboxController extends Controller {
   private final SandboxService sandboxService;
   private final SandboxListView listView;
   private final SandboxDetailsView detailsView;
+  private final DemoWrapperView demoWrapperView;
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
 
@@ -36,11 +41,13 @@ public class SandboxController extends Controller {
       SandboxService sandboxService,
       SandboxListView listView,
       SandboxDetailsView detailsView,
+      DemoWrapperView demoWrapperView,
       PinGateView pinGateView,
       FormFactory formFactory) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
+    this.demoWrapperView = checkNotNull(demoWrapperView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
   }
@@ -179,12 +186,8 @@ public class SandboxController extends Controller {
     // If the browser already has a valid access cookie for this sandbox, skip the PIN form
     // and redirect directly to the live CiviForm URL.
     if (hasAccessCookie(request, id)) {
-      return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
-        if (maybeSandbox.isEmpty()) {
-          return notFound("Sandbox not found: " + id);
-        }
-        return redirect(maybeSandbox.get().getUrl());
-      });
+      return CompletableFuture.completedFuture(
+          redirect("/sandboxes/" + id + "/view"));
     }
 
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
@@ -215,7 +218,7 @@ public class SandboxController extends Controller {
 
     return sandboxService.validatePin(id, pin).thenCompose(maybeSandbox -> {
       if (maybeSandbox.isPresent()) {
-        // Correct PIN — set HTTP-only access cookie and redirect to live CiviForm
+        // Correct PIN — set HTTP-only access cookie and redirect to demo wrapper
         Http.Cookie accessCookie = Http.Cookie.builder(accessCookieName(id), "granted")
             .withHttpOnly(true)
             .withSameSite(Http.Cookie.SameSite.LAX)
@@ -223,7 +226,7 @@ public class SandboxController extends Controller {
             .withMaxAge(java.time.Duration.ofDays(30))
             .build();
         return CompletableFuture.completedFuture(
-            redirect(maybeSandbox.get().getUrl()).withCookies(accessCookie));
+            redirect("/sandboxes/" + id + "/view").withCookies(accessCookie));
       }
       // Wrong PIN — re-render gate with error, no cookie set
       return sandboxService.getSandbox(id).thenApply(ms -> {
@@ -234,6 +237,44 @@ public class SandboxController extends Controller {
             .build();
         return badRequest(pinGateView.render(request, model)).as("text/html");
       });
+    });
+  }
+
+  /**
+   * GET /sandboxes/:id/view — fullscreen demo wrapper with banner + iframe.
+   *
+   * <p>Requires a valid {@code sb_access_<id>} cookie (set by PIN validation).
+   * If no cookie is present, redirects to the PIN gate. The wrapper shows a
+   * persistent dark banner with city name, days remaining, and a role switcher
+   * on top of the live CiviForm instance in an iframe.
+   */
+  public CompletionStage<Result> demoView(Http.Request request, String id) {
+    // Allow access if: (a) portal admin session, OR (b) prospect PIN cookie
+    boolean hasPortalAuth = AuthController.isAuthenticated(request);
+    boolean hasPinCookie = hasAccessCookie(request, id);
+    if (!hasPortalAuth && !hasPinCookie) {
+      return CompletableFuture.completedFuture(
+          redirect("/sandboxes/" + id + "/access"));
+    }
+
+    return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
+      if (maybeSandbox.isEmpty()) {
+        return notFound("Sandbox not found: " + id);
+      }
+      SandboxInstance sandbox = maybeSandbox.get();
+      Instant now = Instant.now();
+      boolean expired = sandbox.getExpiresAt().isBefore(now);
+      long daysRemaining = expired ? 0
+          : Duration.between(now, sandbox.getExpiresAt()).toDays();
+
+      DemoWrapperViewModel model = DemoWrapperViewModel.builder()
+          .cityName(sandbox.getCityName())
+          .sandboxId(id)
+          .sandboxUrl(sandbox.getUrl())
+          .daysRemaining(daysRemaining)
+          .expired(expired)
+          .build();
+      return ok(demoWrapperView.render(request, model)).as("text/html");
     });
   }
 

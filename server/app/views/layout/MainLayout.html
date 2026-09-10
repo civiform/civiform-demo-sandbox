@@ -222,6 +222,28 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+      /* Wizard Tab Navigation */
+      .wizard-tab {
+        flex: 1;
+        padding: 10px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #71767a;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        text-align: center;
+        font-family: inherit;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .wizard-tab:hover {
+        color: #1b1b1b;
+      }
+      .wizard-tab--active {
+        color: #005ea2;
+        border-bottom-color: #005ea2;
+      }
     </style>
   </head>
   <body class="bg-gray-50 flex flex-col min-h-screen">
