@@ -22,6 +22,7 @@ import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -321,7 +322,7 @@ public class DockerSandboxServiceTest {
       throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandboxWithContainer("sb-del1", "container-xyz");
     when(repository.findById("sb-del1")).thenReturn(Optional.of(sandbox));
-    when(repository.delete("sb-del1")).thenReturn(true);
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
 
     StopContainerCmd stopCmd = mock(StopContainerCmd.class);
     when(stopCmd.withTimeout(any(Integer.class))).thenReturn(stopCmd);
@@ -343,7 +344,7 @@ public class DockerSandboxServiceTest {
       throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandboxWithContainer("sb-del2", "container-xyz2");
     when(repository.findById("sb-del2")).thenReturn(Optional.of(sandbox));
-    when(repository.delete("sb-del2")).thenReturn(true);
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
     stubDockerStop("container-xyz2");
 
     service.deleteSandbox("sb-del2").toCompletableFuture().get();
@@ -366,7 +367,41 @@ public class DockerSandboxServiceTest {
     // The row is the only record of the database name; a failed drop must not delete it.
     assertThat(deleted).isFalse();
     verify(repository, never()).delete("sb-del3");
+    verify(repository, never()).softDelete(anyString(), any(Instant.class));
     verify(repository).updateStatus("sb-del3", SandboxStatus.DELETE_FAILED);
+  }
+
+  @Test
+  public void deleteSandbox_keepsScrubbedTombstoneInsteadOfDeletingRow()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance sandbox = makeSandboxWithContainer("sb-del4", "container-xyz4");
+    when(repository.findById("sb-del4")).thenReturn(Optional.of(sandbox));
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
+    stubDockerStop("container-xyz4");
+
+    Boolean deleted = service.deleteSandbox("sb-del4").toCompletableFuture().get();
+
+    // Successful teardown tombstones the row (audit trail for orphaned AWS resources)
+    // instead of hard-deleting it.
+    assertThat(deleted).isTrue();
+    verify(repository).softDelete(anyString(), any(Instant.class));
+    verify(repository, never()).delete(anyString());
+  }
+
+  @Test
+  public void deleteSandbox_alreadyDeletedTombstoneIsNoOp()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance tombstone = makeSandboxWithStatus("sb-del5", SandboxStatus.DELETED);
+    when(repository.findById("sb-del5")).thenReturn(Optional.of(tombstone));
+
+    Boolean deleted = service.deleteSandbox("sb-del5").toCompletableFuture().get();
+
+    // Re-deleting a tombstone must not attempt teardown: the DROP DATABASE would fail
+    // and flip the row to DELETE_FAILED.
+    assertThat(deleted).isFalse();
+    verify(dockerClient, never()).stopContainerCmd(anyString());
+    verify(repository, never()).softDelete(anyString(), any(Instant.class));
+    verify(repository, never()).updateStatus(anyString(), any(SandboxStatus.class));
   }
 
   @Test

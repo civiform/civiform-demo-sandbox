@@ -37,3 +37,10 @@ END $$;
 -- These are deliberately not automated: dropping data should be a human decision per sandbox.
 -- If the whole environment is disposable (local dev), recreating the Postgres volume from
 -- scratch is the simpler path and makes this file unnecessary.
+
+-- 3. Soft-delete tombstones (PR #21 review follow-up).
+--
+-- Successful teardown now keeps the sandbox row as a scrubbed DELETED tombstone (audit trail
+-- of past demos, and the database name survives for orphaned-resource tracking) instead of
+-- deleting it. The app reads and writes deleted_at for this, so the column must exist.
+ALTER TABLE sandbox_instances ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;

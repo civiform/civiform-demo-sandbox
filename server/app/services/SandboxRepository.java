@@ -140,6 +140,26 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Marks a torn-down sandbox as a {@link SandboxStatus#DELETED} tombstone instead of removing
+   * the row. The row stays as the audit record of the demo (including its database name, for
+   * orphaned-resource tracking); the PIN and admin email are cleared so the tombstone holds no
+   * secrets or personal data.
+   */
+  public boolean softDelete(String id, Instant deletedAt) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET status = ?, deleted_at = ?, pin = '', admin_email = '' "
+              + "WHERE id = ?")) {
+        ps.setString(1, SandboxStatus.DELETED.name());
+        ps.setTimestamp(2, Timestamp.from(deletedAt));
+        ps.setString(3, id);
+        return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
   private SandboxInstance mapRow(ResultSet rs) throws java.sql.SQLException {
     return SandboxInstance.builder()
         .id(rs.getString("id"))

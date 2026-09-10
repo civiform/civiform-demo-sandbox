@@ -224,6 +224,13 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
 
+          // A DELETED row is a tombstone: the container and database are already gone.
+          // Re-running teardown would fail the DROP DATABASE and flip the tombstone to
+          // DELETE_FAILED, which would falsely signal a retryable drop.
+          if (sandbox.getStatus() == SandboxStatus.DELETED) {
+            return false;
+          }
+
           // Stop and remove container
           if (sandbox.getContainerId() != null) {
             try {
@@ -251,7 +258,10 @@ public class DockerSandboxService implements SandboxService {
             return false;
           }
 
-          return repository.delete(id);
+          // Keep the row as a scrubbed tombstone rather than deleting it: it is the audit
+          // record of the demo and the only place the database name survives for
+          // orphaned-resource tracking. PIN and admin email are cleared in the same update.
+          return repository.softDelete(id, Instant.now());
         },
         provisioningPool);
   }

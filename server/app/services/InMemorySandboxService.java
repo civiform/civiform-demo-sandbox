@@ -84,13 +84,16 @@ public class InMemorySandboxService implements SandboxService {
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
     SandboxInstance existing = sandboxes.get(id);
-    if (existing == null) {
+    if (existing == null || existing.getStatus() == SandboxStatus.DELETED) {
       return CompletableFuture.completedFuture(false);
     }
     // Soft-delete: mark as DELETED with timestamp so the dashboard can show the tombstone row.
+    // PIN and admin email are cleared to match the scrubbed tombstone the JDBC path keeps.
     SandboxInstance deleted = existing.toBuilder()
         .status(SandboxStatus.DELETED)
         .deletedAt(Instant.now())
+        .pin("")
+        .adminEmail("")
         .build();
     sandboxes.put(id, deleted);
     return CompletableFuture.completedFuture(true);
