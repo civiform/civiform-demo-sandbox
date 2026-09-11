@@ -42,7 +42,7 @@ import services.SandboxService;
  *
  * <p>Sprint 1 required tests (from pr-testing-standards.md):
  * - POST /sandboxes → 303 redirect to /sandboxes/:id
- * - POST /sandboxes/:id/access → redirect to sandbox URL on correct PIN
+ * - POST /sandboxes/:id/access → redirect to the demo wrapper view on correct PIN
  * - POST /sandboxes/:id/access → 400 on wrong PIN
  * - GET /sandboxes/:id/status → returns HTML fragment (not full page)
  */
@@ -82,10 +82,11 @@ public class SandboxControllerTest extends WithApplication {
 
     Result result = Helpers.route(app, request);
 
-    // Must be a 303 redirect to the list page (not detail page, not home)
+    // Must be a 303 redirect to the dashboard list (not the detail page)
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes");
+    assertThat(result.redirectLocation().get())
+        .isEqualTo(routes.SandboxController.index().url());
   }
 
   @Test
@@ -113,7 +114,7 @@ public class SandboxControllerTest extends WithApplication {
   // ── POST /sandboxes/:id/access — PIN validation ───────────────────────────
 
   @Test
-  public void validateAccess_correctPin_redirectsToSandboxUrl() {
+  public void validateAccess_correctPin_redirectsToDemoView() {
     SandboxInstance sandbox = makeSandbox("sb-pin1", SandboxStatus.RUNNING);
     when(sandboxService.validatePin("sb-pin1", "482917"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
@@ -127,7 +128,7 @@ public class SandboxControllerTest extends WithApplication {
 
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("http://localhost:10001");
+    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes/sb-pin1/view");
   }
 
   @Test
@@ -212,9 +213,9 @@ public class SandboxControllerTest extends WithApplication {
 
     Result result = Helpers.route(app, request);
 
-    // Cookie present → skip form, redirect straight to CiviForm URL
+    // Cookie present → skip form, redirect straight to the demo wrapper view
     assertThat(result.status()).isEqualTo(SEE_OTHER);
-    assertThat(result.redirectLocation().orElse("")).isEqualTo("http://localhost:10001");
+    assertThat(result.redirectLocation().orElse("")).isEqualTo("/sandboxes/sb-bypass/view");
   }
 
   @Test
