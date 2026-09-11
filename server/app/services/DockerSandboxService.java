@@ -136,10 +136,10 @@ public class DockerSandboxService implements SandboxService {
   public CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request) {
 
     String id = "sb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    String schemaName = "sandbox_" + id.replace("-", "_");
+    String databaseName = "sandbox_" + id.replace("-", "_");
     String pin = request.getPin();
     String subdomain = request.getSubdomain();
-    String dbUser = schemaName;
+    String dbUser = databaseName;
     String dbPassword = generateSecret(20);
     String appSecret = generateSecret(32);
 
@@ -159,7 +159,7 @@ public class DockerSandboxService implements SandboxService {
             .googleAnalyticsId(request.getGoogleAnalyticsId())
             .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .hostPort(hostPort)
-            .schemaName(schemaName)
+            .databaseName(databaseName)
             .createdAt(Instant.now())
             .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
             .build();
@@ -171,17 +171,17 @@ public class DockerSandboxService implements SandboxService {
     CompletableFuture.runAsync(
         () -> {
           try {
-            log.info("[{}] Provisioning started (port={}, schema={})", id, hostPort, schemaName);
+            log.info("[{}] Provisioning started (port={}, database={})", id, hostPort, databaseName);
 
-            // 1. Create per-sandbox Postgres schema before launching container
-            provisionSchema(schemaName, dbUser, dbPassword);
-            log.info("[{}] Schema provisioned", id);
+            // 1. Create per-sandbox Postgres database before launching container
+            provisionDatabase(databaseName, dbUser, dbPassword);
+            log.info("[{}] Database provisioned", id);
 
             // 2. Build JDBC URL accessible from inside the container
             String dbUrl =
                 String.format(
-                    "jdbc:postgresql://%s:5432/sandbox_builder?currentSchema=%s",
-                    dbHost, schemaName);
+                    "jdbc:postgresql://%s:5432/%s",
+                    dbHost, databaseName);
 
             // 3. Launch the CiviForm Docker container
             String containerId =
@@ -224,6 +224,13 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
 
+          // A DELETED row is a tombstone: the container and database are already gone.
+          // Re-running teardown would fail the DROP DATABASE and flip the tombstone to
+          // DELETE_FAILED, which would falsely signal a retryable drop.
+          if (sandbox.getStatus() == SandboxStatus.DELETED) {
+            return false;
+          }
+
           // Stop and remove container
           if (sandbox.getContainerId() != null) {
             try {
@@ -235,15 +242,26 @@ public class DockerSandboxService implements SandboxService {
             }
           }
 
-          // Drop the per-sandbox schema
+          // Drop the per-sandbox database. On failure, keep the metadata row: it is the only
+          // record of the database name, and deleting it would orphan a database that still
+          // holds whatever people typed into the demo.
           try {
-            dropSchema(sandbox.getSchemaName());
-            log.info("[{}] Schema dropped", id);
+            dropDatabase(sandbox.getDatabaseName());
+            log.info("[{}] Database dropped", id);
           } catch (Exception e) {
-            log.warn("[{}] Could not drop schema: {}", id, e.getMessage());
+            log.error(
+                "[{}] Could not drop database, keeping record for retry: {}",
+                id,
+                e.getMessage(),
+                e);
+            repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
+            return false;
           }
 
-          return repository.delete(id);
+          // Keep the row as a scrubbed tombstone rather than deleting it: it is the audit
+          // record of the demo and the only place the database name survives for
+          // orphaned-resource tracking. PIN and admin email are cleared in the same update.
+          return repository.softDelete(id, Instant.now());
         },
         provisioningPool);
   }
@@ -297,37 +315,59 @@ public class DockerSandboxService implements SandboxService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /** Provisions a dedicated Postgres schema and user for a sandbox. */
-  private void provisionSchema(String schemaName, String dbUser, String dbPassword) {
+  /**
+   * Provisions a dedicated Postgres database and user for a sandbox.
+   *
+   * <p>Each sandbox gets its own database (not just a schema) on the shared Postgres instance.
+   * This provides credential-level isolation: a bug or misconfigured credential in one sandbox
+   * cannot access another sandbox's data. CiviForm assumes it owns its database and applies
+   * Play evolutions, so database-per-sandbox avoids multi-tenancy issues. Teardown is provable:
+   * DROP DATABASE is atomic and total.
+   */
+  private void provisionDatabase(String databaseName, String dbUser, String dbPassword) {
+    // Step 1: Create user and database using the builder's connection pool (connects to sandbox_builder db)
     db.withConnection(
         conn -> {
           try (Statement st = conn.createStatement()) {
-            // Extensions are globally scoped, so we create them in the pg_catalog schema if they
-            // don't exist.
-            // This avoids an evolution error because the newly created user doesn't have permission
-            // to create extensions.
-            st.execute(
-                "CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA pg_catalog;"
-                    + "CREATE EXTENSION IF NOT EXISTS btree_gin SCHEMA pg_catalog;");
-
-            // Create user and schema
             st.execute(String.format("CREATE USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
-            st.execute(String.format("CREATE SCHEMA %s AUTHORIZATION %s", schemaName, dbUser));
-
-            // Grant connect on the database
-            st.execute(String.format("GRANT CONNECT ON DATABASE sandbox_builder TO %s", dbUser));
+            // CREATE DATABASE ... OWNER requires the creating role to be a member of the owner
+            // role. A true superuser (local docker-compose connects as postgres) passes that
+            // check implicitly, but on RDS the builder connects as sandbox_master, which is
+            // only rds_superuser, so grant membership explicitly. Redundant but harmless when
+            // the builder really is a superuser.
+            st.execute(String.format("GRANT %s TO CURRENT_USER", dbUser));
+            st.execute(String.format("CREATE DATABASE %s OWNER %s", databaseName, dbUser));
           }
           return null;
         });
+
+    // Step 2: Install CiviForm-required extensions in the new database.
+    // Must connect to the new database directly since extensions are per-database.
+    // Uses the sandbox user (who is OWNER and can create extensions via pg_database_owner role).
+    String newDbUrl = String.format("jdbc:postgresql://%s:5432/%s", dbHost, databaseName);
+    try (java.sql.Connection extConn =
+             java.sql.DriverManager.getConnection(newDbUrl, dbUser, dbPassword);
+         Statement extSt = extConn.createStatement()) {
+      extSt.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
+      extSt.execute("CREATE EXTENSION IF NOT EXISTS btree_gin;");
+    } catch (java.sql.SQLException e) {
+      throw new RuntimeException("Failed to install extensions in database " + databaseName, e);
+    }
   }
 
-  /** Drops the schema and user for a deleted sandbox. */
-  private void dropSchema(String schemaName) {
+  /**
+   * Drops the database and user for a deleted sandbox.
+   *
+   * <p>{@code WITH (FORCE)} (Postgres 13+) terminates any remaining connections and drops the
+   * database in one statement, closing the window where a client could reconnect between a
+   * separate pg_terminate_backend call and the drop.
+   */
+  private void dropDatabase(String databaseName) {
     db.withConnection(
         conn -> {
           try (Statement st = conn.createStatement()) {
-            st.execute(String.format("DROP SCHEMA IF EXISTS %s CASCADE", schemaName));
-            st.execute(String.format("DROP USER IF EXISTS %s", schemaName));
+            st.execute(String.format("DROP DATABASE IF EXISTS %s WITH (FORCE)", databaseName));
+            st.execute(String.format("DROP USER IF EXISTS %s", databaseName));
           }
           return null;
         });

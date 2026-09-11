@@ -1,6 +1,6 @@
 # ── RDS Postgres: Shared Sandbox Instance ─────────────────────────────────────
 # One RDS instance shared across all sandboxes.
-# Each sandbox gets its own schema + user (same pattern as Sprint 1 Docker approach).
+# Each sandbox gets its own database + user for credential-level isolation.
 # Isolated from Exygy's main CiviForm RDS — separate instance entirely.
 
 resource "random_password" "rds_master" {

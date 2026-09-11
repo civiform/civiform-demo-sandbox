@@ -41,7 +41,7 @@ public class InMemorySandboxService implements SandboxService {
             .adminEmail("admin@civiform.dev")
             .pin("482917")
             .hostPort(10000)
-            .schemaName("sandbox_demo_sb_1")
+            .databaseName("sandbox_demo_sb_1")
             .createdAt(Instant.now().minus(Duration.ofHours(2)))
             .expiresAt(Instant.now().plus(Duration.ofDays(30)))
             .build());
@@ -73,7 +73,7 @@ public class InMemorySandboxService implements SandboxService {
         .googleAnalyticsId(request.getGoogleAnalyticsId())
         .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
         .hostPort(10001)
-        .schemaName("sandbox_" + id.replace("-", "_"))
+        .databaseName("sandbox_" + id.replace("-", "_"))
         .createdAt(Instant.now())
         .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
         .build();
@@ -84,13 +84,16 @@ public class InMemorySandboxService implements SandboxService {
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
     SandboxInstance existing = sandboxes.get(id);
-    if (existing == null) {
+    if (existing == null || existing.getStatus() == SandboxStatus.DELETED) {
       return CompletableFuture.completedFuture(false);
     }
     // Soft-delete: mark as DELETED with timestamp so the dashboard can show the tombstone row.
+    // PIN and admin email are cleared to match the scrubbed tombstone the JDBC path keeps.
     SandboxInstance deleted = existing.toBuilder()
         .status(SandboxStatus.DELETED)
         .deletedAt(Instant.now())
+        .pin("")
+        .adminEmail("")
         .build();
     sandboxes.put(id, deleted);
     return CompletableFuture.completedFuture(true);
