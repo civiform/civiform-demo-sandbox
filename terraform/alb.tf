@@ -80,16 +80,16 @@ resource "aws_lb_listener" "https" {
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "alb_dns_name" {
-  description = "ALB DNS name — create a wildcard Route53/Cloudflare CNAME: *.sandbox.civiform.dev → this value"
+  description = "ALB DNS name - create a wildcard Route53/Cloudflare CNAME: *.sandbox.civiform.dev -> this value"
   value       = aws_lb.sandbox.dns_name
 }
 
 output "alb_zone_id" {
-  description = "ALB hosted zone ID — for Route 53 alias records"
+  description = "ALB hosted zone ID - for Route 53 alias records"
   value       = aws_lb.sandbox.zone_id
 }
 
 output "alb_https_listener_arn" {
-  description = "HTTPS listener ARN — set as ALB_LISTENER_ARN env var on the builder service"
+  description = "HTTPS listener ARN - set as ALB_LISTENER_ARN env var on the builder service"
   value       = aws_lb_listener.https.arn
 }

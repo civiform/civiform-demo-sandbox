@@ -65,7 +65,7 @@ resource "aws_secretsmanager_secret_version" "rds_master_password" {
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "rds_endpoint" {
-  description = "RDS endpoint — used by EcsFargateSandboxService to build per-sandbox DATABASE_URL"
+  description = "RDS endpoint - used by EcsFargateSandboxService to build per-sandbox DATABASE_URL"
   value       = aws_db_instance.sandbox.address
 }
 

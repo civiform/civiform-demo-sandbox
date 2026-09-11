@@ -11,7 +11,7 @@ variable "environment" {
 }
 
 variable "domain" {
-  description = "Base sandbox domain — sandboxes live at {slug}.sandbox.civiform.dev"
+  description = "Base sandbox domain - sandboxes live at {slug}.sandbox.civiform.dev"
   type        = string
   default     = "sandbox.civiform.dev"
 }
