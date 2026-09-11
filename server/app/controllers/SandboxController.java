@@ -207,7 +207,7 @@ public class SandboxController extends Controller {
    * POST /sandboxes/:id/access — validates the 6-digit PIN.
    *
    * <p>Correct PIN → sets HTTP-only {@code sb_access_<id>} session cookie,
-   * then redirects to live CiviForm URL. The cookie lets returning prospects
+   * then redirects to the demo wrapper view. The cookie lets returning prospects
    * bypass the PIN form for the remainder of the sandbox lifetime.
    *
    * <p>Wrong PIN → re-renders PIN gate with error. No cookie is set.
