@@ -1,0 +1,44 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache sbt
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.sbt
+            ~/.cache/coursier
+            server/target
+            server/project/target
+          key: ${{ runner.os }}-sbt-${{ hashFiles('server/project/build.properties', 'server/build.sbt') }}
+          restore-keys: |
+            ${{ runner.os }}-sbt-
+
+      - name: Compile (including test sources)
+        working-directory: server
+        run: sbt -batch -Dsbt.color=always Test/compile
+
+      - name: Run unit tests
+        working-directory: server
+        run: sbt -batch -Dsbt.color=always test
