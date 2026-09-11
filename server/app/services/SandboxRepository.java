@@ -41,7 +41,10 @@ public class SandboxRepository {
     });
   }
 
-  /** Persists a new sandbox row (called before async container launch). */
+  /**
+   * Persists a sandbox row. Uses upsert (INSERT ... ON CONFLICT DO UPDATE) so it works
+   * for both initial creation and subsequent updates (e.g. extendSandbox, soft-delete).
+   */
   public void save(SandboxInstance instance) {
     db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
@@ -50,7 +53,24 @@ public class SandboxRepository {
               + " pin, container_id, host_port, schema_name, target_group_arn, "
               + " listener_rule_arn, google_analytics_id, google_analytics_url, "
               + " created_at, expires_at, deleted_at) "
-              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+              + "ON CONFLICT (id) DO UPDATE SET "
+              + " city_name = EXCLUDED.city_name,"
+              + " subdomain = EXCLUDED.subdomain,"
+              + " civiform_version = EXCLUDED.civiform_version,"
+              + " status = EXCLUDED.status,"
+              + " url = EXCLUDED.url,"
+              + " admin_email = EXCLUDED.admin_email,"
+              + " pin = EXCLUDED.pin,"
+              + " container_id = EXCLUDED.container_id,"
+              + " host_port = EXCLUDED.host_port,"
+              + " schema_name = EXCLUDED.schema_name,"
+              + " target_group_arn = EXCLUDED.target_group_arn,"
+              + " listener_rule_arn = EXCLUDED.listener_rule_arn,"
+              + " google_analytics_id = EXCLUDED.google_analytics_id,"
+              + " google_analytics_url = EXCLUDED.google_analytics_url,"
+              + " expires_at = EXCLUDED.expires_at,"
+              + " deleted_at = EXCLUDED.deleted_at")) {
         ps.setString(1, instance.getId());
         ps.setString(2, instance.getCityName());
         ps.setString(3, instance.getSubdomain());
@@ -130,10 +150,15 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Soft-deletes a sandbox: marks it as DELETED with a timestamp.
+   * The row remains in the database so the dashboard can show a tombstone.
+   * The container and database are cleaned up by the caller before this is invoked.
+   */
   public boolean delete(String id) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
-          "DELETE FROM sandbox_instances WHERE id = ?")) {
+          "UPDATE sandbox_instances SET status = 'DELETED', deleted_at = NOW() WHERE id = ?")) {
         ps.setString(1, id);
         return ps.executeUpdate() > 0;
       }
