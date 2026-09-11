@@ -126,7 +126,7 @@ resource "aws_security_group" "alb" {
 # ECS tasks: accept traffic from ALB only
 resource "aws_security_group" "ecs_tasks" {
   name        = "civiform-sandbox-ecs"
-  description = "ECS sandbox tasks — ingress from ALB only"
+  description = "ECS sandbox tasks - ingress from ALB only"
   vpc_id      = aws_vpc.sandbox.id
 
   ingress {
@@ -149,7 +149,7 @@ resource "aws_security_group" "ecs_tasks" {
 # RDS: accept traffic from ECS tasks only
 resource "aws_security_group" "rds" {
   name        = "civiform-sandbox-rds"
-  description = "Sandbox RDS — ingress from ECS tasks only"
+  description = "Sandbox RDS - ingress from ECS tasks only"
   vpc_id      = aws_vpc.sandbox.id
 
   ingress {

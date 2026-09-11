@@ -41,3 +41,7 @@ RUNNING_PID
 browser-test/node_modules/
 browser-test/tmp/
 browser-test/dist/
+
+# Terraform
+terraform/.terraform/
+*.tfplan
