@@ -54,7 +54,7 @@ public final class AuthController extends Controller {
    * POST /login — validate credentials.
    *
    * <ul>
-   *   <li>Correct → set {@code portal_authed} session key, redirect to {@code /sandboxes}
+   *   <li>Correct → set {@code portal_authed} session key, redirect to the dashboard
    *   <li>Wrong → re-render login with error message (email field pre-filled)
    * </ul>
    */
