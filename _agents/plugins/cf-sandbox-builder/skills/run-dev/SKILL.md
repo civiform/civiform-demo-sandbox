@@ -71,6 +71,39 @@ docker compose logs -f db
 ## Resetting the Database
 
 ```bash
-docker compose down -v   # removes postgres_data volume
-./bin/run-dev            # reinitializes via init_postgres.sql
+./bin/stop-dev -v   # or: see the note below
+./bin/run-dev       # reinitializes via init_postgres.sql
 ```
+
+> **Do not use a bare `docker compose down -v`.** `bin/lib.sh` sets
+> `COMPOSE_PROJECT_NAME=cf-sandbox-builder`, but a plain `docker compose` invocation
+> derives the project name from the directory instead (`civiform-demo-sandbox`). It will
+> cheerfully report `Volume ... Removed` while removing a *different* project's volume and
+> leaving `cf-sandbox-builder_postgres_data` untouched — so the database is not reset and
+> `init_postgres.sql` never re-runs. The symptom is confusing: schema changes appear not to
+> take effect, with no error anywhere.
+>
+> If invoking compose directly, set the project name and pass both files:
+>
+> ```bash
+> COMPOSE_PROJECT_NAME=cf-sandbox-builder \
+>   docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+> ```
+
+### `init_postgres.sql` must be world-readable
+
+It is bind-mounted into `/docker-entrypoint-initdb.d/`, where the container's `postgres`
+user reads it. Bind mounts preserve host permissions, so if the working copy is mode `0640`
+the container cannot read it and Postgres skips initialization entirely — leaving an empty
+database with only this line in `docker logs cf-sandbox-builder-db-1`:
+
+```
+psql: error: /docker-entrypoint-initdb.d/init_postgres.sql: Permission denied
+```
+
+Git records mode `0644`. To restore the tree to the modes git already tracks:
+
+```bash
+git ls-files -z | xargs -0 chmod u+rw,go+r-w
+```
+

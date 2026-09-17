@@ -121,9 +121,9 @@ module "sandbox_builder_role" {
       },
       {
         # Read the RDS master password to CREATE/DROP per-sandbox schemas
-        Sid    = "RdsMasterSecret"
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Sid      = "RdsMasterSecret"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = aws_secretsmanager_secret.rds_master_password.arn
       },
       {
@@ -151,6 +151,13 @@ module "sandbox_builder_role" {
 
 output "ecs_cluster_arn" {
   value = aws_ecs_cluster.sandbox.arn
+}
+
+# ecs_fargate_service needs the cluster name as well as the ARN: the ARN goes to the
+# ECS service, while the autoscaling target is addressed by name.
+output "ecs_cluster_name" {
+  description = "Shared ECS cluster name"
+  value       = aws_ecs_cluster.sandbox.name
 }
 
 output "ecs_execution_role_arn" {
