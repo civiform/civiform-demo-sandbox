@@ -19,11 +19,22 @@ terraform {
     }
   }
 
-  # S3 backend — configure before first apply:
+  # S3 backend. The bucket is created by the bootstrap root (terraform/bootstrap),
+  # which must be applied first. Configure at init time rather than hardcoding,
+  # so the same configuration can target a different account:
+  #
   #   terraform init \
   #     -backend-config="bucket=civiform-sandbox-tfstate" \
-  #     -backend-config="key=sandbox/terraform.tfstate" \
-  #     -backend-config="region=us-east-1"
+  #     -backend-config="key=platform/terraform.tfstate" \
+  #     -backend-config="region=us-east-1" \
+  #     -backend-config="use_lockfile=true"
+  #
+  # The key is deliberately namespaced: per-sandbox stacks use
+  # sandboxes/<id>/terraform.tfstate in the same bucket, so each sandbox locks
+  # independently and concurrent provisioning does not serialise.
+  #
+  # use_lockfile is not a default. Without it there is no locking at all, and
+  # two simultaneous applies will silently clobber each other's state.
   backend "s3" {
     encrypt = true
   }
