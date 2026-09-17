@@ -1,0 +1,178 @@
+# ── Per-sandbox identity ──────────────────────────────────────────────────────
+
+variable "sandbox_id" {
+  description = "Unique sandbox identifier, e.g. sb-a1b2c3d4. Used as app_prefix for both upstream modules."
+  type        = string
+
+  validation {
+    # The upstream ecs_fargate_service module enforces this as a plan-time
+    # precondition, because the target group name it derives is
+    # "<app_prefix>-https-9000" and AWS caps target group names at 32 chars.
+    # Duplicated here so the failure names the actual variable rather than
+    # surfacing from inside a module.
+    condition     = length(var.sandbox_id) <= 21
+    error_message = "sandbox_id must be at most 21 characters: the derived target group name is capped at 32."
+  }
+
+  validation {
+    # Also used in resource names and tags. Keeping it to a valid DNS label
+    # means it can be reused as a subdomain without transformation.
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.sandbox_id))
+    error_message = "sandbox_id must be a valid DNS label: lowercase alphanumerics and hyphens, not starting or ending with a hyphen."
+  }
+}
+
+variable "city_name" {
+  description = "Display name of the municipality, e.g. \"Burlington, VT\". Drives the CiviForm whitelabel branding."
+  type        = string
+}
+
+variable "subdomain" {
+  description = "Host label for this sandbox. Combined with base_domain to form the ALB host-header condition."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", var.subdomain))
+    error_message = "subdomain must be a valid DNS label."
+  }
+}
+
+variable "admin_email" {
+  description = "Email seeded as a CiviForm global admin in the sandbox."
+  type        = string
+}
+
+variable "listener_priority" {
+  description = "ALB listener rule priority. Allocated from the sandbox_listener_priority_seq Postgres sequence so concurrent provisioning cannot collide."
+  type        = number
+
+  validation {
+    condition     = var.listener_priority >= 1 && var.listener_priority <= 50000
+    error_message = "ALB listener rule priorities must be between 1 and 50000."
+  }
+}
+
+# ── Sandbox tuning ────────────────────────────────────────────────────────────
+
+variable "civiform_image_tag" {
+  description = <<-EOT
+    CiviForm image tag this sandbox runs.
+
+    Pinned at creation and never changed for the sandbox's 30-day life: a demo
+    that silently upgrades underneath a prospect mid-evaluation is worse than
+    one running a slightly old build.
+  EOT
+  type        = string
+  default     = "latest"
+}
+
+variable "ecs_task_cpu" {
+  description = "Fargate task CPU units. 1024 = 1 vCPU."
+  type        = number
+  default     = 1024
+}
+
+variable "ecs_task_memory" {
+  description = "Fargate task memory in MiB. Must be a valid pairing with ecs_task_cpu."
+  type        = number
+  default     = 4096
+}
+
+# ── Database ──────────────────────────────────────────────────────────────────
+#
+# The database and its owner are created over JDBC by the builder *before* this
+# apply, so the credentials arrive as inputs rather than being generated here.
+
+variable "db_address" {
+  description = "Hostname of the shared RDS instance (platform output rds_endpoint)."
+  type        = string
+}
+
+variable "db_name" {
+  description = "Per-sandbox database name on the shared RDS instance."
+  type        = string
+}
+
+variable "db_username" {
+  description = "Per-sandbox database role. Owns only this sandbox's database."
+  type        = string
+}
+
+variable "db_password" {
+  description = "Password for db_username. Written to Secrets Manager by this stack."
+  type        = string
+  sensitive   = true
+}
+
+# ── Platform stack outputs ────────────────────────────────────────────────────
+#
+# Injected by the builder from the platform state rather than read with a
+# terraform_remote_state data source. That is deliberate: a remote state read
+# would require every sandbox apply to hold read access to the platform state
+# file, which contains the RDS master password.
+
+variable "aws_region" {
+  description = "AWS region. Must match the platform stack."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "base_domain" {
+  description = "Wildcard domain already pointed at the shared ALB, e.g. sandbox.civiform.dev."
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "Shared VPC ID (platform output vpc_id)."
+  type        = string
+}
+
+variable "private_subnet_ids" {
+  description = "Shared private subnet IDs the ECS tasks run in (platform output private_subnet_ids)."
+  type        = list(string)
+}
+
+variable "alb_security_group_id" {
+  description = "Shared ALB security group. The service module adds an ingress rule on its own task security group allowing traffic from this one."
+  type        = string
+}
+
+variable "alb_listener_arn" {
+  description = "Shared HTTPS listener the per-sandbox host-header rule attaches to (platform output alb_https_listener_arn)."
+  type        = string
+}
+
+variable "ecs_cluster_arn" {
+  description = "Shared ECS cluster ARN (platform output ecs_cluster_arn)."
+  type        = string
+}
+
+variable "ecs_cluster_name" {
+  description = "Shared ECS cluster name (platform output ecs_cluster_name). Needed by the autoscaling submodule."
+  type        = string
+}
+
+variable "log_group_name" {
+  description = "Shared CloudWatch log group (platform output cloudwatch_log_group). Retention is set on the group, so teardown intentionally leaves this sandbox's streams to age out."
+  type        = string
+}
+
+variable "kms_key_arn" {
+  description = "Shared KMS key encrypting sandbox secrets and file storage (platform output sandbox_secrets_kms_key_arn)."
+  type        = string
+}
+
+variable "placeholder_secrets" {
+  description = <<-EOT
+    Shared inert secrets from the platform stack (output placeholder_secrets),
+    appended to this sandbox's four real secrets in upstream's required order.
+
+    Sandboxes use FAKE_IDP, so these identity-provider values are never read —
+    but the container definition still requires an ARN for each.
+  EOT
+  type = list(object({
+    name       = string
+    value_arn  = string
+    secret_arn = string
+  }))
+}
