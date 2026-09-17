@@ -14,6 +14,22 @@ CREATE SEQUENCE IF NOT EXISTS sandbox_port_seq
   CYCLE;
 
 -- ============================================================
+-- ALB listener rule priority sequence (atomic, thread-safe)
+-- Used by the Terraform runtime; Docker sandboxes have no load balancer.
+-- ============================================================
+-- NO CYCLE is deliberate, and differs from sandbox_port_seq above. Ports are a
+-- small pool that has to be recycled. Priorities are not: wrapping would hand
+-- out a number a live ALB rule already holds, and the apply would fail
+-- intermittently and confusingly. 49,000 values is far beyond any plausible
+-- sandbox count, so exhaustion should be a loud error rather than a collision.
+CREATE SEQUENCE IF NOT EXISTS sandbox_listener_priority_seq
+  START 1000
+  INCREMENT 1
+  MINVALUE 1000
+  MAXVALUE 50000
+  NO CYCLE;
+
+-- ============================================================
 -- sandbox_instances: one row per live or historical sandbox
 -- ============================================================
 -- Column order follows SandboxRepository.mapRow so the two stay easy to diff.
@@ -35,6 +51,10 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
   -- AWS resource ARNs, set by the Fargate/Terraform runtime only.
   target_group_arn  VARCHAR(512),
   listener_rule_arn VARCHAR(512),
+  -- Priority of this sandbox's ALB listener rule, allocated from
+  -- sandbox_listener_priority_seq. Recorded so teardown and debugging can find
+  -- the rule without calling AWS. Null for Docker sandboxes.
+  listener_priority INTEGER,
   -- Optional per-sandbox Google Analytics wiring, surfaced in the admin UI.
   google_analytics_id  VARCHAR(64),
   google_analytics_url VARCHAR(512),
