@@ -25,6 +25,15 @@ variable "sandbox_id" {
 variable "city_name" {
   description = "Display name of the municipality, e.g. \"Burlington, VT\". Drives the CiviForm whitelabel branding."
   type        = string
+
+  validation {
+    # Also tagged onto every resource via default_tags, where AWS caps values at
+    # 256 characters. Bounded here so an over-long name fails at plan time with a
+    # message naming this variable, rather than part-way through an apply.
+    # Characters AWS disallows in tags are stripped in main.tf.
+    condition     = length(var.city_name) > 0 && length(var.city_name) <= 200
+    error_message = "city_name must be between 1 and 200 characters."
+  }
 }
 
 variable "subdomain" {

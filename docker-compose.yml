@@ -31,22 +31,22 @@ services:
       - APPLICATION_SECRET=cf-sandbox-builder-dev-secret-key-1234567890
       - DOCKER_SOCKET_PATH=unix:///var/run/docker.sock
       - SANDBOX_DB_HOST=host.docker.internal
-      # Runtime selector: "docker" (Sprint 1 local) or "fargate" (Sprint 2 AWS)
+      # Runtime selector: "docker" (local, no AWS) or "terraform" (AWS)
       - SANDBOX_RUNTIME=docker
       - DEMO_PORTAL_PASSWORD=demo
-      # ── Sprint 2 Fargate vars — only needed when SANDBOX_RUNTIME=fargate ──────
-      # Leave blank for local Docker development. Set in AWS ECS task definition.
-      - SANDBOX_DOMAIN=sandbox.civiform.dev
-      - SANDBOX_VPC_ID=
+      # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
+      # Unset locally. In AWS these are set on the ECS task definition, with the
+      # RDS admin password sourced from Secrets Manager rather than plain env.
+      #
+      # PLATFORM_OUTPUTS_FILE is the output of:
+      #   terraform -chdir=terraform output -json
+      # To exercise this runtime locally, generate that file, drop it somewhere
+      # under ./terraform, and point this at the mounted path.
       - AWS_REGION=us-east-1
-      - ECS_CLUSTER=civiform-sandbox-cluster
-      - ECS_SUBNETS=
-      - ECS_SECURITY_GROUP=
-      - ECS_EXECUTION_ROLE_ARN=
-      - ECS_TASK_ROLE_ARN=
-      - ALB_LISTENER_ARN=
-      - RDS_HOST=
-      - RDS_MASTER_SECRET_ARN=
+      - TERRAFORM_MODULE_DIR=/usr/src/terraform/sandbox
+      - PLATFORM_OUTPUTS_FILE=/usr/src/terraform/platform-outputs.json
+      - TERRAFORM_STATE_BUCKET=civiform-sandbox-tfstate
+      - RDS_ADMIN_PASSWORD=
     volumes:
       # Mount Docker socket so the builder can launch CiviForm containers (Sprint 1)
       - /var/run/docker.sock:/var/run/docker.sock

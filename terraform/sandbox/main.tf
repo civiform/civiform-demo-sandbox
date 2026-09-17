@@ -32,12 +32,15 @@ terraform {
 provider "aws" {
   region = var.aws_region
 
+  # Applied to every resource in this stack, including those created inside the
+  # upstream modules — which is why a bad value here fails the apply in seven
+  # places at once rather than one.
   default_tags {
     tags = {
       Project    = "civiform-sandbox"
       ManagedBy  = "terraform"
       SandboxId  = var.sandbox_id
-      SandboxFor = var.city_name
+      SandboxFor = local.city_name_tag
     }
   }
 }
@@ -46,6 +49,48 @@ data "aws_caller_identity" "current" {}
 
 locals {
   fqdn = "${var.subdomain}.${var.base_domain}"
+
+  # AWS tag values are restricted to letters, numbers, spaces and _ . : / = + - @
+  # (the API enforces ^([\p{L}\p{Z}\p{N}_.:/=+\-@]*)$). Commas are not in that
+  # set, and "Burlington, VT" is the canonical way a city name is written — so
+  # the obvious input breaks the apply.
+  #
+  # Sanitised rather than validated away: city_name is free text typed by a
+  # sales rep and is also the user-visible whitelabel branding, so rejecting
+  # "Burlington, VT" would be the wrong trade. The tag drops the comma; the
+  # branding below keeps it.
+  #
+  # Note this is not cosmetic — default_tags propagates to every resource in
+  # both upstream modules, including the IAM role and target group, so an
+  # invalid value fails the apply in seven places with errors that name AWS
+  # internals rather than this variable.
+  city_name_tag = replace(var.city_name, "/[^\\p{L}\\p{Z}\\p{N}_.:\\/=+\\-@]/", "")
+
+  # Placeholder secrets deliberately withheld from the container.
+  #
+  # Supplying these two crashes the server at startup. AdfsClientProvider.get()
+  # guards on client_id and secret but not on discovery_uri:
+  #
+  #   if (!configuration.hasPath("adfs.client_id")
+  #       || !configuration.hasPath("adfs.secret")) {
+  #     return null;
+  #   }
+  #   ...
+  #   config.setDiscoveryURI(configuration.getString("adfs.discovery_uri"));
+  #
+  # adfs.discovery_uri has no default in CiviForm's auth.conf, so presenting a
+  # client id and secret without it takes the provider past its own guard and
+  # into a ConfigException during Guice injection. Withholding them keeps the
+  # provider on its null path, which is what we want anyway: the admin IdP is
+  # never exercised, because admins sign in through the demo-mode buttons.
+  #
+  # Verified against civiform/civiform:latest — adding only these two env vars
+  # to an otherwise-working container reproduces the failure exactly.
+  #
+  # The alternative, supplying an ADFS_DISCOVERY_URI, would make every sandbox
+  # boot depend on a reachable third-party OIDC endpoint in order to construct a
+  # client no one ever uses.
+  withheld_placeholder_secrets = ["ADFS_CLIENT_ID", "ADFS_SECRET"]
 
   # Order is significant — see the `secrets` variable docs in the civiform_app
   # module. This must stay in upstream's order, because the module renders it
@@ -78,7 +123,10 @@ locals {
         secret_arn = aws_secretsmanager_secret.api_secret_salt.arn
       },
     ],
-    var.placeholder_secrets,
+    [
+      for secret in var.placeholder_secrets : secret
+      if !contains(local.withheld_placeholder_secrets, secret.name)
+    ],
   )
 }
 
@@ -138,13 +186,43 @@ module "civiform_app" {
     WHITELABEL_CIVIC_ENTITY_SHORT_NAME = var.city_name
     WHITELABEL_CIVIC_ENTITY_FULL_NAME  = var.city_name
 
-    # Demo affordances. Both are required by the product brief and both are
-    # exactly what must never be enabled on a real deployment.
+    # Demo affordances. All three are required by the product brief and all
+    # three are exactly what must never be enabled on a real deployment.
     STAGING_DISABLE_DEMO_MODE_LOGINS   = "false"
     SHOW_NOT_PRODUCTION_BANNER_ENABLED = "true"
 
-    CIVIFORM_APPLICANT_IDP = "generic-oidc"
-    STAGING_ADMIN_LIST     = var.admin_email
+    # Load-bearing, and not obviously so. FakeAdminClient — the thing that
+    # actually provides the [CiviForm Admin] / [Program Admin] personas — only
+    # activates for hosts in ImmutableSet.of("localhost", "civiform",
+    # staging_hostname). staging_hostname defaults to "", so without this the
+    # server starts cleanly, serves pages, and silently renders no demo login
+    # buttons at all. STAGING_DISABLE_DEMO_MODE_LOGINS=false is necessary but
+    # not sufficient.
+    STAGING_HOSTNAME = local.fqdn
+
+    # No applicant identity provider.
+    #
+    # Was "generic-oidc", which is what local dev uses against the dev-oidc
+    # container. That does not survive the move to ECS: generic-oidc requires
+    # applicant_generic_oidc.discovery_uri, CiviForm's auth.conf gives it no
+    # default, and there is no fake IdP reachable from a Fargate task — so the
+    # server died during Guice injection before it ever bound a port.
+    #
+    # "disabled" binds a null applicant client (AuthIdentityProviderName.
+    # DISABLED_APPLICANT), which is sound for a demo: residents browse through
+    # GuestClient, which is always registered, and admins sign in through the
+    # demo-mode buttons above. The alternative — pointing at the shared Auth0
+    # staging tenant the way Exygy's hand-built demo sites do — would make every
+    # sandbox boot depend on a third-party endpoint to support a login path no
+    # evaluator is ever asked to use.
+    #
+    # Note the admin IdP is left at its "adfs" default and deliberately given no
+    # ADFS_DISCOVERY_URI. Verified empirically against civiform/civiform:latest:
+    # the server boots, serves /playIndex, and renders all four fake-admin
+    # personas with no ADFS configuration present.
+    CIVIFORM_APPLICANT_IDP = "disabled"
+
+    STAGING_ADMIN_LIST = var.admin_email
   }
 }
 

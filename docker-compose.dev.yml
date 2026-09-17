@@ -2,6 +2,10 @@ services:
   builder:
     volumes:
       - ./server:/usr/src/server
+      # Read-only: the service copies the root module to a temp dir per job and
+      # never runs Terraform in place. Mounting it means SANDBOX_RUNTIME can be
+      # flipped to "terraform" locally without rebuilding the image.
+      - ./terraform:/usr/src/terraform:ro
       - /usr/src/server/target
       - /usr/src/server/project/target
       - /usr/src/server/node_modules
