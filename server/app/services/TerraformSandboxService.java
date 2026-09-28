@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.typesafe.config.Config;
 import java.io.IOException;
@@ -524,10 +525,32 @@ public class TerraformSandboxService implements SandboxService {
     }
   }
 
-  private String rdsUrl(String databaseName) {
+  /**
+   * Host and port for the builder's own administrative connection.
+   *
+   * <p>Defaults to the shared RDS endpoint on 5432, which is correct whenever the builder runs
+   * inside the VPC — the production topology. Overridable because the builder's connection and the
+   * sandbox task's connection need not take the same route: a developer reaches RDS through an SSM
+   * port-forward on localhost, while the task always uses the real endpoint from inside the private
+   * subnets.
+   *
+   * <p>This is why the override exists at all rather than simply editing the platform outputs file.
+   * {@code rds_endpoint} is also passed to the sandbox stack as {@code db_address}, so pointing it
+   * at a tunnel would tell the ECS task to connect to the developer's laptop.
+   *
+   * <p>Resolved on each use rather than in the constructor: an incomplete outputs file must surface
+   * when a sandbox is created, not refuse to start the whole application.
+   */
+  private String rdsAdminHost() {
+    String configured = config.getString("sandbox.rds.adminHost");
+    return configured.isBlank() ? platformOutput("rds_endpoint").asText() : configured;
+  }
+
+  @VisibleForTesting
+  String rdsUrl(String databaseName) {
     return String.format(
-        "jdbc:postgresql://%s:5432/%s?ssl=true&sslmode=require",
-        platformOutput("rds_endpoint").asText(), databaseName);
+        "jdbc:postgresql://%s:%d/%s?ssl=true&sslmode=require",
+        rdsAdminHost(), config.getInt("sandbox.rds.adminPort"), databaseName);
   }
 
   @FunctionalInterface

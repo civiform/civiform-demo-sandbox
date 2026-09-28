@@ -99,6 +99,18 @@ public class TerraformSandboxServiceTest {
     values.put("sandbox.rds.adminDatabase", "postgres");
     values.put("sandbox.rds.adminUser", "sandbox_master");
     values.put("sandbox.rds.adminPassword", "secret");
+    // Production defaults: empty host means "fall back to rds_endpoint".
+    values.put("sandbox.rds.adminHost", "");
+    values.put("sandbox.rds.adminPort", 5432);
+    return ConfigFactory.parseMap(values);
+  }
+
+  /** Variant of {@link #config(Path)} with the admin connection pointed at a tunnel. */
+  private Config configWithAdminOverride(String host, int port) {
+    Map<String, Object> values = new HashMap<>();
+    config(platformOutputsFile).entrySet().forEach(e -> values.put(e.getKey(), e.getValue().unwrapped()));
+    values.put("sandbox.rds.adminHost", host);
+    values.put("sandbox.rds.adminPort", port);
     return ConfigFactory.parseMap(values);
   }
 
@@ -342,5 +354,45 @@ public class TerraformSandboxServiceTest {
     assertThatThrownBy(() -> service.createSandbox(request()))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("base_domain");
+  }
+  // ── admin connection routing ────────────────────────────────────────────────
+
+  @Test
+  public void rdsUrl_defaultsToPlatformEndpoint() {
+    // The production case: the builder runs in the VPC and talks to RDS directly.
+    assertThat(newService().rdsUrl("postgres"))
+        .isEqualTo("jdbc:postgresql://rds.internal:5432/postgres?ssl=true&sslmode=require");
+  }
+
+  @Test
+  public void rdsUrl_honoursAdminHostAndPortOverride() {
+    TerraformSandboxService service =
+        new TerraformSandboxService(
+            repository, configWithAdminOverride("host.docker.internal", 15432), terraform);
+
+    // The local-development case: an SSM port-forward standing in for RDS.
+    assertThat(service.rdsUrl("sb_a1b2c3d4"))
+        .isEqualTo(
+            "jdbc:postgresql://host.docker.internal:15432/sb_a1b2c3d4?ssl=true&sslmode=require");
+  }
+
+  @Test
+  public void adminHostOverride_doesNotChangeTheSandboxesOwnDatabaseHost() throws Exception {
+    TerraformSandboxService service =
+        new TerraformSandboxService(
+            repository, configWithAdminOverride("host.docker.internal", 15432), terraform);
+
+    // The whole reason this override exists rather than editing rds_endpoint in
+    // the platform outputs file. rds_endpoint is also passed to the sandbox stack
+    // as db_address, so if the two were the same knob, tunnelling locally would
+    // deploy an ECS task configured to reach a developer's laptop — and it would
+    // fail its health check in AWS for reasons invisible from the tunnel.
+    service.createSandbox(request()).toCompletableFuture().get();
+
+    ArgumentCaptor<SandboxInstance> saved = ArgumentCaptor.forClass(SandboxInstance.class);
+    verify(repository).save(saved.capture());
+
+    assertThat(service.rdsUrl("postgres")).contains("host.docker.internal:15432");
+    assertThat(saved.getValue().getUrl()).contains("sandbox.civiform.dev");
   }
 }

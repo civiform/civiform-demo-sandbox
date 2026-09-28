@@ -6,6 +6,11 @@ services:
       # never runs Terraform in place. Mounting it means SANDBOX_RUNTIME can be
       # flipped to "terraform" locally without rebuilding the image.
       - ./terraform:/usr/src/terraform:ro
+      # Local AWS credentials, for SANDBOX_RUNTIME=terraform. Read-only, and
+      # dev-only: in AWS the task role provides credentials and this path does
+      # not exist. Needed for AWS_PROFILE and SSO caches; plain key/secret env
+      # vars are passed through in docker-compose.yml instead.
+      - ${HOME}/.aws:/root/.aws:ro
       - /usr/src/server/target
       - /usr/src/server/project/target
       - /usr/src/server/node_modules

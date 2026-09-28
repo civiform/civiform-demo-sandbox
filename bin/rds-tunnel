@@ -1,0 +1,162 @@
+#! /usr/bin/env bash
+#
+# Opens an admin connection to the shared sandbox RDS instance from a laptop,
+# reachable BOTH from the host and from inside the builder container.
+#
+# Run this in its own terminal and leave it running, then in another terminal:
+#
+#   export SANDBOX_RUNTIME=terraform
+#   export RDS_ADMIN_HOST=host.docker.internal
+#   export RDS_ADMIN_PORT=15432
+#   export RDS_ADMIN_PASSWORD=$(bin/rds-password)
+#   ./bin/run-dev
+#
+# Why this is not just one `aws ssm start-session` call:
+#
+# session-manager-plugin binds its forwarded port to 127.0.0.1 and gives you no
+# way to change that. The builder runs in a container on the default bridge
+# network, where `host.docker.internal` resolves to the bridge gateway, not to
+# the host's loopback. So the container's connection is refused even though the
+# tunnel is up and `psql localhost:15432` works fine from the host -- a
+# genuinely confusing failure, and the error it produces is a plain
+# "Connection refused" that looks identical to "you forgot to start the tunnel".
+#
+# So we bind a second listener on the bridge gateway and relay it to loopback.
+# The two listeners can share the port number because they are on different
+# addresses, which means the host and the container use the same port and
+# nothing in application.conf needs a special case.
+
+source bin/lib.sh
+
+REGION="${AWS_REGION:-us-east-1}"
+LOCAL_PORT="${RDS_ADMIN_PORT:-15432}"
+BASTION_NAME="${BASTION_NAME:-civiform-sandbox-bastion}"
+OUTPUTS_FILE="${OUTPUTS_FILE:-terraform/platform-outputs.json}"
+
+for tool in aws jq session-manager-plugin; do
+  command -v "$tool" >/dev/null || {
+    echo "error: $tool is not installed or not on PATH" >&2
+    exit 1
+  }
+done
+
+# ── Where is RDS? ─────────────────────────────────────────────────────────────
+# Prefer the generated outputs file so this agrees with what the builder itself
+# was handed. Fall back to querying AWS, so the script still works before the
+# file has been generated.
+if [[ -f "$OUTPUTS_FILE" ]] && jq -e '.rds_endpoint.value' "$OUTPUTS_FILE" >/dev/null 2>&1; then
+  RDS_HOST="$(jq -r '.rds_endpoint.value' "$OUTPUTS_FILE")"
+  echo "RDS endpoint (from $OUTPUTS_FILE): $RDS_HOST"
+else
+  echo "No rds_endpoint in $OUTPUTS_FILE; querying AWS..."
+  RDS_HOST="$(aws rds describe-db-instances --region "$REGION" \
+    --query 'DBInstances[?starts_with(DBInstanceIdentifier,`civiform-sandbox`)].Endpoint.Address | [0]' \
+    --output text)"
+  [[ -n "$RDS_HOST" && "$RDS_HOST" != "None" ]] || {
+    echo "error: could not determine the RDS endpoint" >&2
+    exit 1
+  }
+  echo "RDS endpoint (from AWS): $RDS_HOST"
+fi
+
+# The endpoint is stored as a bare hostname, but tolerate a :port suffix in case
+# that ever changes -- appending it to the SSM parameter would fail obscurely.
+RDS_HOST="${RDS_HOST%%:*}"
+
+# ── Where is the bastion? ─────────────────────────────────────────────────────
+INSTANCE_ID="$(aws ec2 describe-instances --region "$REGION" \
+  --filters "Name=tag:Name,Values=${BASTION_NAME}" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].InstanceId | [0]' --output text)"
+
+if [[ -z "$INSTANCE_ID" || "$INSTANCE_ID" == "None" ]]; then
+  cat >&2 <<EOF
+error: no running instance tagged Name=${BASTION_NAME} in ${REGION}.
+
+RDS is not publicly accessible, so an admin connection needs the bastion. If it
+was torn down, recreate it -- see step 6 of first_manual_apply_runbook.md.
+EOF
+  exit 1
+fi
+echo "Bastion: $INSTANCE_ID"
+
+# ── Where can the container reach us? ─────────────────────────────────────────
+# docker-compose maps host.docker.internal to host-gateway, which is this.
+GATEWAY_IP="$(ip -4 -o addr show docker0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)"
+if [[ -z "$GATEWAY_IP" ]]; then
+  echo "warning: no docker0 interface; skipping the bridge relay." >&2
+  echo "         The tunnel will work from the host but NOT from the builder." >&2
+fi
+
+# ── Clean up both children on exit ────────────────────────────────────────────
+SSM_PID=""
+RELAY_PID=""
+CLEANED=""
+cleanup() {
+  # Registered for EXIT as well as the signals, so without this guard Ctrl+C
+  # runs it twice and prints the shutdown message twice.
+  [[ -n "$CLEANED" ]] && return
+  CLEANED=1
+  echo
+  echo "Shutting down..."
+  [[ -n "$RELAY_PID" ]] && kill "$RELAY_PID" 2>/dev/null || true
+  [[ -n "$SSM_PID" ]] && kill "$SSM_PID" 2>/dev/null || true
+  wait 2>/dev/null || true
+  echo "Tunnel closed."
+}
+trap cleanup EXIT INT TERM
+
+# ── Start the SSM port-forward (binds 127.0.0.1 only) ─────────────────────────
+echo "Starting SSM port-forward 127.0.0.1:${LOCAL_PORT} -> ${RDS_HOST}:5432 ..."
+aws ssm start-session \
+  --region "$REGION" \
+  --target "$INSTANCE_ID" \
+  --document-name AWS-StartPortForwardingSessionToRemoteHost \
+  --parameters "{\"host\":[\"${RDS_HOST}\"],\"portNumber\":[\"5432\"],\"localPortNumber\":[\"${LOCAL_PORT}\"]}" &
+SSM_PID=$!
+
+# Wait for the listener rather than sleeping a fixed amount: session setup is
+# seconds-scale but variable, and starting the relay too early makes it look
+# like the tunnel is broken.
+echo -n "Waiting for the tunnel"
+for _ in $(seq 1 60); do
+  if ss -ltn "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q ":${LOCAL_PORT}"; then
+    break
+  fi
+  if ! kill -0 "$SSM_PID" 2>/dev/null; then
+    echo
+    echo "error: the SSM session exited before the port opened (see output above)." >&2
+    exit 1
+  fi
+  echo -n "."
+  sleep 1
+done
+echo
+
+ss -ltn "sport = :${LOCAL_PORT}" 2>/dev/null | grep -q ":${LOCAL_PORT}" || {
+  echo "error: timed out waiting for 127.0.0.1:${LOCAL_PORT}" >&2
+  exit 1
+}
+echo "  tunnel: 127.0.0.1:${LOCAL_PORT} is up"
+
+# ── Relay the bridge gateway to loopback ──────────────────────────────────────
+if [[ -n "$GATEWAY_IP" ]]; then
+  python3 bin/tcp-relay.py "$GATEWAY_IP" "$LOCAL_PORT" 127.0.0.1 "$LOCAL_PORT" &
+  RELAY_PID=$!
+  sleep 1
+  kill -0 "$RELAY_PID" 2>/dev/null || {
+    echo "error: the relay failed to start (see output above)." >&2
+    exit 1
+  }
+fi
+
+cat <<EOF
+
+Ready.
+
+  From the host:       psql -h localhost -p ${LOCAL_PORT} -U sandbox_master postgres
+  From the builder:    RDS_ADMIN_HOST=host.docker.internal RDS_ADMIN_PORT=${LOCAL_PORT}
+
+Leave this running. Ctrl+C to close the tunnel.
+EOF
+
+wait "$SSM_PID"

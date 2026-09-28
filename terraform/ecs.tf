@@ -259,6 +259,23 @@ module "sandbox_builder_role" {
         Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:civiform-sandbox_*"
       },
       {
+        # The RDS master password, read to CREATE and DROP per-sandbox databases
+        # and roles.
+        #
+        # A separate statement because the pattern above does not reach it: the
+        # per-sandbox secrets are named civiform-sandbox_<id>_<key> with an
+        # underscore, while this one is civiform-sandbox/rds-master-password with
+        # a slash. The names look alike enough that the gap is easy to miss, and
+        # the symptom would be an AccessDenied several minutes into a provision.
+        #
+        # Read-only on purpose. The builder must never rotate or delete the
+        # credential that every sandbox database depends on.
+        Sid      = "RdsMasterSecret"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+        Resource = aws_secretsmanager_secret.rds_master_password.arn
+      },
+      {
         # ecs_fargate_service always instantiates its autoscaling submodule, even
         # with min and max pinned equal, so these are required for apply to
         # succeed rather than for any scaling we actually want.
