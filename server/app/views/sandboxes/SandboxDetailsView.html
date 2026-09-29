@@ -185,6 +185,7 @@
         </button>
         <button
           type="button"
+          th:if="${model.sandbox.status.name() != 'DELETED' and model.sandbox.status.name() != 'DELETING'}"
           onclick="openDestroyModal()"
           class="usa-button usa-button--secondary"
         >

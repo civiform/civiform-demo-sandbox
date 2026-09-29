@@ -278,6 +278,16 @@ public class TerraformSandboxServiceTest {
         .isEmpty();
   }
 
+  @Test
+  public void validatePin_deletingSandboxRejected() throws Exception {
+    SandboxInstance deleting =
+        live("123456").toBuilder().status(SandboxStatus.DELETING).build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleting));
+
+    assertThat(newService().validatePin("sb-abcd1234", "123456").toCompletableFuture().get())
+        .isEmpty();
+  }
+
   // ── deleteSandbox ───────────────────────────────────────────────────────────
 
   @Test
@@ -286,6 +296,32 @@ public class TerraformSandboxServiceTest {
 
     assertThat(newService().deleteSandbox("sb-nope").toCompletableFuture().get()).isFalse();
     verify(terraform, never()).destroy(any(), any(), any());
+  }
+
+  @Test
+  public void deleteSandbox_marksDeletingSynchronouslyBeforeReturning() throws Exception {
+    SandboxInstance running =
+        live("123456").toBuilder().databaseName("sb_abcd1234").build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(running));
+
+    // Returns immediately once DELETING is persisted, matching createSandbox —
+    // teardown runs in the background so the HTTP redirect does not block for ~3m.
+    assertThat(newService().deleteSandbox("sb-abcd1234").toCompletableFuture().get()).isTrue();
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+  }
+
+  @Test
+  public void deleteSandbox_deletingSandboxIsNotTornDownAgain() throws Exception {
+    SandboxInstance deleting =
+        live("123456").toBuilder().status(SandboxStatus.DELETING).databaseName("sb_abcd1234").build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleting));
+
+    // A second delete while the first is still running would launch a competing
+    // `terraform destroy`, collide on the S3 .tflock (HTTP 412 PreconditionFailed),
+    // and flip the row to DELETE_FAILED while the first destroy is succeeding.
+    assertThat(newService().deleteSandbox("sb-abcd1234").toCompletableFuture().get()).isFalse();
+    verify(terraform, never()).destroy(any(), any(), any());
+    verify(repository, never()).updateStatus(anyString(), any());
   }
 
   @Test

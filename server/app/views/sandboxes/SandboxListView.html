@@ -275,6 +275,7 @@
               <!-- Delete → styled confirmation modal -->
               <button
                 type="button"
+                th:if="${sb.sandbox.status.name() != 'DELETED' and sb.sandbox.status.name() != 'DELETING'}"
                 th:data-id="${sb.sandbox.id}"
                 th:data-city-name="${sb.cityName}"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
