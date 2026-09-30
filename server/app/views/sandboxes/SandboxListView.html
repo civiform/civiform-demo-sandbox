@@ -885,6 +885,20 @@
       var cityNameEl = document.getElementById('cityName')
       var subdomainEl = document.getElementById('subdomain')
 
+      // Mirror live inputs into hidden inputs for the Step 3 POST
+      window.syncHiddenInputs = function () {
+        function val(id) {
+          var el = document.getElementById(id)
+          return el ? (el.value || '').trim() : ''
+        }
+        document.getElementById('hidden-cityName').value          = val('cityName')
+        document.getElementById('hidden-adminEmail').value        = val('adminEmail')
+        document.getElementById('hidden-subdomain').value         = val('subdomain')
+        document.getElementById('hidden-pin').value               = val('pin')
+        document.getElementById('hidden-expirationDays').value    = val('expirationDays') || '30'
+        document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
+      }
+
       if (cityNameEl) {
         cityNameEl.addEventListener('input', function () {
           if (!subdomainDirty && subdomainEl) {
@@ -905,20 +919,6 @@
         var el = document.getElementById(id)
         if (el) el.addEventListener('input', syncHiddenInputs)
       })
-
-      // Mirror live inputs into hidden inputs for the Step 3 POST
-      window.syncHiddenInputs = function () {
-        function val(id) {
-          var el = document.getElementById(id)
-          return el ? (el.value || '').trim() : ''
-        }
-        document.getElementById('hidden-cityName').value          = val('cityName')
-        document.getElementById('hidden-adminEmail').value        = val('adminEmail')
-        document.getElementById('hidden-subdomain').value         = val('subdomain')
-        document.getElementById('hidden-pin').value               = val('pin')
-        document.getElementById('hidden-expirationDays').value    = val('expirationDays') || '30'
-        document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
-      }
 
       // Update tab states and show the correct panel
       function showStep(targetStep) {

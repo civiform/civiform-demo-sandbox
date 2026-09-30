@@ -31,22 +31,56 @@ services:
       - APPLICATION_SECRET=cf-sandbox-builder-dev-secret-key-1234567890
       - DOCKER_SOCKET_PATH=unix:///var/run/docker.sock
       - SANDBOX_DB_HOST=host.docker.internal
-      # Runtime selector: "docker" (Sprint 1 local) or "fargate" (Sprint 2 AWS)
-      - SANDBOX_RUNTIME=docker
+      # Runtime selector: "docker" (local, no AWS) or "terraform" (AWS).
+      # Passed through from the shell so that
+      #   SANDBOX_RUNTIME=terraform ./bin/run-dev
+      # works. Hardcoding a value here would override application.conf, since
+      # `${?SANDBOX_RUNTIME}` is applied after the literal default.
+      - SANDBOX_RUNTIME=${SANDBOX_RUNTIME:-docker}
       - DEMO_PORTAL_PASSWORD=demo
-      # ── Sprint 2 Fargate vars — only needed when SANDBOX_RUNTIME=fargate ──────
-      # Leave blank for local Docker development. Set in AWS ECS task definition.
-      - SANDBOX_DOMAIN=sandbox.civiform.dev
-      - SANDBOX_VPC_ID=
+      # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
+      # In AWS these are set on the ECS task definition, with the RDS admin
+      # password sourced from Secrets Manager rather than plain env.
+      #
+      # PLATFORM_OUTPUTS_FILE is the output of:
+      #   terraform -chdir=terraform output -json > terraform/platform-outputs.json
+      # Write it on the host: ./terraform is mounted read-only.
       - AWS_REGION=us-east-1
-      - ECS_CLUSTER=civiform-sandbox-cluster
-      - ECS_SUBNETS=
-      - ECS_SECURITY_GROUP=
-      - ECS_EXECUTION_ROLE_ARN=
-      - ECS_TASK_ROLE_ARN=
-      - ALB_LISTENER_ARN=
-      - RDS_HOST=
-      - RDS_MASTER_SECRET_ARN=
+      - TERRAFORM_MODULE_DIR=/usr/src/terraform/sandbox
+      - PLATFORM_OUTPUTS_FILE=/usr/src/terraform/platform-outputs.json
+      - TERRAFORM_STATE_BUCKET=civiform-sandbox-tfstate
+      # Bare passthrough, not `VAR=`. An empty assignment defines the variable as
+      # the empty string, and Typesafe Config's `${?VAR}` treats defined-but-empty
+      # as a genuine override — so `VAR=` here would clobber whatever the
+      # developer exported. Bare means "unset on the host → unset in the
+      # container", which correctly falls back to the application.conf default.
+      - RDS_ADMIN_PASSWORD
+      # RDS is not publicly accessible, so the admin connection has to be
+      # tunnelled when the builder runs on a laptop. Use:
+      #
+      #   ./bin/rds-tunnel            # leave running in its own terminal
+      #   export RDS_ADMIN_HOST=host.docker.internal
+      #   export RDS_ADMIN_PORT=15432
+      #
+      # Do NOT just run `aws ssm start-session` by hand: session-manager-plugin
+      # binds the forwarded port to 127.0.0.1, which this container cannot reach
+      # (host.docker.internal resolves to the bridge gateway, not loopback). The
+      # result is a "Connection refused" that looks exactly like a tunnel you
+      # forgot to start. bin/rds-tunnel adds the relay that fixes it.
+      #
+      # Unset means "use rds_endpoint from the platform outputs", which is what a
+      # builder running inside AWS should do.
+      - RDS_ADMIN_HOST
+      - RDS_ADMIN_PORT
+      # Credentials for terraform and any AWS SDK calls. Inherited from the
+      # developer's shell rather than written down; in AWS the task role supplies
+      # them and none of these are set. Without at least one of these, or the
+      # ~/.aws mount in docker-compose.dev.yml, `terraform init` fails
+      # immediately on the S3 backend.
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_PROFILE
     volumes:
       # Mount Docker socket so the builder can launch CiviForm containers (Sprint 1)
       - /var/run/docker.sock:/var/run/docker.sock

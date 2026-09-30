@@ -51,3 +51,14 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.100.0.0/16"
 }
+
+# Referenced by the builder IAM policy in ecs.tf, not by any resource here: the
+# bucket itself is owned by terraform/bootstrap. Keep the default in sync with
+# that stack's state_bucket_name or the builder will be granted access to a
+# bucket that does not exist.
+variable "state_bucket_name" {
+  description = "Terraform state bucket created by terraform/bootstrap"
+  type        = string
+  default     = "civiform-sandbox-tfstate"
+}
+

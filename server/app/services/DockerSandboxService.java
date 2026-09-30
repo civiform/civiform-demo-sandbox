@@ -297,7 +297,10 @@ public class DockerSandboxService implements SandboxService {
               existing.toBuilder()
                   .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
                   .build();
-          repository.save(extended);
+          // updateExpiry, not save: save is a plain INSERT, so passing an
+          // already-persisted instance raises a duplicate key violation on the
+          // primary key rather than updating the row.
+          repository.updateExpiry(id, extended.getExpiresAt());
           log.info(
               "[{}] Sandbox extended by {} days. New expiry: {}",
               id,

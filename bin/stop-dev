@@ -3,4 +3,9 @@
 source bin/lib.sh
 
 echo "Stopping containers..."
-docker::compose_dev down
+# Arguments are forwarded to `docker compose down`, so `./bin/stop-dev -v` also
+# removes volumes (including postgres_data, which forces init_postgres.sql to
+# re-run on the next start). Going through this script rather than calling
+# docker compose directly is what ensures COMPOSE_PROJECT_NAME is set; without it
+# compose infers the project from the directory name and operates on the wrong one.
+docker::compose_dev down "$@"
