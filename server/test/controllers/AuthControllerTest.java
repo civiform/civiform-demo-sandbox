@@ -44,6 +44,9 @@ public class AuthControllerTest extends WithApplication {
         })
         // Inject the test password via config override
         .configure("portal.password", CORRECT_PASSWORD)
+        // Disable CSRF filter in tests — POST requests don't carry tokens
+        .configure("play.filters.disabled",
+            java.util.List.of("play.filters.csrf.CSRFFilter"))
         .build();
   }
 
@@ -176,6 +179,8 @@ public class AuthControllerTest extends WithApplication {
           }
         })
         .configure("portal.password", "")
+        .configure("play.filters.disabled",
+            java.util.List.of("play.filters.csrf.CSRFFilter"))
         .build();
 
     Http.RequestBuilder request = loginRequest(CORRECT_EMAIL, "");

@@ -94,14 +94,19 @@ services:
   # on the same host:port. Developers need to add a localhost IP alias for this
   # container name in their /etc/hosts file for the web brower to load the auth url.
   # EG: 127.0.0.1 dev-oidc
-  dev-oidc:
-    image: civiform-oidc-provider
-    restart: always
-    expose:
-      - 3390
-    environment:
-      # Use an explicit port to not conflict with other test instances.
-      - OIDC_PORT=3390
+  #
+  # DISABLED: civiform-oidc-provider image does not exist on Docker Hub (M6 audit).
+  # Sandboxes use CiviForm's built-in FAKE_IDP instead.
+  # Re-enable when a real OIDC image is published.
+  #
+  # dev-oidc:
+  #   image: civiform-oidc-provider
+  #   restart: always
+  #   expose:
+  #     - 3390
+  #   environment:
+  #     # Use an explicit port to not conflict with other test instances.
+  #     - OIDC_PORT=3390
 
 volumes:
   postgres_data:

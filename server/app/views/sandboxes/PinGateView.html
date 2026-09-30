@@ -24,6 +24,7 @@
       </div>
 
       <form th:action="|/sandboxes/${model.sandboxId}/access|" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <div class="mb-4">
           <label for="pin" class="usa-label">Access PIN</label>
           <input

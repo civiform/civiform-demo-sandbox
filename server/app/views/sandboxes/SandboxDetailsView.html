@@ -105,7 +105,7 @@
             <a
               th:href="|/sandboxes/${model.sandbox.id}/access|"
               class="text-blue-600 hover:underline break-all"
-              th:text="|localhost:9000/sandboxes/${model.sandbox.id}/access|"
+              th:text="|/sandboxes/${model.sandbox.id}/access|"
             >
             </a>
           </dd>
@@ -213,6 +213,7 @@
         from AWS. This cannot be undone.
       </p>
       <form th:action="|/sandboxes/${model.sandbox.id}/delete|" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <button
           type="submit"
           class="usa-button w-full"
@@ -247,6 +248,7 @@
         Specify the number of days you want to extend this sandbox demo by.
       </p>
       <form th:action="|/sandboxes/${model.sandbox.id}/extend|" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <div class="mb-5">
           <label
             for="extend-days"
