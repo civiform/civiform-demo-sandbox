@@ -1,34 +1,53 @@
 <div th:fragment="content" class="grid-container py-8">
   <!-- Page Header -->
-  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div
+    class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+  >
     <div>
       <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
     </div>
-    <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
-      <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-        <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
-      </svg>
-      Create new demo
-    </button>
+    <div class="flex items-center gap-3">
+      <a href="https://console.aws.amazon.com/ecs/v2/clusters"
+         target="_blank"
+         rel="noopener"
+         class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
+        View in AWS ↗
+      </a>
+      <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
+        <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+          <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
+        </svg>
+        Create new demo
+      </button>
+    </div>
   </div>
 
   <!-- Flash: success (create / extend) -->
-  <div th:if="${flash != null && #maps.containsKey(flash, 'success')}" role="status"
-    class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2">
+  <div
+    th:if="${flash != null && #maps.containsKey(flash, 'success')}"
+    role="status"
+    class="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center gap-2"
+  >
     <span>✓</span>
     <span th:text="${flash['success']}"></span>
   </div>
 
   <!-- Flash: deleted (auto-dismisses after 4s, matches prototype) -->
-  <div th:if="${flash != null && #maps.containsKey(flash, 'deleted')}" id="deleted-flash" role="status"
-    class="mb-4 flex items-center gap-3 border-l-4 border-orange-600 bg-orange-50 px-4 py-3 text-sm text-gray-900">
+  <div
+    th:if="${flash != null && #maps.containsKey(flash, 'deleted')}"
+    id="deleted-flash"
+    role="status"
+    class="mb-4 flex items-center gap-3 border-l-4 border-orange-600 bg-orange-50 px-4 py-3 text-sm text-gray-900"
+  >
     <span
       class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white text-xs font-bold"
-      aria-hidden="true">!</span>
+      aria-hidden="true"
+      >!</span
+    >
     <span th:text="${flash['deleted']}">Deleted demo for Burlington, VT.</span>
   </div>
   <script>
-    ; (function () {
+    ;(function () {
       var el = document.getElementById('deleted-flash')
       if (el) setTimeout(function () { el.remove() }, 4000)
     })()
@@ -37,95 +56,168 @@
   <!-- Stats Bar -->
   <div class="grid grid-cols-3 gap-4 mb-8">
     <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
-      <span class="text-2xl font-bold text-gray-900" th:text="${model.totalCount}">0</span>
+      <span
+        class="text-2xl font-bold text-gray-900"
+        th:text="${model.totalCount}"
+        >0</span
+      >
       <span class="text-gray-600 ml-1">Total demos</span>
     </div>
     <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
-      <span class="text-2xl font-bold text-gray-900" th:text="${model.activeCount}">0</span>
+      <span
+        class="text-2xl font-bold text-gray-900"
+        th:text="${model.activeCount}"
+        >0</span
+      >
       <span class="text-gray-600 ml-1">Active</span>
     </div>
-    <div class="bg-white border border-gray-200 rounded-lg p-4 text-center"
-      th:classappend="${model.expiringCount > 0} ? 'border-yellow-300 bg-yellow-50' : ''">
-      <span th:if="${model.expiringCount > 0}" class="text-yellow-600 mr-1">⚠</span>
-      <span class="text-2xl font-bold" th:classappend="${model.expiringCount > 0} ? 'text-yellow-700' : 'text-gray-900'"
-        th:text="${model.expiringCount}">0</span>
+    <div
+      class="bg-white border border-gray-200 rounded-lg p-4 text-center"
+      th:classappend="${model.expiringCount > 0} ? 'border-yellow-300 bg-yellow-50' : ''"
+    >
+      <span th:if="${model.expiringCount > 0}" class="text-yellow-600 mr-1"
+        >⚠</span
+      >
+      <span
+        class="text-2xl font-bold"
+        th:classappend="${model.expiringCount > 0} ? 'text-yellow-700' : 'text-gray-900'"
+        th:text="${model.expiringCount}"
+        >0</span
+      >
       <span class="text-gray-600 ml-1">Expiring in ≤ 5 days</span>
     </div>
   </div>
 
   <!-- Sandbox Table -->
-  <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+  <div
+    class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden"
+  >
     <!-- Empty state -->
-    <div th:if="${model.sandboxes.isEmpty()}" class="text-center py-16 text-gray-400">
+    <div
+      th:if="${model.sandboxes.isEmpty()}"
+      class="text-center py-16 text-gray-400"
+    >
       <p class="text-5xl mb-4">🏛️</p>
       <p class="text-lg font-medium text-gray-600">No demos yet</p>
       <p class="text-sm mt-1">Click "Create new demo" to get started.</p>
     </div>
 
     <!-- Table -->
-    <table th:if="${!model.sandboxes.isEmpty()}" class="usa-table usa-table--borderless w-full text-sm" data-sortable>
+    <table
+      th:if="${!model.sandboxes.isEmpty()}"
+      class="usa-table usa-table--borderless w-full text-sm"
+      data-sortable
+    >
       <thead>
         <tr>
-          <th data-sortable scope="col" role="columnheader">Civic entity</th>
-          <th data-sortable scope="col" role="columnheader">Status</th>
-          <th data-sortable scope="col" role="columnheader">Days Remaining</th>
+          <th data-sortable scope="col" role="columnheader">Civic entity<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
+          <th data-sortable scope="col" role="columnheader">Status<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
+          <th data-sortable scope="col" role="columnheader">Days Remaining<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
           <th scope="col" role="columnheader">
             <span class="usa-sr-only">Actions</span>
           </th>
         </tr>
       </thead>
       <tbody>
-        <tr th:each="sb : ${model.sandboxes}" th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''">
+        <tr
+          th:each="sb : ${model.sandboxes}"
+          th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
+        >
           <!-- Civic entity name -->
-          <td class="font-semibold text-gray-900" th:data-sort-value="${sb.cityName}" th:text="${sb.cityName}">
+          <td
+            class="font-semibold text-gray-900"
+            th:data-sort-value="${sb.cityName}"
+            th:text="${sb.cityName}"
+          >
             Burlington, VT
           </td>
 
           <!-- Status badge -->
           <td
-            th:data-sort-value="${sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : sb.sandbox.status.name())}">
-            <span th:if="${sb.daysRemaining <= 0}" class="usa-tag bg-base-dark text-white">
+            th:data-sort-value="${sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : sb.sandbox.status.name())}"
+          >
+            <span
+              th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
+              class="usa-tag bg-base-dark text-white"
+            >
               EXPIRED
             </span>
-            <span th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5}" class="usa-tag bg-warning text-ink">
+            <span
+              th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5 and !sb.deleted}"
+              class="usa-tag bg-warning text-ink"
+            >
               EXPIRING
             </span>
-            <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
-              class="usa-tag bg-success-dark text-white">
+            <span
+              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING' and !sb.deleted}"
+              class="usa-tag bg-success-dark text-white"
+            >
               ACTIVE
             </span>
-            <span th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
-              class="usa-tag bg-warning text-ink" th:text="${sb.sandbox.status}">
+            <span
+              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING' and !sb.deleted}"
+              class="usa-tag bg-warning text-ink"
+              th:text="${sb.sandbox.status}"
+            >
               PROVISIONING
+            </span>
+            <span
+              th:if="${sb.deleted}"
+              class="usa-tag bg-gray-400 text-white"
+            >
+              DELETED
             </span>
           </td>
 
           <!-- Days remaining + expiry date -->
           <td class="text-gray-700" th:data-sort-value="${sb.daysRemaining}">
-            <div th:if="${sb.daysRemaining > 0}">
-              <span class="font-medium" th:text="${sb.daysRemaining} + ' days'">30 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expires ' + ${sb.expiryFormatted}">
+            <div th:if="${sb.daysRemaining > 0 and !sb.deleted}">
+              <span class="font-medium" th:text="${sb.daysRemaining} + ' days'"
+                >30 days</span
+              >
+              <div
+                class="text-xs text-gray-400 mt-0.5"
+                th:text="'Expires ' + ${sb.expiryFormatted}"
+              >
                 Expires Sep 13, 2026
               </div>
             </div>
-            <div th:if="${sb.daysRemaining <= 0}">
+            <div th:if="${sb.daysRemaining <= 0 and !sb.deleted}">
               <span class="font-medium text-gray-400">0 days</span>
-              <div class="text-xs text-gray-400 mt-0.5" th:text="'Expired ' + ${sb.expiryFormatted}">
+              <div
+                class="text-xs text-gray-400 mt-0.5"
+                th:text="'Expired ' + ${sb.expiryFormatted}"
+              >
                 Expired Aug 18, 2026
               </div>
+              <div class="text-xs text-red-600 font-medium mt-1">
+                Autodeletion pending
+              </div>
+            </div>
+            <div th:if="${sb.deleted}">
+              <span class="font-medium text-gray-400"
+                    th:text="'Deleted ' + ${sb.deletedFormatted}">Deleted Oct 1, 2026</span>
             </div>
           </td>
 
           <!-- Action buttons -->
           <td>
-            <div class="flex items-center gap-2 flex-wrap">
+            <div th:if="${!sb.deleted}" class="flex items-center gap-2 flex-wrap">
               <!-- Launch → opens CiviForm in new tab -->
-              <a th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/view| : '#'"
-                target="_blank" rel="noopener"
+              <a
+                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/view| : '#'"
+                target="_blank"
+                rel="noopener"
                 th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
-                class="usa-button inline-flex items-center gap-1 no-underline">
+                class="usa-button inline-flex items-center gap-1 no-underline"
+              >
                 Launch
-                <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                <svg
+                  class="usa-icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                >
                   <use href="/assets/dist/img/sprite.svg#launch"></use>
                 </svg>
               </a>
@@ -134,27 +226,45 @@
               <ul class="usa-button-group usa-button-group--segmented">
                 <li class="usa-button-group__item">
                   <!-- Details → modal with URL + PIN (password) -->
-                  <button type="button" th:data-id="${sb.sandbox.id}" th:data-city-name="${sb.cityName}"
-                    th:data-url="${sb.sandbox.url}" th:data-pin="${sb.sandbox.pin}"
+                  <button
+                    type="button"
+                    th:data-id="${sb.sandbox.id}"
+                    th:data-city-name="${sb.cityName}"
+                    th:data-url="${sb.sandbox.url}"
+                    th:data-pin="${sb.sandbox.pin}"
                     th:onclick="openDetailsModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
-                    class="usa-button usa-button--outline">
+                    class="usa-button usa-button--outline"
+                  >
                     Details
                   </button>
                 </li>
                 <li class="usa-button-group__item">
                   <!-- Extend → modal -->
-                  <button type="button" th:data-id="${sb.sandbox.id}" th:data-city-name="${sb.cityName}"
+                  <button
+                    type="button"
+                    th:data-id="${sb.sandbox.id}"
+                    th:data-city-name="${sb.cityName}"
                     th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                    class="usa-button usa-button--outline">
+                    class="usa-button usa-button--outline"
+                  >
                     Extend
                   </button>
                 </li>
                 <li class="usa-button-group__item">
                   <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
-                  <a href="https://console.aws.amazon.com" target="_blank" rel="noopener"
-                    class="usa-button usa-button--outline inline-flex items-center gap-1 no-underline">
+                  <a
+                    th:href="|https://console.aws.amazon.com/ecs/v2/clusters?search=${sb.sandbox.id}|"
+                    target="_blank"
+                    rel="noopener"
+                    class="usa-button usa-button--outline inline-flex items-center gap-1 no-underline"
+                  >
                     AWS
-                    <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                    <svg
+                      class="usa-icon"
+                      aria-hidden="true"
+                      focusable="false"
+                      role="img"
+                    >
                       <use href="/assets/dist/img/sprite.svg#launch"></use>
                     </svg>
                   </a>
@@ -162,14 +272,26 @@
               </ul>
 
               <!-- Delete → styled confirmation modal -->
-              <button type="button" th:data-id="${sb.sandbox.id}" th:data-city-name="${sb.cityName}"
+              <button
+                type="button"
+                th:data-id="${sb.sandbox.id}"
+                th:data-city-name="${sb.cityName}"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600">
-                <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+                class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600"
+                th:disabled="${sb.provisioning}"
+                th:classappend="${sb.provisioning} ? 'opacity-50 cursor-not-allowed' : ''"
+              >
+                <svg
+                  class="usa-icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                >
                   <use href="/assets/dist/img/sprite.svg#delete"></use>
                 </svg>
               </button>
             </div>
+            <span th:if="${sb.deleted}" class="text-xs text-gray-400 italic">—</span>
           </td>
         </tr>
       </tbody>
@@ -178,54 +300,63 @@
 
   <!-- ── Create Modal (3-step wizard) ──────────────────────────────────── -->
   <div id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title"
-    class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
-    style="display: none; background: rgba(0,0,0,0.4);">
+       class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
+       style="display: none; background: rgba(0,0,0,0.4);">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
-      style="max-height: 85vh; overflow-y: auto; margin: auto;">
+         style="max-height: 85vh; overflow-y: auto; margin: auto;">
       <!-- Close X -->
       <button onclick="closeModal('create-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
-        style="font-size: 24px;">×</button>
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer" style="font-size: 24px;">×</button>
 
       <div class="px-6 pt-6 pb-6">
         <!-- Tab Navigation -->
         <div class="flex border-b-2 border-gray-200 mb-5" role="tablist" aria-label="Wizard steps">
           <button type="button" role="tab" id="wizard-tab-1" aria-selected="true" aria-controls="create-step-panel-1"
-            class="wizard-tab wizard-tab--active" onclick="wizardGoTo(1)">CiviForm setup</button>
+                  class="wizard-tab wizard-tab--active"
+                  onclick="wizardGoTo(1)">CiviForm setup</button>
           <button type="button" role="tab" id="wizard-tab-2" aria-selected="false" aria-controls="create-step-panel-2"
-            class="wizard-tab" onclick="wizardGoTo(2)">AWS setup</button>
+                  class="wizard-tab"
+                  onclick="wizardGoTo(2)">AWS setup</button>
           <button type="button" role="tab" id="wizard-tab-3" aria-selected="false" aria-controls="create-step-panel-3"
-            class="wizard-tab" onclick="wizardGoTo(3)">Program setup</button>
+                  class="wizard-tab"
+                  onclick="wizardGoTo(3)">Program setup</button>
         </div>
 
         <!-- Inline validation error -->
-        <div id="create-wizard-error" role="alert" aria-live="polite"
-          class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"></div>
+        <div
+          id="create-wizard-error"
+          role="alert"
+          aria-live="polite"
+          class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+        ></div>
 
         <!-- Wizard Form -->
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
-          <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
 
           <!-- Step 1: CiviForm setup -->
           <div id="create-step-panel-1" class="wizard-panel" role="tabpanel" aria-labelledby="wizard-tab-1">
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">1</span>
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">1</span>
               <span class="text-sm text-gray-500">of 3</span>
               <span class="text-lg font-bold text-gray-900">CiviForm setup</span>
             </div>
-            <p class="text-sm text-gray-600 mb-5">Configure general demo and banner information. This is visible to all
-              demo users.</p>
+            <p class="text-sm text-gray-600 mb-5">Configure general demo and banner information. This is visible to all demo users.</p>
 
             <!-- Civic entity -->
             <div class="mb-5" id="fg-cityName">
               <label for="cityName" class="block text-sm font-bold text-gray-900 mb-1">
                 Civic entity<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <input id="cityName" name="cityName" type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="e.g. Bloomington"
-                autocomplete="off" aria-required="true" />
+              <input
+                id="cityName"
+                name="cityName"
+                type="text"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                placeholder="e.g. Bloomington"
+                autocomplete="off"
+                aria-required="true"
+              />
             </div>
 
             <!-- Logo / seal -->
@@ -237,8 +368,7 @@
                 <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
                   <input type="radio" name="logoType" value="default" checked class="accent-blue-700" />
                   Default (Preview:
-                  <span
-                    class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">C</span>)
+                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">C</span>)
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
                   <input type="radio" name="logoType" value="custom" class="accent-blue-700" />
@@ -252,15 +382,26 @@
               <label for="expirationDays" class="block text-sm font-bold text-gray-900 mb-1">
                 Expiration limit (days)<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <input id="expirationDays" name="expirationDays" type="number"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm" value="30" min="1" max="365"
-                aria-label="Demo expiration in days" />
+              <input
+                id="expirationDays"
+                name="expirationDays"
+                type="number"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                value="30"
+                min="1"
+                max="365"
+                aria-label="Demo expiration in days"
+              />
             </div>
 
             <!-- Step 1 footer -->
             <div class="flex items-center justify-end">
-              <button type="button" class="usa-button px-8" onclick="wizardNext(1)"
-                aria-label="Continue to Step 2: AWS setup">
+              <button
+                type="button"
+                class="usa-button px-8"
+                onclick="wizardNext(1)"
+                aria-label="Continue to Step 2: AWS setup"
+              >
                 Next
               </button>
             </div>
@@ -270,8 +411,7 @@
           <div id="create-step-panel-2" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-2">
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">2</span>
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">2</span>
               <span class="text-sm text-gray-500">of 3</span>
               <span class="text-lg font-bold text-gray-900">AWS setup</span>
             </div>
@@ -282,9 +422,15 @@
               <label for="adminEmail" class="block text-sm font-bold text-gray-900 mb-1">
                 Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <input id="adminEmail" name="adminEmail" type="email"
+              <input
+                id="adminEmail"
+                name="adminEmail"
+                type="email"
                 class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                placeholder="e.g. civiform-dev@exygy.com" autocomplete="email" aria-required="true" />
+                placeholder="e.g. civiform-dev@exygy.com"
+                autocomplete="email"
+                aria-required="true"
+              />
             </div>
 
             <!-- Subdomain -->
@@ -294,11 +440,16 @@
               </label>
               <p class="text-xs text-gray-500 mt-0.5 mb-1">Auto-filled from city name — editable.</p>
               <div class="flex items-center gap-0">
-                <input id="subdomain" name="subdomain" type="text"
-                  class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm" placeholder="e.g. bloomington"
-                  autocomplete="off" aria-required="true" />
-                <span
-                  class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap">.sandbox.civiform.dev</span>
+                <input
+                  id="subdomain"
+                  name="subdomain"
+                  type="text"
+                  class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm"
+                  placeholder="e.g. bloomington"
+                  autocomplete="off"
+                  aria-required="true"
+                />
+                <span class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap">.sandbox.civiform.dev</span>
               </div>
             </div>
 
@@ -307,9 +458,18 @@
               <label for="pin" class="block text-sm font-bold text-gray-900 mb-1">
                 Demo instance access PIN<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <input id="pin" name="pin" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="e.g. 123456"
-                autocomplete="off" aria-required="true" />
+              <input
+                id="pin"
+                name="pin"
+                type="text"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                placeholder="e.g. 123456"
+                autocomplete="off"
+                aria-required="true"
+              />
             </div>
 
             <!-- Google Analytics ID (optional) -->
@@ -317,20 +477,32 @@
               <label for="googleAnalyticsId" class="block text-sm font-bold text-gray-900 mb-1">
                 Google Analytics ID <span class="text-gray-400 font-normal">(optional)</span>
               </label>
-              <input id="googleAnalyticsId" name="googleAnalyticsId" type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="G-ABC123XYZ"
-                autocomplete="off" />
+              <input
+                id="googleAnalyticsId"
+                name="googleAnalyticsId"
+                type="text"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                placeholder="G-ABC123XYZ"
+                autocomplete="off"
+              />
             </div>
 
             <!-- Step 2 footer -->
             <div class="flex items-center justify-between gap-4">
-              <button type="button"
+              <button
+                type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                onclick="wizardBack(2)" aria-label="Back to Step 1: CiviForm setup">
+                onclick="wizardBack(2)"
+                aria-label="Back to Step 1: CiviForm setup"
+              >
                 &#x2190; Back
               </button>
-              <button type="button" class="usa-button px-8" onclick="wizardNext(2)"
-                aria-label="Continue to Step 3: Program setup">
+              <button
+                type="button"
+                class="usa-button px-8"
+                onclick="wizardNext(2)"
+                aria-label="Continue to Step 3: Program setup"
+              >
                 Next
               </button>
             </div>
@@ -340,8 +512,7 @@
           <div id="create-step-panel-3" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-3">
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">3</span>
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">3</span>
               <span class="text-sm text-gray-500">of 3</span>
               <span class="text-lg font-bold text-gray-900">Program setup</span>
             </div>
@@ -358,28 +529,35 @@
             <!-- Import from PDF (stub, disabled) -->
             <div class="mb-6">
               <button type="button" disabled aria-disabled="true"
-                class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed">
+                      class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed">
                 Import from PDF
               </button>
-              <p class="text-xs text-gray-500 mt-2">Upload PDF forms to automatically extract and generate additional
-                custom programs in the demo. Imported programs are editable after the demo is provisioned.</p>
+              <p class="text-xs text-gray-500 mt-2">Upload PDF forms to automatically extract and generate additional custom programs in the demo. Imported programs are editable after the demo is provisioned.</p>
             </div>
 
-            <input type="hidden" id="hidden-cityName" name="cityName" value="" />
-            <input type="hidden" id="hidden-adminEmail" name="adminEmail" value="" />
-            <input type="hidden" id="hidden-subdomain" name="subdomain" value="" />
-            <input type="hidden" id="hidden-pin" name="pin" value="" />
-            <input type="hidden" id="hidden-expirationDays" name="expirationDays" value="30" />
+            <input type="hidden" id="hidden-cityName"          name="cityName"          value="" />
+            <input type="hidden" id="hidden-adminEmail"        name="adminEmail"        value="" />
+            <input type="hidden" id="hidden-subdomain"         name="subdomain"         value="" />
+            <input type="hidden" id="hidden-pin"               name="pin"               value="" />
+            <input type="hidden" id="hidden-expirationDays"    name="expirationDays"    value="30" />
             <input type="hidden" id="hidden-googleAnalyticsId" name="googleAnalyticsId" value="" />
 
             <!-- Step 3 footer -->
             <div class="flex items-center justify-between gap-4">
-              <button type="button"
+              <button
+                type="button"
                 class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                onclick="wizardBack(3)" aria-label="Back to Step 2: AWS setup">
+                onclick="wizardBack(3)"
+                aria-label="Back to Step 2: AWS setup"
+              >
                 &#x2190; Back
               </button>
-              <button type="submit" class="usa-button px-8" aria-label="Provision demo" onclick="syncHiddenInputs()">
+              <button
+                type="submit"
+                class="usa-button px-8"
+                aria-label="Provision demo"
+                onclick="syncHiddenInputs()"
+              >
                 Provision demo
               </button>
             </div>
@@ -390,11 +568,19 @@
   </div>
 
   <!-- ── Info Modal ──────────────────────────────────────────────────────── -->
-  <div id="info-modal" role="dialog" aria-modal="true" aria-labelledby="info-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div
+    id="info-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="info-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeModal('info-modal')" aria-label="Close"
-        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+      <button
+        onclick="closeModal('info-modal')"
+        aria-label="Close"
+        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
         ×
       </button>
       <h2 id="info-modal-title" class="text-xl font-bold text-gray-900 mb-1">
@@ -406,12 +592,21 @@
 
       <!-- Demo URL -->
       <div class="mb-4">
-        <label class="block text-xs font-semibold text-blue-700 uppercase mb-1">Demo URL</label>
+        <label class="block text-xs font-semibold text-blue-700 uppercase mb-1"
+          >Demo URL</label
+        >
         <div class="flex gap-2">
-          <input id="info-url" type="text" readonly
+          <input
+            id="info-url"
+            type="text"
+            readonly
             class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-            aria-label="Demo URL" />
-          <button onclick="copyField('info-url', this)" class="usa-button usa-button--outline whitespace-nowrap">
+            aria-label="Demo URL"
+          />
+          <button
+            onclick="copyField('info-url', this)"
+            class="usa-button usa-button--outline whitespace-nowrap"
+          >
             Copy
           </button>
         </div>
@@ -419,23 +614,50 @@
 
       <!-- Password (PIN) -->
       <div class="mb-6">
-        <label class="block text-xs font-semibold text-blue-700 uppercase mb-1">Password</label>
+        <label class="block text-xs font-semibold text-blue-700 uppercase mb-1"
+          >Password</label
+        >
         <div class="flex gap-2">
           <div class="relative flex-1">
-            <input id="info-pin" type="password"
-              class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono" readonly
-              aria-label="Sandbox password (PIN)" />
-            <button type="button" onclick="togglePinVisibility()" aria-label="Toggle password visibility"
-              class="usa-button usa-button--unstyled absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800">
-              <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            <input
+              id="info-pin"
+              type="password"
+              class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono"
+              readonly
+              aria-label="Sandbox password (PIN)"
+            />
+            <button
+              type="button"
+              onclick="togglePinVisibility()"
+              aria-label="Toggle password visibility"
+              class="usa-button usa-button--unstyled absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
+            >
+              <svg
+                id="eye-icon"
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
               </svg>
             </button>
           </div>
-          <button onclick="copyField('info-pin', this)" class="usa-button usa-button--outline whitespace-nowrap">
+          <button
+            onclick="copyField('info-pin', this)"
+            class="usa-button usa-button--outline whitespace-nowrap"
+          >
             Copy
           </button>
         </div>
@@ -447,11 +669,24 @@
       </button>
       <!-- Details Page Link -->
       <div class="mt-4 pt-4 border-t border-gray-200 text-center">
-        <a id="info-details-link" href="#"
-          class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1">
+        <a
+          id="info-details-link"
+          href="#"
+          class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+        >
           View sandbox details
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
           </svg>
         </a>
       </div>
@@ -459,11 +694,19 @@
   </div>
 
   <!-- ── Extend Modal ────────────────────────────────────────────────────── -->
-  <div id="extend-modal" role="dialog" aria-modal="true" aria-labelledby="extend-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div
+    id="extend-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="extend-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeModal('extend-modal')" aria-label="Close"
-        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+      <button
+        onclick="closeModal('extend-modal')"
+        aria-label="Close"
+        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
         ×
       </button>
       <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
@@ -473,16 +716,30 @@
         Specify the number of days you want to extend this sandbox demo by.
       </p>
       <form id="extend-form" method="POST">
-        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <div class="mb-5">
-          <label for="extend-days" class="block text-sm font-medium text-gray-700 mb-1">Extend by (days):</label>
-          <input id="extend-days" name="days" type="number" value="30" min="1" max="90"
-            class="w-full border border-gray-300 rounded px-3 py-2 text-sm" aria-label="Number of days to extend" />
+          <label
+            for="extend-days"
+            class="block text-sm font-medium text-gray-700 mb-1"
+            >Extend by (days):</label
+          >
+          <input
+            id="extend-days"
+            name="days"
+            type="number"
+            value="30"
+            min="1"
+            max="90"
+            class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+            aria-label="Number of days to extend"
+          />
         </div>
         <div class="flex items-center gap-4">
           <button type="submit" class="usa-button">Extend Demo</button>
-          <button type="button" onclick="closeModal('extend-modal')"
-            class="usa-button usa-button--unstyled text-blue-600 hover:underline text-sm font-medium cursor-pointer">
+          <button
+            type="button"
+            onclick="closeModal('extend-modal')"
+            class="usa-button usa-button--unstyled text-blue-600 hover:underline text-sm font-medium cursor-pointer"
+          >
             Cancel
           </button>
         </div>
@@ -491,11 +748,19 @@
   </div>
 
   <!-- ── Delete Modal ─────────────────────────────────────────────────── -->
-  <div id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4">
+  <div
+    id="delete-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="delete-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button onclick="closeModal('delete-modal')" aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none">
+      <button
+        onclick="closeModal('delete-modal')"
+        aria-label="Close"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
         ×
       </button>
       <h2 id="delete-modal-title" class="text-lg font-bold text-gray-900 mb-2">
@@ -507,16 +772,12 @@
         undone.
       </p>
       <form id="delete-form" method="POST">
-        <div class="flex items-center gap-4 justify-end pt-2">
-          <button type="button" onclick="closeModal('delete-modal')"
-            class="text-gray-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer">
-            Cancel
-          </button>
-          <button type="submit"
-            class="px-4 py-2 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600">
-            Delete demo
-          </button>
-        </div>
+        <button
+          type="submit"
+          class="usa-button usa-button--secondary w-full"
+        >
+          Delete demo
+        </button>
       </form>
     </div>
   </div>
@@ -601,11 +862,41 @@
         setTimeout(() => (btn.textContent = 'Copy All'), 1800)
       })
     }
+
+    // ── Column sort ──────────────────────────────────────────────────
+    ;(function () {
+      var table = document.querySelector('table[data-sortable]')
+      if (!table) return
+      var headers = table.querySelectorAll('th[data-sortable]')
+      headers.forEach(function (th, colIdx) {
+        th.style.cursor = 'pointer'
+        th.setAttribute('aria-sort', 'none')
+        th.addEventListener('click', function () {
+          var tbody = table.querySelector('tbody')
+          var rows = Array.from(tbody.querySelectorAll('tr'))
+          var asc = th.getAttribute('aria-sort') !== 'ascending'
+          // Reset all headers
+          headers.forEach(function (h) { h.setAttribute('aria-sort', 'none') })
+          th.setAttribute('aria-sort', asc ? 'ascending' : 'descending')
+          rows.sort(function (a, b) {
+            var aVal = a.children[colIdx].getAttribute('data-sort-value') || a.children[colIdx].textContent.trim()
+            var bVal = b.children[colIdx].getAttribute('data-sort-value') || b.children[colIdx].textContent.trim()
+            // Try numeric comparison
+            var aNum = parseFloat(aVal), bNum = parseFloat(bVal)
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return asc ? aNum - bNum : bNum - aNum
+            }
+            return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+          })
+          rows.forEach(function (row) { tbody.appendChild(row) })
+        })
+      })
+    })()
   </script>
 
   <!-- ── Create Wizard JS ────────────────────────────────────────────────── -->
   <script>
-    ; (function () {
+    ;(function () {
       'use strict'
 
       var TOTAL_STEPS = 3
@@ -629,11 +920,11 @@
           var el = document.getElementById(id)
           return el ? (el.value || '').trim() : ''
         }
-        document.getElementById('hidden-cityName').value = val('cityName')
-        document.getElementById('hidden-adminEmail').value = val('adminEmail')
-        document.getElementById('hidden-subdomain').value = val('subdomain')
-        document.getElementById('hidden-pin').value = val('pin')
-        document.getElementById('hidden-expirationDays').value = val('expirationDays') || '30'
+        document.getElementById('hidden-cityName').value          = val('cityName')
+        document.getElementById('hidden-adminEmail').value        = val('adminEmail')
+        document.getElementById('hidden-subdomain').value         = val('subdomain')
+        document.getElementById('hidden-pin').value               = val('pin')
+        document.getElementById('hidden-expirationDays').value    = val('expirationDays') || '30'
         document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
       }
 
@@ -703,7 +994,7 @@
 
       function markFieldError(fieldId, hasError) {
         var input = document.getElementById(fieldId)
-        var fg = document.getElementById('fg-' + fieldId)
+        var fg    = document.getElementById('fg-' + fieldId)
         if (!input) return
         if (hasError) {
           input.classList.add('border-red-500')
@@ -719,8 +1010,8 @@
       function validateStep1() {
         var cityVal = (document.getElementById('cityName').value || '').trim()
         var daysVal = parseInt(document.getElementById('expirationDays').value, 10)
-        var cityOk = cityVal.length > 0
-        var daysOk = !isNaN(daysVal) && daysVal > 0
+        var cityOk  = cityVal.length > 0
+        var daysOk  = !isNaN(daysVal) && daysVal > 0
         markFieldError('cityName', !cityOk)
         markFieldError('expirationDays', !daysOk)
         if (!cityOk) {
@@ -735,19 +1026,19 @@
       }
 
       function validateStep2() {
-        var emailVal = (document.getElementById('adminEmail').value || '').trim()
-        var subVal = (document.getElementById('subdomain').value || '').trim()
-        var pinVal = (document.getElementById('pin').value || '').trim()
-        var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        var pinRe = /^[0-9]{6}$/
+        var emailVal  = (document.getElementById('adminEmail').value || '').trim()
+        var subVal    = (document.getElementById('subdomain').value || '').trim()
+        var pinVal    = (document.getElementById('pin').value || '').trim()
+        var emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var pinRe     = /^[0-9]{6}$/
 
         var emailOk = emailVal.length > 0 && emailRe.test(emailVal)
-        var subOk = subVal.length > 0
-        var pinOk = pinRe.test(pinVal)
+        var subOk   = subVal.length > 0
+        var pinOk   = pinRe.test(pinVal)
 
         markFieldError('adminEmail', !emailOk)
-        markFieldError('subdomain', !subOk)
-        markFieldError('pin', !pinOk)
+        markFieldError('subdomain',  !subOk)
+        markFieldError('pin',        !pinOk)
 
         if (!emailOk) {
           showError(emailVal.length === 0 ? 'Admin Notification Email is required.' : 'Please enter a valid email address.')
@@ -802,7 +1093,7 @@
       }
 
       // Navigate directly to a step via tab click
-      window.wizardGoTo = function (targetStep) {
+      window.wizardGoTo = function(targetStep) {
         clearError()
         syncHiddenInputs()
         for (var i = 1; i <= TOTAL_STEPS; i++) {
