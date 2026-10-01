@@ -204,17 +204,17 @@
               <!-- AWS, Info, Extend button group -->
               <ul class="usa-button-group usa-button-group--segmented">
                 <li class="usa-button-group__item">
-                  <!-- Info → modal with URL + PIN (password) -->
+                  <!-- Details → modal with URL + PIN (password) -->
                   <button
                     type="button"
                     th:data-id="${sb.sandbox.id}"
                     th:data-city-name="${sb.cityName}"
                     th:data-url="${sb.sandbox.url}"
                     th:data-pin="${sb.sandbox.pin}"
-                    th:onclick="openInfoModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
+                    th:onclick="openDetailsModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
                     class="usa-button usa-button--outline"
                   >
-                    Info
+                    Details
                   </button>
                 </li>
                 <li class="usa-button-group__item">
@@ -739,53 +739,28 @@
       >
         ×
       </button>
-      <div class="flex items-start gap-4 mb-4">
-        <div
-          class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center"
-        >
-          <svg
-            class="usa-icon w-5 h-5 text-red-600"
-            aria-hidden="true"
-            focusable="false"
-            role="img"
-          >
-            <use href="/assets/dist/img/sprite.svg#delete"></use>
-          </svg>
-        </div>
-        <div>
-          <h2 id="delete-modal-title" class="text-lg font-bold text-gray-900">
-            Delete demo?
-          </h2>
-          <p class="text-sm text-gray-600 mt-1">
-            This will permanently delete the demo for
-            <strong id="delete-city-name"></strong> from AWS. This cannot be
-            undone.
-          </p>
-        </div>
-      </div>
+      <h2 id="delete-modal-title" class="text-lg font-bold text-gray-900 mb-2">
+        Delete demo?
+      </h2>
+      <p class="text-sm text-gray-600 mb-6">
+        This will permanently delete the demo for
+        <strong id="delete-city-name"></strong> from AWS. This cannot be
+        undone.
+      </p>
       <form id="delete-form" method="POST">
-        <div class="flex items-center gap-4 justify-end pt-2">
-          <button
-            type="button"
-            onclick="closeModal('delete-modal')"
-            class="text-gray-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="px-4 py-2 rounded text-sm font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600"
-          >
-            Delete demo
-          </button>
-        </div>
+        <button
+          type="submit"
+          class="usa-button usa-button--secondary w-full"
+        >
+          Delete demo
+        </button>
       </form>
     </div>
   </div>
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
-    function openInfoModal(id, cityName, url, pin) {
+    function openDetailsModal(id, cityName, url, pin) {
       document.getElementById('info-city-name').textContent = cityName
       document.getElementById('info-url').value = url
       document.getElementById('info-pin').value = pin
