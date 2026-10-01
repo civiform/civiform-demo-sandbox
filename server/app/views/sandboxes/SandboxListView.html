@@ -6,12 +6,20 @@
     <div>
       <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
     </div>
-    <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
-      <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-        <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
-      </svg>
-      Create new demo
-    </button>
+    <div class="flex items-center gap-3">
+      <a href="https://console.aws.amazon.com/ecs/v2/clusters"
+         target="_blank"
+         rel="noopener"
+         class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
+        View in AWS ↗
+      </a>
+      <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
+        <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+          <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
+        </svg>
+        Create new demo
+      </button>
+    </div>
   </div>
 
   <!-- Flash: success (create / extend) -->
@@ -102,9 +110,9 @@
     >
       <thead>
         <tr>
-          <th data-sortable scope="col" role="columnheader">Civic entity</th>
-          <th data-sortable scope="col" role="columnheader">Status</th>
-          <th data-sortable scope="col" role="columnheader">Days Remaining</th>
+          <th data-sortable scope="col" role="columnheader">Civic entity<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
+          <th data-sortable scope="col" role="columnheader">Status<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
+          <th data-sortable scope="col" role="columnheader">Days Remaining<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
           <th scope="col" role="columnheader">
             <span class="usa-sr-only">Actions</span>
           </th>
@@ -113,7 +121,7 @@
       <tbody>
         <tr
           th:each="sb : ${model.sandboxes}"
-          th:classappend="${sb.daysRemaining <= 0} ? 'opacity-60' : ''"
+          th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
         >
           <!-- Civic entity name -->
           <td
@@ -129,35 +137,41 @@
             th:data-sort-value="${sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : sb.sandbox.status.name())}"
           >
             <span
-              th:if="${sb.daysRemaining <= 0}"
+              th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
               class="usa-tag bg-base-dark text-white"
             >
               EXPIRED
             </span>
             <span
-              th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5}"
+              th:if="${sb.daysRemaining > 0 and sb.daysRemaining <= 5 and !sb.deleted}"
               class="usa-tag bg-warning text-ink"
             >
               EXPIRING
             </span>
             <span
-              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING'}"
+              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() == 'RUNNING' and !sb.deleted}"
               class="usa-tag bg-success-dark text-white"
             >
               ACTIVE
             </span>
             <span
-              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING'}"
+              th:if="${sb.daysRemaining > 5 and sb.sandbox.status.name() != 'RUNNING' and !sb.deleted}"
               class="usa-tag bg-warning text-ink"
               th:text="${sb.sandbox.status}"
             >
               PROVISIONING
             </span>
+            <span
+              th:if="${sb.deleted}"
+              class="usa-tag bg-gray-400 text-white"
+            >
+              DELETED
+            </span>
           </td>
 
           <!-- Days remaining + expiry date -->
           <td class="text-gray-700" th:data-sort-value="${sb.daysRemaining}">
-            <div th:if="${sb.daysRemaining > 0}">
+            <div th:if="${sb.daysRemaining > 0 and !sb.deleted}">
               <span class="font-medium" th:text="${sb.daysRemaining} + ' days'"
                 >30 days</span
               >
@@ -168,7 +182,7 @@
                 Expires Sep 13, 2026
               </div>
             </div>
-            <div th:if="${sb.daysRemaining <= 0}">
+            <div th:if="${sb.daysRemaining <= 0 and !sb.deleted}">
               <span class="font-medium text-gray-400">0 days</span>
               <div
                 class="text-xs text-gray-400 mt-0.5"
@@ -176,12 +190,19 @@
               >
                 Expired Aug 18, 2026
               </div>
+              <div class="text-xs text-red-600 font-medium mt-1">
+                Autodeletion pending
+              </div>
+            </div>
+            <div th:if="${sb.deleted}">
+              <span class="font-medium text-gray-400"
+                    th:text="'Deleted ' + ${sb.deletedFormatted}">Deleted Oct 1, 2026</span>
             </div>
           </td>
 
           <!-- Action buttons -->
           <td>
-            <div class="flex items-center gap-2 flex-wrap">
+            <div th:if="${!sb.deleted}" class="flex items-center gap-2 flex-wrap">
               <!-- Launch → opens CiviForm in new tab -->
               <a
                 th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/view| : '#'"
@@ -232,7 +253,7 @@
                 <li class="usa-button-group__item">
                   <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
                   <a
-                    href="https://console.aws.amazon.com"
+                    th:href="|https://console.aws.amazon.com/ecs/v2/clusters?search=${sb.sandbox.id}|"
                     target="_blank"
                     rel="noopener"
                     class="usa-button usa-button--outline inline-flex items-center gap-1 no-underline"
@@ -257,6 +278,8 @@
                 th:data-city-name="${sb.cityName}"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
                 class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600"
+                th:disabled="${sb.provisioning}"
+                th:classappend="${sb.provisioning} ? 'opacity-50 cursor-not-allowed' : ''"
               >
                 <svg
                   class="usa-icon"
@@ -268,6 +291,7 @@
                 </svg>
               </button>
             </div>
+            <span th:if="${sb.deleted}" class="text-xs text-gray-400 italic">—</span>
           </td>
         </tr>
       </tbody>
@@ -838,6 +862,36 @@
         setTimeout(() => (btn.textContent = 'Copy All'), 1800)
       })
     }
+
+    // ── Column sort ──────────────────────────────────────────────────
+    ;(function () {
+      var table = document.querySelector('table[data-sortable]')
+      if (!table) return
+      var headers = table.querySelectorAll('th[data-sortable]')
+      headers.forEach(function (th, colIdx) {
+        th.style.cursor = 'pointer'
+        th.setAttribute('aria-sort', 'none')
+        th.addEventListener('click', function () {
+          var tbody = table.querySelector('tbody')
+          var rows = Array.from(tbody.querySelectorAll('tr'))
+          var asc = th.getAttribute('aria-sort') !== 'ascending'
+          // Reset all headers
+          headers.forEach(function (h) { h.setAttribute('aria-sort', 'none') })
+          th.setAttribute('aria-sort', asc ? 'ascending' : 'descending')
+          rows.sort(function (a, b) {
+            var aVal = a.children[colIdx].getAttribute('data-sort-value') || a.children[colIdx].textContent.trim()
+            var bVal = b.children[colIdx].getAttribute('data-sort-value') || b.children[colIdx].textContent.trim()
+            // Try numeric comparison
+            var aNum = parseFloat(aVal), bNum = parseFloat(bVal)
+            if (!isNaN(aNum) && !isNaN(bNum)) {
+              return asc ? aNum - bNum : bNum - aNum
+            }
+            return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+          })
+          rows.forEach(function (row) { tbody.appendChild(row) })
+        })
+      })
+    })()
   </script>
 
   <!-- ── Create Wizard JS ────────────────────────────────────────────────── -->
