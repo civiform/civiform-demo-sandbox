@@ -58,12 +58,27 @@ public class SandboxController extends Controller {
       return CompletableFuture.completedFuture(
           redirect(controllers.routes.AuthController.login()));
     }
-    return sandboxService.listSandboxes().thenApply(sandboxes -> {
+
+    // If redirected from status poll with ?ready=<id>, look up the sandbox name
+    // and surface a success flash: "<City> demo is live!"
+    String readyId = request.getQueryString("ready");
+
+    return sandboxService.listSandboxes().thenCompose(sandboxes -> {
       if (isJsonRequest(request)) {
-        return ok(Json.toJson(sandboxes));
+        return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
       SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
-      return ok(listView.render(request, model)).as("text/html");
+      Result result = ok(listView.render(request, model)).as("text/html");
+
+      if (readyId != null && !readyId.isEmpty()) {
+        String cityName = sandboxes.stream()
+            .filter(s -> readyId.equals(s.getId()))
+            .map(SandboxInstance::getCityName)
+            .findFirst()
+            .orElse("Sandbox");
+        result = result.flashing("success", cityName + " demo is live! 🚀");
+      }
+      return CompletableFuture.completedFuture(result);
     });
   }
 
@@ -169,9 +184,9 @@ public class SandboxController extends Controller {
           + " hx-trigger=\"every 3s\""
           + " hx-swap=\"outerHTML\"";
 
-      // Once running, redirect the whole page to the detail view
+      // Once running, redirect the whole page to the sandbox list with a success flash
       String redirectScript = isRunning
-          ? "<script>window.location.href='/sandboxes/" + id + "'</script>"
+          ? "<script>window.location.href='/sandboxes?ready=" + id + "'</script>"
           : "";
 
       String html = "<span class=\"" + badgeClass + "\"" + hxAttrs + ">"
