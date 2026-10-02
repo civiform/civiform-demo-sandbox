@@ -3,6 +3,13 @@
 -- before this script runs. Statements below are idempotent.
 
 -- ============================================================
+-- Harden the metadata database: revoke PUBLIC connect
+-- The sandbox_builder database holds PINs and admin emails.
+-- Sandbox user credentials must not be able to connect to it.
+-- ============================================================
+REVOKE CONNECT, TEMPORARY ON DATABASE sandbox_builder FROM PUBLIC;
+
+-- ============================================================
 -- Port allocation sequence (atomic, thread-safe)
 -- Allocate ports 10000–11000 for CiviForm sandbox containers
 -- ============================================================

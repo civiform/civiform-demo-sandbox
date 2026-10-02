@@ -340,6 +340,12 @@ public class DockerSandboxService implements SandboxService {
             // the builder really is a superuser.
             st.execute(String.format("GRANT %s TO CURRENT_USER", dbUser));
             st.execute(String.format("CREATE DATABASE %s OWNER %s", databaseName, dbUser));
+            // Postgres grants CONNECT and TEMPORARY to PUBLIC by default, which lets
+            // any sandbox credential connect to any other sandbox's database. Revoking
+            // these privileges closes the cross-sandbox isolation gap (#16).
+            st.execute(
+                String.format(
+                    "REVOKE CONNECT, TEMPORARY ON DATABASE %s FROM PUBLIC", databaseName));
           }
           return null;
         });
