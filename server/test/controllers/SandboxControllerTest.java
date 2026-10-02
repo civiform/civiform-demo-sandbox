@@ -60,9 +60,6 @@ public class SandboxControllerTest extends WithApplication {
             bind(SandboxService.class).toInstance(sandboxService);
           }
         })
-        // Disable CSRF filter in tests — POST requests don't carry tokens
-        .configure("play.filters.disabled",
-            java.util.List.of("play.filters.csrf.CSRFFilter"))
         .build();
   }
 
