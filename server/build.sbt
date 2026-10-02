@@ -5,7 +5,7 @@ lazy val root = (project in file("."))
   .settings(
     name := """cf-sandbox-builder""",
     version := "0.0.1",
-    scalaVersion := "2.13.15",
+    scalaVersion := "2.13.16",
     maintainer := "civiform-dev@google.com",
     javacOptions ++= Seq(
       "-encoding", "UTF-8",
@@ -54,5 +54,14 @@ lazy val root = (project in file("."))
       "software.amazon.awssdk" % "secretsmanager" % "2.26.29",
       "software.amazon.awssdk" % "rds" % "2.26.29",
       "software.amazon.awssdk" % "url-connection-client" % "2.26.29"
-    )
+    ),
+    // Include Thymeleaf HTML templates in the production dist ZIP.
+    // FileTemplateResolver resolves them at application.path / app/views/.
+    Universal / mappings ++= {
+      val viewsDir = baseDirectory.value / "app" / "views"
+      val viewFiles = (viewsDir ** "*.html").get
+      viewFiles.map { f =>
+        f -> ("app/views/" + viewsDir.toPath.relativize(f.toPath).toString)
+      }
+    }
   )
