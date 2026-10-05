@@ -201,10 +201,15 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Soft-deletes a sandbox: marks it as DELETED with a timestamp.
+   * The row remains in the database so the dashboard can show a tombstone.
+   * The container and database are cleaned up by the caller before this is invoked.
+   */
   public boolean delete(String id) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
-          "DELETE FROM sandbox_instances WHERE id = ?")) {
+          "UPDATE sandbox_instances SET status = 'DELETED', deleted_at = NOW() WHERE id = ?")) {
         ps.setString(1, id);
         return ps.executeUpdate() > 0;
       }
