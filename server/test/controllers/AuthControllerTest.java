@@ -74,7 +74,8 @@ public class AuthControllerTest extends WithApplication {
     // Already logged in → skip login page, go straight to dashboard
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes");
+    assertThat(result.redirectLocation().get())
+        .isEqualTo(routes.SandboxController.index().url());
   }
 
   // ── POST /login — correct credentials ─────────────────────────────────────
@@ -87,7 +88,8 @@ public class AuthControllerTest extends WithApplication {
 
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes");
+    assertThat(result.redirectLocation().get())
+        .isEqualTo(routes.SandboxController.index().url());
   }
 
   @Test
@@ -109,7 +111,8 @@ public class AuthControllerTest extends WithApplication {
     Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(SEE_OTHER);
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes");
+    assertThat(result.redirectLocation().get())
+        .isEqualTo(routes.SandboxController.index().url());
   }
 
   // ── POST /login — wrong credentials ───────────────────────────────────────
@@ -125,8 +128,8 @@ public class AuthControllerTest extends WithApplication {
     assertThat(body).containsIgnoringCase("Incorrect email or password");
     // Email field should be pre-filled with the submitted value
     assertThat(body).contains(CORRECT_EMAIL);
-    // No session set on failed login
-    assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+    // Failed login must not touch the session (Result.session() is null when untouched)
+    assertThat(result.session()).isNull();
   }
 
   @Test
@@ -137,7 +140,7 @@ public class AuthControllerTest extends WithApplication {
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
     assertThat(contentAsString(result)).containsIgnoringCase("Incorrect email or password");
-    assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+    assertThat(result.session()).isNull();
   }
 
   @Test
@@ -147,7 +150,7 @@ public class AuthControllerTest extends WithApplication {
     Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
-    assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+    assertThat(result.session()).isNull();
   }
 
   @Test
@@ -157,7 +160,7 @@ public class AuthControllerTest extends WithApplication {
     Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
-    assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+    assertThat(result.session()).isNull();
   }
 
   // ── POST /login — no password configured ──────────────────────────────────
@@ -180,7 +183,7 @@ public class AuthControllerTest extends WithApplication {
     Result result = Helpers.route(appNoPassword, request);
 
     assertThat(result.status()).isEqualTo(BAD_REQUEST);
-    assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+    assertThat(result.session()).isNull();
 
     appNoPassword.asScala().stop();
   }

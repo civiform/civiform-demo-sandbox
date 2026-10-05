@@ -10,3 +10,17 @@ server/project/target
 .metals
 .idea
 .vscode
+
+# Terraform working directories hold the downloaded provider cache — ~865 MB for
+# terraform/sandbox alone. prod.Dockerfile copies terraform/sandbox into the
+# image, so without this the provider binaries ship too, and every build (dev
+# included) pays the cost of sending them to the daemon.
+#
+# .terraform.lock.hcl is deliberately NOT excluded: the image should pin the same
+# provider versions that were tested.
+**/.terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+

@@ -44,8 +44,8 @@ public class SandboxInstance {
   /** Host port bound to CiviForm's internal 9000 (Sprint 1 Docker only). */
   private int hostPort;
 
-  /** Postgres schema name for this sandbox (e.g. "sandbox_sb_a1b2c3d4"). */
-  private String schemaName;
+  /** Postgres database name for this sandbox (e.g. "sandbox_sb_a1b2c3d4"). */
+  private String databaseName;
 
   /**
    * ARN of the per-sandbox ALB target group (Sprint 2 ECS Fargate only).
@@ -59,6 +59,16 @@ public class SandboxInstance {
    * Null for Docker sandboxes.
    */
   private String listenerRuleArn;
+
+  /**
+   * Priority of this sandbox's ALB listener rule, allocated atomically from the
+   * {@code sandbox_listener_priority_seq} Postgres sequence.
+   *
+   * <p>Boxed rather than primitive on purpose: {@code null} means "this sandbox has no load
+   * balancer rule", which is the normal state for Docker sandboxes. A primitive {@code int} would
+   * render that as 0, which is indistinguishable from a real value and is not a legal ALB priority.
+   */
+  private Integer listenerPriority;
 
   /**
    * Google Analytics measurement ID (e.g. "G-ABC123XYZ"). Optional.

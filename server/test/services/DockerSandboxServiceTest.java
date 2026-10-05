@@ -22,6 +22,7 @@ import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +33,6 @@ import models.SandboxInstance;
 import models.SandboxStatus;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import play.db.ConnectionCallable;
 import play.db.Database;
 import play.libs.ws.WSClient;
@@ -44,13 +44,13 @@ import play.libs.ws.WSClient;
  * socket or Postgres is required. Tests verify the service's logic layer in isolation.
  *
  * <p>Sprint 1 required tests (from pr-testing-standards.md): - createSandbox() → status is
- * PROVISIONING - createSandbox() → PIN is exactly 6 digits - createSandbox() → Postgres schema
+ * PROVISIONING - createSandbox() → PIN is exactly 6 digits - createSandbox() → Postgres database
  * created before container launch - createSandbox() → container env vars include DATABASE_URL,
  * APPLICATION_SECRET - createSandbox() → concurrent calls get different ports - getSandboxStatus()
  * → returns PROVISIONING while container starting - getSandboxStatus() → returns RUNNING after
  * /health + 15s buffer - getSandboxStatus() → returns FAILED if container exits non-zero -
  * validatePin() → returns sandbox on correct PIN - validatePin() → returns empty on wrong PIN -
- * deleteSandbox() → drops Postgres schema - deleteSandbox() → stops container
+ * deleteSandbox() → drops Postgres database - deleteSandbox() → stops container
  */
 public class DockerSandboxServiceTest {
 
@@ -173,14 +173,14 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_instanceHasSchemaAndPort()
+  public void createSandbox_instanceHasDatabaseAndPort()
       throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
         service.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
 
-    assertThat(result.getSchemaName()).startsWith("sandbox_");
+    assertThat(result.getDatabaseName()).startsWith("sandbox_");
     assertThat(result.getHostPort()).isGreaterThanOrEqualTo(10000);
     assertThat(result.getHostPort()).isLessThanOrEqualTo(11000);
   }
@@ -322,7 +322,7 @@ public class DockerSandboxServiceTest {
       throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandboxWithContainer("sb-del1", "container-xyz");
     when(repository.findById("sb-del1")).thenReturn(Optional.of(sandbox));
-    when(repository.delete("sb-del1")).thenReturn(true);
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
 
     StopContainerCmd stopCmd = mock(StopContainerCmd.class);
     when(stopCmd.withTimeout(any(Integer.class))).thenReturn(stopCmd);
@@ -340,20 +340,68 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void deleteSandbox_dropsPostgresSchema() throws ExecutionException, InterruptedException {
+  public void deleteSandbox_dropsPostgresDatabase()
+      throws ExecutionException, InterruptedException {
     SandboxInstance sandbox = makeSandboxWithContainer("sb-del2", "container-xyz2");
     when(repository.findById("sb-del2")).thenReturn(Optional.of(sandbox));
-    when(repository.delete("sb-del2")).thenReturn(true);
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
     stubDockerStop("container-xyz2");
 
-    // Capture the SQL executed via db.withConnection
-    ArgumentCaptor<String> schemaCaptor = ArgumentCaptor.forClass(String.class);
-    // We verify the schemaName that was on the SandboxInstance makes it to the drop call
     service.deleteSandbox("sb-del2").toCompletableFuture().get();
 
-    // The schema name on the instance is "sandbox_sb_del2"
-    // Verify db.withConnection was called (schema drop happens inside it)
+    // Verify db.withConnection was called (database drop happens inside it)
     verify(db, atLeastOnce()).withConnection(any(ConnectionCallable.class));
+  }
+
+  @Test
+  public void deleteSandbox_keepsRecordWhenDatabaseDropFails()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance sandbox = makeSandboxWithContainer("sb-del3", "container-xyz3");
+    when(repository.findById("sb-del3")).thenReturn(Optional.of(sandbox));
+    stubDockerStop("container-xyz3");
+    when(db.withConnection(any(ConnectionCallable.class)))
+        .thenThrow(new RuntimeException("connection refused"));
+
+    Boolean deleted = service.deleteSandbox("sb-del3").toCompletableFuture().get();
+
+    // The row is the only record of the database name; a failed drop must not delete it.
+    assertThat(deleted).isFalse();
+    verify(repository, never()).delete("sb-del3");
+    verify(repository, never()).softDelete(anyString(), any(Instant.class));
+    verify(repository).updateStatus("sb-del3", SandboxStatus.DELETE_FAILED);
+  }
+
+  @Test
+  public void deleteSandbox_keepsScrubbedTombstoneInsteadOfDeletingRow()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance sandbox = makeSandboxWithContainer("sb-del4", "container-xyz4");
+    when(repository.findById("sb-del4")).thenReturn(Optional.of(sandbox));
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
+    stubDockerStop("container-xyz4");
+
+    Boolean deleted = service.deleteSandbox("sb-del4").toCompletableFuture().get();
+
+    // Successful teardown tombstones the row (audit trail for orphaned AWS resources)
+    // instead of hard-deleting it.
+    assertThat(deleted).isTrue();
+    verify(repository).softDelete(anyString(), any(Instant.class));
+    verify(repository, never()).delete(anyString());
+  }
+
+  @Test
+  public void deleteSandbox_alreadyDeletedTombstoneIsNoOp()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance tombstone = makeSandboxWithStatus("sb-del5", SandboxStatus.DELETED);
+    when(repository.findById("sb-del5")).thenReturn(Optional.of(tombstone));
+
+    Boolean deleted = service.deleteSandbox("sb-del5").toCompletableFuture().get();
+
+    // Re-deleting a tombstone must not attempt teardown: the DROP DATABASE would fail
+    // and flip the row to DELETE_FAILED.
+    assertThat(deleted).isFalse();
+    verify(dockerClient, never()).stopContainerCmd(anyString());
+    verify(repository, never()).softDelete(anyString(), any(Instant.class));
+    verify(repository, never()).updateStatus(anyString(), any(SandboxStatus.class));
   }
 
   @Test
@@ -447,7 +495,7 @@ public class DockerSandboxServiceTest {
     StartContainerCmd startCmd = mock(StartContainerCmd.class);
     when(dockerClient.startContainerCmd(anyString())).thenReturn(startCmd);
 
-    // Stub db.withConnection for schema provisioning (no-op)
+    // Stub db.withConnection for database provisioning (no-op)
     when(db.withConnection(any(ConnectionCallable.class))).thenReturn(null);
   }
 
@@ -470,7 +518,7 @@ public class DockerSandboxServiceTest {
         .url("http://localhost:10001")
         .pin(pin)
         .hostPort(10001)
-        .schemaName("sandbox_" + id.replace("-", "_"))
+        .databaseName("sandbox_" + id.replace("-", "_"))
         .adminEmail("")
         .createdAt(java.time.Instant.now())
         .expiresAt(java.time.Instant.now().plus(Duration.ofDays(30)))
@@ -480,7 +528,7 @@ public class DockerSandboxServiceTest {
   private SandboxInstance makeSandboxWithContainer(String id, String containerId) {
     return makeSandbox(id, "123456").toBuilder()
         .containerId(containerId)
-        .schemaName("sandbox_" + id.replace("-", "_"))
+        .databaseName("sandbox_" + id.replace("-", "_"))
         .build();
   }
 
