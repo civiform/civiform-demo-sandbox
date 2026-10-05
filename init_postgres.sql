@@ -50,7 +50,6 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
   status          VARCHAR(32)   NOT NULL DEFAULT 'PROVISIONING',
   url             VARCHAR(512)  NOT NULL DEFAULT '',
   admin_email     VARCHAR(255)  NOT NULL DEFAULT '',
-  notes           TEXT          NOT NULL DEFAULT '',
   pin             VARCHAR(6)    NOT NULL,
   container_id    VARCHAR(128),          -- Docker container ID (set after launch)
   host_port       INTEGER       NOT NULL,

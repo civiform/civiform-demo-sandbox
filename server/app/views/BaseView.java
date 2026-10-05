@@ -113,7 +113,8 @@ public abstract class BaseView<TModel extends BaseViewModel> {
             .pageHeading(pageHeading(model, messages))
             .pageIntro(pageIntro(model, messages))
             .cspNonce(CspUtil.getNonce(request))
-            .csrfToken("")
+            .csrfToken(play.filters.csrf.CSRF.getToken(request.asScala())
+                .map(t -> t.value()).getOrElse(() -> ""))
             .isDev(environment.isDev())
             .build());
 
