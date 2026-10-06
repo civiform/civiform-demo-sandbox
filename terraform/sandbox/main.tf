@@ -137,13 +137,11 @@ locals {
 # module block. When bumping the pin, bump it in both blocks below — there is
 # no way to factor it into one place, and nothing will warn you if they drift.
 #
-# Pinned to d85c413 ("Move civiform container/task definition to its own
-# module"), which also contains 00c45d6 ("Modify ecs_fargate_service to allow
-# external load balancers") as its parent. A commit SHA rather than a branch:
-# a moving ref would mean two sandboxes created a week apart silently run
-# different infrastructure.
+# Pinned to daf8155 ("Move civiform container/task definition to its own module #600"),
+# on main branch. A commit SHA rather than a branch: a moving ref would mean
+# two sandboxes created a week apart silently run different infrastructure.
 module "civiform_app" {
-  source = "git::https://github.com/civiform/cloud-deploy-infra.git//cloud/aws/modules/civiform_app?ref=d85c413549bfcbe0be7f1c6cacc4a65ebe702706"
+  source = "git::https://github.com/civiform/cloud-deploy-infra.git//cloud/aws/modules/civiform_app?ref=daf8155c367509e2acbe6d9d77fabd113917786d"
 
   app_prefix = var.sandbox_id
   aws_region = var.aws_region
@@ -233,7 +231,7 @@ module "civiform_app" {
 # would cost more than everything else in a sandbox combined and would need its
 # own certificate and DNS record.
 module "civiform_service" {
-  source = "git::https://github.com/civiform/cloud-deploy-infra.git//cloud/aws/modules/ecs_fargate_service?ref=d85c413549bfcbe0be7f1c6cacc4a65ebe702706"
+  source = "git::https://github.com/civiform/cloud-deploy-infra.git//cloud/aws/modules/ecs_fargate_service?ref=daf8155c367509e2acbe6d9d77fabd113917786d"
 
   app_prefix = var.sandbox_id
 
