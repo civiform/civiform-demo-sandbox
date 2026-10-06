@@ -126,7 +126,7 @@ resource "aws_security_group" "alb" {
 # ECS tasks: accept traffic from ALB only
 resource "aws_security_group" "ecs_tasks" {
   name        = "civiform-sandbox-ecs"
-  description = "ECS sandbox tasks — ingress from ALB only"
+  description = "ECS sandbox tasks - ingress from ALB only"
   vpc_id      = aws_vpc.sandbox.id
 
   ingress {
@@ -149,7 +149,7 @@ resource "aws_security_group" "ecs_tasks" {
 # RDS: accept traffic from ECS tasks only
 resource "aws_security_group" "rds" {
   name        = "civiform-sandbox-rds"
-  description = "Sandbox RDS — ingress from ECS tasks only"
+  description = "Sandbox RDS - ingress from ECS tasks only"
   vpc_id      = aws_vpc.sandbox.id
 
   ingress {
@@ -157,6 +157,27 @@ resource "aws_security_group" "rds" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs_tasks.id]
+  }
+
+  # Per-sandbox tasks do NOT use aws_security_group.ecs_tasks above. The upstream
+  # ecs_fargate_service module creates its own security group per service
+  # ("<app_prefix>-civiform-ecs-tasks-sg"), and those IDs only exist once a
+  # sandbox is provisioned, so this platform-level rule cannot reference them.
+  #
+  # Authorising the private subnet CIDRs instead is what lets any task in the
+  # private tier reach the database, whichever security group it carries. This is
+  # also the contract the sandbox stack relies on: it never modifies this security
+  # group, because a per-sandbox stack mutating a shared resource would race with
+  # every other sandbox.
+  #
+  # The subnets are not routable from the internet, so this does not widen exposure
+  # beyond the VPC.
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = aws_subnet.private[*].cidr_block
+    description = "Private subnets - covers per-sandbox ECS task security groups"
   }
 
   egress {
@@ -167,4 +188,53 @@ resource "aws_security_group" "rds" {
   }
 
   tags = { Name = "civiform-sandbox-rds-sg" }
+}
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+# Consumed by the per-sandbox Terraform stack (terraform/sandbox), which is applied
+# separately with its own state file and therefore cannot reference these resources
+# directly. The builder reads them from this stack's output and passes them in as
+# variables.
+
+output "vpc_id" {
+  description = "Sandbox VPC ID"
+  value       = aws_vpc.sandbox.id
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs - ECS tasks and RDS run here"
+  value       = aws_subnet.private[*].id
+}
+
+output "public_subnet_ids" {
+  description = "Public subnet IDs - the shared ALB lives here"
+  value       = aws_subnet.public[*].id
+}
+
+output "private_subnet_cidrs" {
+  description = "Private subnet CIDRs, authorised on the RDS security group"
+  value       = aws_subnet.private[*].cidr_block
+}
+
+output "alb_security_group_id" {
+  description = <<-EOT
+    Shared ALB security group. Passed to the upstream ecs_fargate_service module as
+    existing_lb_security_group_id so each sandbox admits traffic from the shared load
+    balancer without creating one of its own.
+  EOT
+  value       = aws_security_group.alb.id
+}
+
+output "ecs_tasks_security_group_id" {
+  description = <<-EOT
+    Platform ECS task security group. NOT used by Terraform-provisioned sandboxes:
+    ecs_fargate_service creates one security group per service. Retained for tasks
+    managed outside the per-sandbox stack.
+  EOT
+  value       = aws_security_group.ecs_tasks.id
+}
+
+output "rds_security_group_id" {
+  description = "Shared RDS security group"
+  value       = aws_security_group.rds.id
 }

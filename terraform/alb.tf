@@ -90,6 +90,16 @@ output "alb_zone_id" {
 }
 
 output "alb_https_listener_arn" {
-  description = "HTTPS listener ARN — set as ALB_LISTENER_ARN env var on the builder service"
+  description = "HTTPS listener ARN — the per-sandbox host-header rules attach to this"
   value       = aws_lb_listener.https.arn
+}
+
+# Echoed as an output purely so that the per-sandbox tfvars can be generated
+# entirely from `terraform output -json`. Without it the base domain is the one
+# value that has to be hand-copied into every sandbox, which is exactly the kind
+# of thing that drifts and then fails as an unexplained 404 from the ALB's
+# default action.
+output "base_domain" {
+  description = "Wildcard domain the certificate covers and sandboxes live under"
+  value       = var.domain
 }

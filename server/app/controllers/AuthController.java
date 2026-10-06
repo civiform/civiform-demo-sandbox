@@ -6,6 +6,8 @@ import com.google.inject.Inject;
 import com.typesafe.config.Config;
 import play.data.DynamicForm;
 import play.data.FormFactory;
+import play.filters.csrf.AddCSRFToken;
+import play.filters.csrf.RequireCSRFCheck;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
@@ -42,6 +44,7 @@ public final class AuthController extends Controller {
   }
 
   /** GET /login — show the login page. Redirects to dashboard if already authenticated. */
+  @AddCSRFToken
   public Result login(Http.Request request) {
     if (isAuthenticated(request)) {
       return redirect(controllers.routes.SandboxController.index());
@@ -58,6 +61,7 @@ public final class AuthController extends Controller {
    *   <li>Wrong → re-render login with error message (email field pre-filled)
    * </ul>
    */
+  @RequireCSRFCheck
   public Result authenticate(Http.Request request) {
     DynamicForm form = formFactory.form().bindFromRequest(request);
     String email = orEmpty(form.get("email"));

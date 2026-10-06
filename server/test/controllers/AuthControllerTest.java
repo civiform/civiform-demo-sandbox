@@ -2,6 +2,7 @@ package controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static play.mvc.Http.Status.BAD_REQUEST;
+import static play.mvc.Http.Status.FORBIDDEN;
 import static play.mvc.Http.Status.OK;
 import static play.mvc.Http.Status.SEE_OTHER;
 import static play.test.Helpers.contentAsString;
@@ -204,6 +205,28 @@ public class AuthControllerTest extends WithApplication {
     assertThat(result.redirectLocation().get()).isEqualTo("/login");
     // Session key must be gone after logout
     assertThat(result.session().get(AuthController.SESSION_KEY)).isEmpty();
+  }
+
+  // ── CSRF enforcement ──────────────────────────────────────────────────────
+
+  @Test
+  public void authenticate_hasCsrfCheckAnnotation() throws NoSuchMethodException {
+    // Structural test: @RequireCSRFCheck must be present on authenticate().
+    // Helpers.route() bypasses HTTP filters, so we can't provoke a 403 in a
+    // WithApplication test — but we can verify the annotation exists.
+    java.lang.reflect.Method authenticate =
+        AuthController.class.getMethod("authenticate", Http.Request.class);
+    assertThat(authenticate.isAnnotationPresent(
+        play.filters.csrf.RequireCSRFCheck.class)).isTrue();
+  }
+
+  @Test
+  public void csrfFilter_isNotDisabled() {
+    // Verify that CSRFFilter is NOT in the disabled-filters list.
+    // (It was disabled globally before this PR.)
+    java.util.List<String> disabled =
+        app.config().getStringList("play.filters.disabled");
+    assertThat(disabled).doesNotContain("play.filters.csrf.CSRFFilter");
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

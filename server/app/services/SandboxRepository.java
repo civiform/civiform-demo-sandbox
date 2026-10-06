@@ -41,16 +41,39 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Allocates the next ALB listener rule priority atomically via the Postgres sequence.
+   *
+   * <p>ALB requires rule priorities to be unique per listener. A sequence is the only allocation
+   * strategy here that is safe under concurrency: describing the listener's existing rules and
+   * picking the next free number — which is what {@code EcsFargateSandboxService} did — races
+   * whenever two sandboxes are provisioned at once, and the loser fails partway through, after its
+   * ECS service has already been created.
+   *
+   * <p>The sequence is declared {@code NO CYCLE}, so exhaustion raises rather than silently
+   * reissuing a priority that a live rule already holds.
+   */
+  public int nextListenerPriority() {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "SELECT nextval('sandbox_listener_priority_seq')");
+           ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        return rs.getInt(1);
+      }
+    });
+  }
+
   /** Persists a new sandbox row (called before async container launch). */
   public void save(SandboxInstance instance) {
     db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "INSERT INTO sandbox_instances "
               + "(id, city_name, subdomain, civiform_version, status, url, admin_email, "
-              + " pin, container_id, host_port, schema_name, target_group_arn, "
-              + " listener_rule_arn, google_analytics_id, google_analytics_url, "
-              + " created_at, expires_at, deleted_at) "
-              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+              + " pin, container_id, host_port, database_name, target_group_arn, "
+              + " listener_rule_arn, listener_priority, google_analytics_id, "
+              + " google_analytics_url, created_at, expires_at, deleted_at) "
+              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
         ps.setString(1, instance.getId());
         ps.setString(2, instance.getCityName());
         ps.setString(3, instance.getSubdomain());
@@ -61,14 +84,17 @@ public class SandboxRepository {
         ps.setString(8, instance.getPin());
         ps.setString(9, instance.getContainerId());
         ps.setInt(10, instance.getHostPort());
-        ps.setString(11, instance.getSchemaName());
+        ps.setString(11, instance.getDatabaseName());
         ps.setString(12, instance.getTargetGroupArn());
         ps.setString(13, instance.getListenerRuleArn());
-        ps.setString(14, instance.getGoogleAnalyticsId());
-        ps.setString(15, instance.getGoogleAnalyticsUrl());
-        ps.setTimestamp(16, instance.getCreatedAt() != null ? Timestamp.from(instance.getCreatedAt()) : null);
-        ps.setTimestamp(17, instance.getExpiresAt() != null ? Timestamp.from(instance.getExpiresAt()) : null);
-        ps.setTimestamp(18, instance.getDeletedAt() != null ? Timestamp.from(instance.getDeletedAt()) : null);
+        // setObject rather than setInt: the column is nullable and Docker sandboxes
+        // legitimately have no listener rule. setInt would coerce null to 0.
+        ps.setObject(14, instance.getListenerPriority(), java.sql.Types.INTEGER);
+        ps.setString(15, instance.getGoogleAnalyticsId());
+        ps.setString(16, instance.getGoogleAnalyticsUrl());
+        ps.setTimestamp(17, instance.getCreatedAt() != null ? Timestamp.from(instance.getCreatedAt()) : null);
+        ps.setTimestamp(18, instance.getExpiresAt() != null ? Timestamp.from(instance.getExpiresAt()) : null);
+        ps.setTimestamp(19, instance.getDeletedAt() != null ? Timestamp.from(instance.getDeletedAt()) : null);
         ps.executeUpdate();
       }
       return null;
@@ -95,6 +121,51 @@ public class SandboxRepository {
           "UPDATE sandbox_instances SET container_id = ? WHERE id = ?")) {
         ps.setString(1, containerId);
         ps.setString(2, id);
+        ps.executeUpdate();
+      }
+      return null;
+    });
+  }
+
+  /**
+   * Moves a sandbox's expiry.
+   *
+   * <p>Exists because {@code save} is a plain INSERT: calling it with an already-persisted
+   * instance, as an "update", raises a duplicate key violation on the primary key.
+   */
+  public boolean updateExpiry(String id, Instant expiresAt) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances SET expires_at = ? WHERE id = ?")) {
+        ps.setTimestamp(1, Timestamp.from(expiresAt));
+        ps.setString(2, id);
+        return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
+  /**
+   * Records the AWS resources a Terraform apply produced.
+   *
+   * <p>Written as a single statement so a sandbox row never shows a URL without the ARNs needed to
+   * tear it down. The priority is allocated and stored before apply; only the resulting ARNs and
+   * the URL are set here.
+   */
+  public void updateTerraformOutputs(
+      String id, String url, String targetGroupArn, String listenerRuleArn, String taskDefinitionArn) {
+    db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET url = ?, target_group_arn = ?, listener_rule_arn = ?, container_id = ? "
+              + "WHERE id = ?")) {
+        ps.setString(1, url);
+        ps.setString(2, targetGroupArn);
+        ps.setString(3, listenerRuleArn);
+        // container_id is the runtime's opaque handle for the workload. For Docker that is a
+        // container ID; for Terraform the closest equivalent is the task definition ARN, which is
+        // what identifies the exact image and configuration this sandbox is pinned to.
+        ps.setString(4, taskDefinitionArn);
+        ps.setString(5, id);
         ps.executeUpdate();
       }
       return null;
@@ -130,11 +201,36 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Soft-deletes a sandbox: marks it as DELETED with a timestamp.
+   * The row remains in the database so the dashboard can show a tombstone.
+   * The container and database are cleaned up by the caller before this is invoked.
+   */
   public boolean delete(String id) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
-          "DELETE FROM sandbox_instances WHERE id = ?")) {
+          "UPDATE sandbox_instances SET status = 'DELETED', deleted_at = NOW() WHERE id = ?")) {
         ps.setString(1, id);
+        return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
+  /**
+   * Marks a torn-down sandbox as a {@link SandboxStatus#DELETED} tombstone instead of removing
+   * the row. The row stays as the audit record of the demo (including its database name, for
+   * orphaned-resource tracking); the PIN and admin email are cleared so the tombstone holds no
+   * secrets or personal data.
+   */
+  public boolean softDelete(String id, Instant deletedAt) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET status = ?, deleted_at = ?, pin = '', admin_email = '' "
+              + "WHERE id = ?")) {
+        ps.setString(1, SandboxStatus.DELETED.name());
+        ps.setTimestamp(2, Timestamp.from(deletedAt));
+        ps.setString(3, id);
         return ps.executeUpdate() > 0;
       }
     });
@@ -152,9 +248,12 @@ public class SandboxRepository {
         .pin(rs.getString("pin"))
         .containerId(rs.getString("container_id"))
         .hostPort(rs.getInt("host_port"))
-        .schemaName(rs.getString("schema_name"))
+        .databaseName(rs.getString("database_name"))
         .targetGroupArn(rs.getString("target_group_arn"))
         .listenerRuleArn(rs.getString("listener_rule_arn"))
+        // getObject, not getInt: getInt maps SQL NULL to 0, which would make a Docker
+        // sandbox look like it holds ALB rule priority 0.
+        .listenerPriority(rs.getObject("listener_priority", Integer.class))
         .googleAnalyticsId(rs.getString("google_analytics_id"))
         .googleAnalyticsUrl(rs.getString("google_analytics_url"))
         .createdAt(rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null)

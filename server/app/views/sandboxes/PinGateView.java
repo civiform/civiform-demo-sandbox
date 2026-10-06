@@ -2,7 +2,9 @@ package views.sandboxes;
 
 import com.google.inject.Inject;
 import play.i18n.Messages;
+import java.util.Optional;
 import views.BaseView;
+import views.LayoutTemplate;
 import views.shared.BaseViewDeps;
 
 /** View for the prospect PIN entry gate page at /sandboxes/:id/access. */
@@ -21,6 +23,11 @@ public final class PinGateView extends BaseView<PinGateViewModel> {
   @Override
   protected String pageHeading(PinGateViewModel model, Messages messages) {
     return model.getCityName() + " CiviForm Demo";
+  }
+
+  @Override
+  protected Optional<LayoutTemplate> layoutTemplate() {
+    return Optional.of(LayoutTemplate.LOGIN_LAYOUT);
   }
 
   @Override

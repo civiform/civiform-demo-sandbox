@@ -26,6 +26,7 @@
 
     <!-- Login form -->
     <form action="/login" method="POST" class="w-full">
+      <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
 
       <div class="mb-4">
         <label for="email" class="usa-label font-medium text-gray-700">

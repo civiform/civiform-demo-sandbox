@@ -66,6 +66,14 @@ public class InMemorySandboxServiceTest {
     assertThat(retrieved).isPresent();
     assertThat(retrieved.get().getStatus()).isEqualTo(SandboxStatus.DELETED);
     assertThat(retrieved.get().getDeletedAt()).isNotNull();
+
+    // The tombstone is scrubbed: no PIN or admin email retained.
+    assertThat(retrieved.get().getPin()).isEmpty();
+    assertThat(retrieved.get().getAdminEmail()).isEmpty();
+
+    // Deleting a tombstone again is a no-op.
+    Boolean deletedAgain = service.deleteSandbox(created.getId()).toCompletableFuture().get();
+    assertThat(deletedAgain).isFalse();
   }
 
   @Test

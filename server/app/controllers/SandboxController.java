@@ -16,6 +16,8 @@ import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import play.filters.csrf.AddCSRFToken;
+import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.SandboxService;
 import views.sandboxes.DemoWrapperView;
@@ -53,17 +55,33 @@ public class SandboxController extends Controller {
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). Requires portal auth. */
+  @AddCSRFToken
   public CompletionStage<Result> index(Http.Request request) {
     if (!AuthController.isAuthenticated(request)) {
       return CompletableFuture.completedFuture(
           redirect(controllers.routes.AuthController.login()));
     }
-    return sandboxService.listSandboxes().thenApply(sandboxes -> {
+
+    // If redirected from status poll with ?ready=<id>, look up the sandbox name
+    // and surface a success flash: "<City> demo is live!"
+    String readyId = request.getQueryString("ready");
+
+    return sandboxService.listSandboxes().thenCompose(sandboxes -> {
       if (isJsonRequest(request)) {
-        return ok(Json.toJson(sandboxes));
+        return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
       SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
-      return ok(listView.render(request, model)).as("text/html");
+      Result result = ok(listView.render(request, model)).as("text/html");
+
+      if (readyId != null && !readyId.isEmpty()) {
+        String cityName = sandboxes.stream()
+            .filter(s -> readyId.equals(s.getId()))
+            .map(SandboxInstance::getCityName)
+            .findFirst()
+            .orElse("Sandbox");
+        result = result.flashing("success", cityName + " demo is live! 🚀");
+      }
+      return CompletableFuture.completedFuture(result);
     });
   }
 
@@ -71,6 +89,7 @@ public class SandboxController extends Controller {
    * POST /sandboxes — create a new sandbox.
    * Redirects back to the dashboard list with a flash banner (spec: "Demo provisioning initiated").
    */
+  @RequireCSRFCheck
   public CompletionStage<Result> create(Http.Request request) {
     CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
     return sandboxService.createSandbox(sandboxRequest)
@@ -126,6 +145,7 @@ public class SandboxController extends Controller {
 
 
   /** GET /sandboxes/:id — detail page or JSON. */
+  @AddCSRFToken
   public CompletionStage<Result> show(Http.Request request, String id) {
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
       if (maybeSandbox.isEmpty()) {
@@ -169,9 +189,9 @@ public class SandboxController extends Controller {
           + " hx-trigger=\"every 3s\""
           + " hx-swap=\"outerHTML\"";
 
-      // Once running, redirect the whole page to the detail view
+      // Once running, redirect the whole page to the sandbox list with a success flash
       String redirectScript = isRunning
-          ? "<script>window.location.href='/sandboxes/" + id + "'</script>"
+          ? "<script>window.location.href='/sandboxes?ready=" + id + "'</script>"
           : "";
 
       String html = "<span class=\"" + badgeClass + "\"" + hxAttrs + ">"
@@ -182,6 +202,7 @@ public class SandboxController extends Controller {
   }
 
   /** GET /sandboxes/:id/access — PIN gate page for prospects. */
+  @AddCSRFToken
   public CompletionStage<Result> pinGate(Http.Request request, String id) {
     // If the browser already has a valid access cookie for this sandbox, skip the PIN form
     // and redirect directly to the live CiviForm URL.
@@ -212,6 +233,7 @@ public class SandboxController extends Controller {
    *
    * <p>Wrong PIN → re-renders PIN gate with error. No cookie is set.
    */
+  @RequireCSRFCheck
   public CompletionStage<Result> validateAccess(Http.Request request, String id) {
     DynamicForm form = formFactory.form().bindFromRequest(request);
     String pin = orDefault(form.get("pin"), "");
@@ -279,6 +301,7 @@ public class SandboxController extends Controller {
   }
 
   /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
+  @RequireCSRFCheck
   public CompletionStage<Result> delete(Http.Request request, String id) {
     return sandboxService
         .getSandbox(id)
@@ -304,6 +327,7 @@ public class SandboxController extends Controller {
    * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
    * Redirects back to the dashboard with the updated sandbox visible.
    */
+  @RequireCSRFCheck
   public CompletionStage<Result> extend(Http.Request request, String id) {
     DynamicForm form = formFactory.form().bindFromRequest(request);
     String daysStr = orDefault(form.get("days"), "30");
