@@ -15,8 +15,8 @@ public class SandboxInstance {
   private String cityName;
 
   /**
-   * URL subdomain slug chosen by the sales rep (e.g. "burlington-vt").
-   * Full URL = {@code https://{subdomain}.sandbox.civiform.dev}.
+   * URL subdomain slug chosen by the sales rep (e.g. "burlington-vt"). Full URL = {@code
+   * https://{subdomain}.sandbox.civiform.dev}.
    */
   private String subdomain;
 
@@ -27,8 +27,8 @@ public class SandboxInstance {
   private SandboxStatus status;
 
   /**
-   * Sandbox URL — per-sandbox subdomain under wildcard cert.
-   * e.g. "https://burlington-vt.sandbox.civiform.dev"
+   * Sandbox URL — per-sandbox subdomain under wildcard cert. e.g.
+   * "https://burlington-vt.sandbox.civiform.dev"
    */
   private String url;
 
@@ -48,21 +48,20 @@ public class SandboxInstance {
   private String databaseName;
 
   /**
-   * ARN of the per-sandbox ALB target group (Sprint 2 ECS Fargate only).
-   * Created at provision time, deleted at teardown. Null for Docker sandboxes.
+   * ARN of the per-sandbox ALB target group (Sprint 2 ECS Fargate only). Created at provision time,
+   * deleted at teardown. Null for Docker sandboxes.
    */
   private String targetGroupArn;
 
   /**
-   * ARN of the per-sandbox ALB listener rule routing
-   * {slug}.sandbox.civiform.dev → this sandbox's target group (Sprint 2 only).
-   * Null for Docker sandboxes.
+   * ARN of the per-sandbox ALB listener rule routing {slug}.sandbox.civiform.dev → this sandbox's
+   * target group (Sprint 2 only). Null for Docker sandboxes.
    */
   private String listenerRuleArn;
 
   /**
-   * Priority of this sandbox's ALB listener rule, allocated atomically from the
-   * {@code sandbox_listener_priority_seq} Postgres sequence.
+   * Priority of this sandbox's ALB listener rule, allocated atomically from the {@code
+   * sandbox_listener_priority_seq} Postgres sequence.
    *
    * <p>Boxed rather than primitive on purpose: {@code null} means "this sandbox has no load
    * balancer rule", which is the normal state for Docker sandboxes. A primitive {@code int} would
@@ -71,16 +70,15 @@ public class SandboxInstance {
   private Integer listenerPriority;
 
   /**
-   * Google Analytics measurement ID (e.g. "G-ABC123XYZ"). Optional.
-   * Injected as GOOGLE_ANALYTICS_ID env var into the sandbox container.
-   * Null if GA not configured.
+   * Google Analytics measurement ID (e.g. "G-ABC123XYZ"). Optional. Injected as GOOGLE_ANALYTICS_ID
+   * env var into the sandbox container. Null if GA not configured.
    */
   private String googleAnalyticsId;
 
   /**
-   * Full GA property console deep-link URL for the "View in GA" button. Optional.
-   * e.g. "https://analytics.google.com/analytics/web/#/a12345p678/reports/intelligenthome"
-   * Null if rep has not set it; falls back to GA home in the UI.
+   * Full GA property console deep-link URL for the "View in GA" button. Optional. e.g.
+   * "https://analytics.google.com/analytics/web/#/a12345p678/reports/intelligenthome" Null if rep
+   * has not set it; falls back to GA home in the UI.
    */
   private String googleAnalyticsUrl;
 
@@ -88,9 +86,7 @@ public class SandboxInstance {
   private Instant expiresAt;
 
   /**
-   * Timestamp when the sandbox was soft-deleted (status = DELETED).
-   * Null for all other statuses.
+   * Timestamp when the sandbox was soft-deleted (status = DELETED). Null for all other statuses.
    */
   private Instant deletedAt;
 }
-

@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import models.SandboxInstance;
 import models.SandboxStatus;
@@ -108,7 +107,9 @@ public class TerraformSandboxServiceTest {
   /** Variant of {@link #config(Path)} with the admin connection pointed at a tunnel. */
   private Config configWithAdminOverride(String host, int port) {
     Map<String, Object> values = new HashMap<>();
-    config(platformOutputsFile).entrySet().forEach(e -> values.put(e.getKey(), e.getValue().unwrapped()));
+    config(platformOutputsFile)
+        .entrySet()
+        .forEach(e -> values.put(e.getKey(), e.getValue().unwrapped()));
     values.put("sandbox.rds.adminHost", host);
     values.put("sandbox.rds.adminPort", port);
     return ConfigFactory.parseMap(values);
@@ -270,8 +271,7 @@ public class TerraformSandboxServiceTest {
 
   @Test
   public void validatePin_deletedSandboxRejected() throws Exception {
-    SandboxInstance tombstone =
-        live("123456").toBuilder().status(SandboxStatus.DELETED).build();
+    SandboxInstance tombstone = live("123456").toBuilder().status(SandboxStatus.DELETED).build();
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(tombstone));
 
     assertThat(newService().validatePin("sb-abcd1234", "123456").toCompletableFuture().get())
@@ -280,8 +280,7 @@ public class TerraformSandboxServiceTest {
 
   @Test
   public void validatePin_deletingSandboxRejected() throws Exception {
-    SandboxInstance deleting =
-        live("123456").toBuilder().status(SandboxStatus.DELETING).build();
+    SandboxInstance deleting = live("123456").toBuilder().status(SandboxStatus.DELETING).build();
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleting));
 
     assertThat(newService().validatePin("sb-abcd1234", "123456").toCompletableFuture().get())
@@ -300,8 +299,7 @@ public class TerraformSandboxServiceTest {
 
   @Test
   public void deleteSandbox_marksDeletingSynchronouslyBeforeReturning() throws Exception {
-    SandboxInstance running =
-        live("123456").toBuilder().databaseName("sb_abcd1234").build();
+    SandboxInstance running = live("123456").toBuilder().databaseName("sb_abcd1234").build();
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(running));
 
     // Returns immediately once DELETING is persisted, matching createSandbox —
@@ -313,7 +311,10 @@ public class TerraformSandboxServiceTest {
   @Test
   public void deleteSandbox_deletingSandboxIsNotTornDownAgain() throws Exception {
     SandboxInstance deleting =
-        live("123456").toBuilder().status(SandboxStatus.DELETING).databaseName("sb_abcd1234").build();
+        live("123456").toBuilder()
+            .status(SandboxStatus.DELETING)
+            .databaseName("sb_abcd1234")
+            .build();
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleting));
 
     // A second delete while the first is still running would launch a competing
@@ -391,6 +392,7 @@ public class TerraformSandboxServiceTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("base_domain");
   }
+
   // ── admin connection routing ────────────────────────────────────────────────
 
   @Test

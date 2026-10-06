@@ -32,7 +32,7 @@ fi
 
 # Verify server is reachable before running
 echo "🔍 Checking server health at http://localhost:9001/health ..."
-if ! curl -sf http://localhost:9001/health > /dev/null; then
+if ! curl -sf http://localhost:9001/health >/dev/null; then
   echo ""
   echo "❌ Server is not running. Start it first:"
   echo "   ./bin/run-dev"

@@ -133,8 +133,7 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_storesSuppliedPin()
-      throws ExecutionException, InterruptedException {
+  public void createSandbox_storesSuppliedPin() throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
     SandboxInstance result =
@@ -145,17 +144,17 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_storesSubdomain()
-      throws ExecutionException, InterruptedException {
+  public void createSandbox_storesSubdomain() throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
-    services.CreateSandboxRequest request = services.CreateSandboxRequest.builder()
-        .cityName("Burlington, VT")
-        .subdomain("burlington-vt")
-        .pin("482917")
-        .adminEmail("")
-        .expirationDays(30)
-        .build();
+    services.CreateSandboxRequest request =
+        services.CreateSandboxRequest.builder()
+            .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
+            .pin("482917")
+            .adminEmail("")
+            .expirationDays(30)
+            .build();
 
     SandboxInstance result = service.createSandbox(request).toCompletableFuture().get();
 
@@ -220,17 +219,17 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_customExpirationDays()
-      throws ExecutionException, InterruptedException {
+  public void createSandbox_customExpirationDays() throws ExecutionException, InterruptedException {
     stubSuccessfulContainerLaunch("container-abc");
 
-    services.CreateSandboxRequest request = services.CreateSandboxRequest.builder()
-        .cityName("Test City")
-        .subdomain("test-city")
-        .pin("000000")
-        .adminEmail("")
-        .expirationDays(14)
-        .build();
+    services.CreateSandboxRequest request =
+        services.CreateSandboxRequest.builder()
+            .cityName("Test City")
+            .subdomain("test-city")
+            .pin("000000")
+            .adminEmail("")
+            .expirationDays(14)
+            .build();
 
     SandboxInstance result = service.createSandbox(request).toCompletableFuture().get();
 

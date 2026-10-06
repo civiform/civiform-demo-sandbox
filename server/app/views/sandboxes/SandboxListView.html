@@ -49,12 +49,15 @@
   <script>
     ;(function () {
       var el = document.getElementById('deleted-flash')
-      if (el) setTimeout(function () { el.remove() }, 4000)
+      if (el)
+        setTimeout(function () {
+          el.remove()
+        }, 4000)
     })()
   </script>
 
   <!-- Stats Bar -->
-  <div class="grid grid-cols-3 gap-4 mb-8">
+  <div id="sandbox-stats" class="grid grid-cols-3 gap-4 mb-8">
     <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
       <span
         class="text-2xl font-bold text-gray-900"
@@ -122,6 +125,13 @@
         <tr
           th:each="sb : ${model.sandboxes}"
           th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
+          th:id="|sandbox-row-${sb.sandbox.id}|"
+          th:attr="
+            hx-get=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '/sandboxes' : null},
+            hx-trigger=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? 'every 3s' : null},
+            hx-select=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '#sandbox-row-' + sb.sandbox.id : null},
+            hx-select-oob=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '#sandbox-stats' : null},
+            hx-swap=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? 'outerHTML' : null}"
         >
           <!-- Civic entity name -->
           <td
@@ -134,7 +144,7 @@
 
           <!-- Status badge -->
           <td
-            th:data-sort-value="${sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : sb.sandbox.status.name())}"
+            th:data-sort-value="${sb.sandbox.status.name() != 'RUNNING' ? sb.sandbox.status.name() : (sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : 'RUNNING'))}"
           >
             <span
               th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
@@ -301,27 +311,68 @@
   </div>
 
   <!-- ── Create Modal (3-step wizard) ──────────────────────────────────── -->
-  <div id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title"
-       class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
-       style="display: none; background: rgba(0,0,0,0.4);">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
-         style="max-height: 85vh; overflow-y: auto; margin: auto;">
+  <div
+    id="create-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="create-modal-title"
+    class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
+    style="display: none; background: rgba(0, 0, 0, 0.4)"
+  >
+    <div
+      class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
+      style="max-height: 85vh; overflow-y: auto; margin: auto"
+    >
       <!-- Close X -->
-      <button onclick="closeModal('create-modal')" aria-label="Close"
-              class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer" style="font-size: 24px;">×</button>
+      <button
+        onclick="closeModal('create-modal')"
+        aria-label="Close"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
+        style="font-size: 24px"
+      >
+        ×
+      </button>
 
       <div class="px-6 pt-6 pb-6">
         <!-- Tab Navigation -->
-        <div class="flex border-b-2 border-gray-200 mb-5" role="tablist" aria-label="Wizard steps">
-          <button type="button" role="tab" id="wizard-tab-1" aria-selected="true" aria-controls="create-step-panel-1"
-                  class="wizard-tab wizard-tab--active"
-                  onclick="wizardGoTo(1)">CiviForm setup</button>
-          <button type="button" role="tab" id="wizard-tab-2" aria-selected="false" aria-controls="create-step-panel-2"
-                  class="wizard-tab"
-                  onclick="wizardGoTo(2)">AWS setup</button>
-          <button type="button" role="tab" id="wizard-tab-3" aria-selected="false" aria-controls="create-step-panel-3"
-                  class="wizard-tab"
-                  onclick="wizardGoTo(3)">Program setup</button>
+        <div
+          class="flex border-b-2 border-gray-200 mb-5"
+          role="tablist"
+          aria-label="Wizard steps"
+        >
+          <button
+            type="button"
+            role="tab"
+            id="wizard-tab-1"
+            aria-selected="true"
+            aria-controls="create-step-panel-1"
+            class="wizard-tab wizard-tab--active"
+            onclick="wizardGoTo(1)"
+          >
+            CiviForm setup
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="wizard-tab-2"
+            aria-selected="false"
+            aria-controls="create-step-panel-2"
+            class="wizard-tab"
+            onclick="wizardGoTo(2)"
+          >
+            AWS setup
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="wizard-tab-3"
+            aria-selected="false"
+            aria-controls="create-step-panel-3"
+            class="wizard-tab"
+            onclick="wizardGoTo(3)"
+          >
+            Program setup
+          </button>
         </div>
 
         <!-- Inline validation error -->
@@ -334,21 +385,38 @@
 
         <!-- Wizard Form -->
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
-
           <!-- Step 1: CiviForm setup -->
-          <div id="create-step-panel-1" class="wizard-panel" role="tabpanel" aria-labelledby="wizard-tab-1">
+          <div
+            id="create-step-panel-1"
+            class="wizard-panel"
+            role="tabpanel"
+            aria-labelledby="wizard-tab-1"
+          >
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">1</span>
+              <span
+                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
+                >1</span
+              >
               <span class="text-sm text-gray-500">of 3</span>
-              <span class="text-lg font-bold text-gray-900">CiviForm setup</span>
+              <span class="text-lg font-bold text-gray-900"
+                >CiviForm setup</span
+              >
             </div>
-            <p class="text-sm text-gray-600 mb-5">Configure general demo and banner information. This is visible to all demo users.</p>
+            <p class="text-sm text-gray-600 mb-5">
+              Configure general demo and banner information. This is visible to
+              all demo users.
+            </p>
 
             <!-- Civic entity -->
             <div class="mb-5" id="fg-cityName">
-              <label for="cityName" class="block text-sm font-bold text-gray-900 mb-1">
-                Civic entity<span class="text-red-600" aria-hidden="true">*</span>
+              <label
+                for="cityName"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Civic entity<span class="text-red-600" aria-hidden="true"
+                  >*</span
+                >
               </label>
               <input
                 id="cityName"
@@ -364,16 +432,36 @@
             <!-- Logo / seal -->
             <div class="mb-5">
               <p class="text-sm font-bold text-gray-900 mb-2">
-                Logo / seal<span class="text-red-600" aria-hidden="true">*</span>
+                Logo / seal<span class="text-red-600" aria-hidden="true"
+                  >*</span
+                >
               </p>
               <div class="flex flex-col gap-2">
-                <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
-                  <input type="radio" name="logoType" value="default" checked class="accent-blue-700" />
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="logoType"
+                    value="default"
+                    checked
+                    class="accent-blue-700"
+                  />
                   Default (Preview:
-                  <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold">C</span>)
+                  <span
+                    class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold"
+                    >C</span
+                  >)
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
-                  <input type="radio" name="logoType" value="custom" class="accent-blue-700" />
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="logoType"
+                    value="custom"
+                    class="accent-blue-700"
+                  />
                   Custom
                 </label>
               </div>
@@ -381,8 +469,15 @@
 
             <!-- Expiration limit (days) -->
             <div class="mb-6" id="fg-expirationDays">
-              <label for="expirationDays" class="block text-sm font-bold text-gray-900 mb-1">
-                Expiration limit (days)<span class="text-red-600" aria-hidden="true">*</span>
+              <label
+                for="expirationDays"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Expiration limit (days)<span
+                  class="text-red-600"
+                  aria-hidden="true"
+                  >*</span
+                >
               </label>
               <input
                 id="expirationDays"
@@ -410,19 +505,36 @@
           </div>
 
           <!-- Step 2: AWS setup -->
-          <div id="create-step-panel-2" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-2">
+          <div
+            id="create-step-panel-2"
+            class="wizard-panel hidden"
+            role="tabpanel"
+            aria-labelledby="wizard-tab-2"
+          >
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">2</span>
+              <span
+                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
+                >2</span
+              >
               <span class="text-sm text-gray-500">of 3</span>
               <span class="text-lg font-bold text-gray-900">AWS setup</span>
             </div>
-            <p class="text-sm text-gray-600 mb-5">Configure setup details for the AWS deployment.</p>
+            <p class="text-sm text-gray-600 mb-5">
+              Configure setup details for the AWS deployment.
+            </p>
 
             <!-- Admin Notification Email -->
             <div class="mb-5" id="fg-adminEmail">
-              <label for="adminEmail" class="block text-sm font-bold text-gray-900 mb-1">
-                Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
+              <label
+                for="adminEmail"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Admin notification email<span
+                  class="text-red-600"
+                  aria-hidden="true"
+                  >*</span
+                >
               </label>
               <input
                 id="adminEmail"
@@ -437,10 +549,19 @@
 
             <!-- Subdomain -->
             <div class="mb-5" id="fg-subdomain">
-              <label for="subdomain" class="block text-sm font-bold text-gray-900 mb-1">
-                Demo instance subdomain<span class="text-red-600" aria-hidden="true">*</span>
+              <label
+                for="subdomain"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Demo instance subdomain<span
+                  class="text-red-600"
+                  aria-hidden="true"
+                  >*</span
+                >
               </label>
-              <p class="text-xs text-gray-500 mt-0.5 mb-1">Auto-filled from city name — editable.</p>
+              <p class="text-xs text-gray-500 mt-0.5 mb-1">
+                Auto-filled from city name — editable.
+              </p>
               <div class="flex items-center gap-0">
                 <input
                   id="subdomain"
@@ -451,14 +572,24 @@
                   autocomplete="off"
                   aria-required="true"
                 />
-                <span class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap">.sandbox.civiform.dev</span>
+                <span
+                  class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap"
+                  >.sandbox.civiform.dev</span
+                >
               </div>
             </div>
 
             <!-- PIN -->
             <div class="mb-5" id="fg-pin">
-              <label for="pin" class="block text-sm font-bold text-gray-900 mb-1">
-                Demo instance access PIN<span class="text-red-600" aria-hidden="true">*</span>
+              <label
+                for="pin"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Demo instance access PIN<span
+                  class="text-red-600"
+                  aria-hidden="true"
+                  >*</span
+                >
               </label>
               <input
                 id="pin"
@@ -476,8 +607,12 @@
 
             <!-- Google Analytics ID (optional) -->
             <div class="mb-6" id="fg-googleAnalyticsId">
-              <label for="googleAnalyticsId" class="block text-sm font-bold text-gray-900 mb-1">
-                Google Analytics ID <span class="text-gray-400 font-normal">(optional)</span>
+              <label
+                for="googleAnalyticsId"
+                class="block text-sm font-bold text-gray-900 mb-1"
+              >
+                Google Analytics ID
+                <span class="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
                 id="googleAnalyticsId"
@@ -511,38 +646,86 @@
           </div>
 
           <!-- Step 3: Program setup -->
-          <div id="create-step-panel-3" class="wizard-panel hidden" role="tabpanel" aria-labelledby="wizard-tab-3">
+          <div
+            id="create-step-panel-3"
+            class="wizard-panel hidden"
+            role="tabpanel"
+            aria-labelledby="wizard-tab-3"
+          >
             <!-- Step heading -->
             <div class="flex items-center gap-2 mb-2">
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold">3</span>
+              <span
+                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
+                >3</span
+              >
               <span class="text-sm text-gray-500">of 3</span>
               <span class="text-lg font-bold text-gray-900">Program setup</span>
             </div>
 
             <!-- Pre-loaded programs info block -->
-            <div class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
-              <span class="text-blue-500 text-lg flex-shrink-0 mt-0.5" aria-hidden="true">&#x2139;</span>
+            <div
+              class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3"
+            >
+              <span
+                class="text-blue-500 text-lg flex-shrink-0 mt-0.5"
+                aria-hidden="true"
+                >&#x2139;</span
+              >
               <p class="text-sm text-blue-800 leading-relaxed">
                 Demos are pre-loaded with a generic set of programs designed to
-                demonstrate the range of CiviForm features for different user roles.
+                demonstrate the range of CiviForm features for different user
+                roles.
               </p>
             </div>
 
             <!-- Import from PDF (stub, disabled) -->
             <div class="mb-6">
-              <button type="button" disabled aria-disabled="true"
-                      class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed">
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed"
+              >
                 Import from PDF
               </button>
-              <p class="text-xs text-gray-500 mt-2">Upload PDF forms to automatically extract and generate additional custom programs in the demo. Imported programs are editable after the demo is provisioned.</p>
+              <p class="text-xs text-gray-500 mt-2">
+                Upload PDF forms to automatically extract and generate
+                additional custom programs in the demo. Imported programs are
+                editable after the demo is provisioned.
+              </p>
             </div>
 
-            <input type="hidden" id="hidden-cityName"          name="cityName"          value="" />
-            <input type="hidden" id="hidden-adminEmail"        name="adminEmail"        value="" />
-            <input type="hidden" id="hidden-subdomain"         name="subdomain"         value="" />
-            <input type="hidden" id="hidden-pin"               name="pin"               value="" />
-            <input type="hidden" id="hidden-expirationDays"    name="expirationDays"    value="30" />
-            <input type="hidden" id="hidden-googleAnalyticsId" name="googleAnalyticsId" value="" />
+            <input
+              type="hidden"
+              id="hidden-cityName"
+              name="cityName"
+              value=""
+            />
+            <input
+              type="hidden"
+              id="hidden-adminEmail"
+              name="adminEmail"
+              value=""
+            />
+            <input
+              type="hidden"
+              id="hidden-subdomain"
+              name="subdomain"
+              value=""
+            />
+            <input type="hidden" id="hidden-pin" name="pin" value="" />
+            <input
+              type="hidden"
+              id="hidden-expirationDays"
+              name="expirationDays"
+              value="30"
+            />
+            <input
+              type="hidden"
+              id="hidden-googleAnalyticsId"
+              name="googleAnalyticsId"
+              value=""
+            />
 
             <!-- Step 3 footer -->
             <div class="flex items-center justify-between gap-4">
@@ -939,12 +1122,14 @@
           var el = document.getElementById(id)
           return el ? (el.value || '').trim() : ''
         }
-        document.getElementById('hidden-cityName').value          = val('cityName')
-        document.getElementById('hidden-adminEmail').value        = val('adminEmail')
-        document.getElementById('hidden-subdomain').value         = val('subdomain')
-        document.getElementById('hidden-pin').value               = val('pin')
-        document.getElementById('hidden-expirationDays').value    = val('expirationDays') || '30'
-        document.getElementById('hidden-googleAnalyticsId').value = val('googleAnalyticsId')
+        document.getElementById('hidden-cityName').value = val('cityName')
+        document.getElementById('hidden-adminEmail').value = val('adminEmail')
+        document.getElementById('hidden-subdomain').value = val('subdomain')
+        document.getElementById('hidden-pin').value = val('pin')
+        document.getElementById('hidden-expirationDays').value =
+          val('expirationDays') || '30'
+        document.getElementById('hidden-googleAnalyticsId').value =
+          val('googleAnalyticsId')
       }
 
       if (cityNameEl) {
@@ -963,10 +1148,12 @@
         })
       }
 
-      ;['adminEmail', 'pin', 'expirationDays', 'googleAnalyticsId'].forEach(function (id) {
-        var el = document.getElementById(id)
-        if (el) el.addEventListener('input', syncHiddenInputs)
-      })
+      ;['adminEmail', 'pin', 'expirationDays', 'googleAnalyticsId'].forEach(
+        function (id) {
+          var el = document.getElementById(id)
+          if (el) el.addEventListener('input', syncHiddenInputs)
+        },
+      )
 
       // Update tab states and show the correct panel
       function showStep(targetStep) {
@@ -1013,7 +1200,7 @@
 
       function markFieldError(fieldId, hasError) {
         var input = document.getElementById(fieldId)
-        var fg    = document.getElementById('fg-' + fieldId)
+        var fg = document.getElementById('fg-' + fieldId)
         if (!input) return
         if (hasError) {
           input.classList.add('border-red-500')
@@ -1028,9 +1215,12 @@
 
       function validateStep1() {
         var cityVal = (document.getElementById('cityName').value || '').trim()
-        var daysVal = parseInt(document.getElementById('expirationDays').value, 10)
-        var cityOk  = cityVal.length > 0
-        var daysOk  = !isNaN(daysVal) && daysVal > 0
+        var daysVal = parseInt(
+          document.getElementById('expirationDays').value,
+          10,
+        )
+        var cityOk = cityVal.length > 0
+        var daysOk = !isNaN(daysVal) && daysVal > 0
         markFieldError('cityName', !cityOk)
         markFieldError('expirationDays', !daysOk)
         if (!cityOk) {
@@ -1045,22 +1235,28 @@
       }
 
       function validateStep2() {
-        var emailVal  = (document.getElementById('adminEmail').value || '').trim()
-        var subVal    = (document.getElementById('subdomain').value || '').trim()
-        var pinVal    = (document.getElementById('pin').value || '').trim()
-        var emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        var pinRe     = /^[0-9]{6}$/
+        var emailVal = (
+          document.getElementById('adminEmail').value || ''
+        ).trim()
+        var subVal = (document.getElementById('subdomain').value || '').trim()
+        var pinVal = (document.getElementById('pin').value || '').trim()
+        var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var pinRe = /^[0-9]{6}$/
 
         var emailOk = emailVal.length > 0 && emailRe.test(emailVal)
-        var subOk   = subVal.length > 0
-        var pinOk   = pinRe.test(pinVal)
+        var subOk = subVal.length > 0
+        var pinOk = pinRe.test(pinVal)
 
         markFieldError('adminEmail', !emailOk)
-        markFieldError('subdomain',  !subOk)
-        markFieldError('pin',        !pinOk)
+        markFieldError('subdomain', !subOk)
+        markFieldError('pin', !pinOk)
 
         if (!emailOk) {
-          showError(emailVal.length === 0 ? 'Admin Notification Email is required.' : 'Please enter a valid email address.')
+          showError(
+            emailVal.length === 0
+              ? 'Admin Notification Email is required.'
+              : 'Please enter a valid email address.',
+          )
           return false
         }
         if (!subOk) {
@@ -1112,7 +1308,7 @@
       }
 
       // Navigate directly to a step via tab click
-      window.wizardGoTo = function(targetStep) {
+      window.wizardGoTo = function (targetStep) {
         clearError()
         syncHiddenInputs()
         for (var i = 1; i <= TOTAL_STEPS; i++) {
@@ -1130,7 +1326,13 @@
           setStepInputsDisabled(i, false)
         }
         // Clear all field values
-        ;['cityName', 'adminEmail', 'subdomain', 'pin', 'googleAnalyticsId'].forEach(function (id) {
+        ;[
+          'cityName',
+          'adminEmail',
+          'subdomain',
+          'pin',
+          'googleAnalyticsId',
+        ].forEach(function (id) {
           var el = document.getElementById(id)
           if (el) el.value = ''
         })

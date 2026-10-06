@@ -78,7 +78,7 @@ docker compose logs -f db
 > **Do not use a bare `docker compose down -v`.** `bin/lib.sh` sets
 > `COMPOSE_PROJECT_NAME=cf-sandbox-builder`, but a plain `docker compose` invocation
 > derives the project name from the directory instead (`civiform-demo-sandbox`). It will
-> cheerfully report `Volume ... Removed` while removing a *different* project's volume and
+> cheerfully report `Volume ... Removed` while removing a _different_ project's volume and
 > leaving `cf-sandbox-builder_postgres_data` untouched — so the database is not reset and
 > `init_postgres.sql` never re-runs. The symptom is confusing: schema changes appear not to
 > take effect, with no error anywhere.
@@ -106,4 +106,3 @@ Git records mode `0644`. To restore the tree to the modes git already tracks:
 ```bash
 git ls-files -z | xargs -0 chmod u+rw,go+r-w
 ```
-

@@ -28,7 +28,8 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void listSandboxes_returnsInitialDemoSandbox() throws ExecutionException, InterruptedException {
+  public void listSandboxes_returnsInitialDemoSandbox()
+      throws ExecutionException, InterruptedException {
     var sandboxes = service.listSandboxes().toCompletableFuture().get();
     assertThat(sandboxes).isNotEmpty();
     assertThat(sandboxes.get(0).getId()).isEqualTo("sb-demo0001");
@@ -37,10 +38,13 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void createSandbox_createsAndRetrievesInstance() throws ExecutionException, InterruptedException {
-    SandboxInstance created = service.createSandbox(
-        makeRequest("Test Sandbox", "test-sandbox", "482917")
-    ).toCompletableFuture().get();
+  public void createSandbox_createsAndRetrievesInstance()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance created =
+        service
+            .createSandbox(makeRequest("Test Sandbox", "test-sandbox", "482917"))
+            .toCompletableFuture()
+            .get();
 
     assertThat(created.getId()).isNotNull();
     assertThat(created.getCityName()).isEqualTo("Test Sandbox");
@@ -54,9 +58,11 @@ public class InMemorySandboxServiceTest {
 
   @Test
   public void deleteSandbox_softDeletesInstance() throws ExecutionException, InterruptedException {
-    SandboxInstance created = service.createSandbox(
-        makeRequest("To Delete", "to-delete", "000000")
-    ).toCompletableFuture().get();
+    SandboxInstance created =
+        service
+            .createSandbox(makeRequest("To Delete", "to-delete", "000000"))
+            .toCompletableFuture()
+            .get();
 
     Boolean deleted = service.deleteSandbox(created.getId()).toCompletableFuture().get();
     assertThat(deleted).isTrue();
@@ -77,9 +83,9 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void deleteSandbox_returnsFalseForMissingId() throws ExecutionException, InterruptedException {
+  public void deleteSandbox_returnsFalseForMissingId()
+      throws ExecutionException, InterruptedException {
     Boolean deleted = service.deleteSandbox("does-not-exist").toCompletableFuture().get();
     assertThat(deleted).isFalse();
   }
 }
-

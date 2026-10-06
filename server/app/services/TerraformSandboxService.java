@@ -111,7 +111,8 @@ public class TerraformSandboxService implements SandboxService {
     this.awsRegion = config.getString("sandbox.aws.region");
     this.civiformImageTag = config.getString("sandbox.terraform.civiformImageTag");
 
-    this.platformOutputs = loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
+    this.platformOutputs =
+        loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
   }
 
   @Override
@@ -286,7 +287,8 @@ public class TerraformSandboxService implements SandboxService {
       dropDatabase(sandbox.getDatabaseName());
       log.info("[{}] Database dropped", id);
     } catch (Exception e) {
-      log.error("[{}] Could not drop database, keeping record for retry: {}", id, e.getMessage(), e);
+      log.error(
+          "[{}] Could not drop database, keeping record for retry: {}", id, e.getMessage(), e);
       repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
       return;
     }
@@ -319,10 +321,7 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   private boolean isDeleting(String id) {
-    return repository
-        .findById(id)
-        .map(s -> s.getStatus() == SandboxStatus.DELETING)
-        .orElse(false);
+    return repository.findById(id).map(s -> s.getStatus() == SandboxStatus.DELETING).orElse(false);
   }
 
   @Override
@@ -464,7 +463,8 @@ public class TerraformSandboxService implements SandboxService {
    */
   private static Map<String, JsonNode> loadPlatformOutputs(String path) {
     try {
-      JsonNode root = new ObjectMapper().readTree(Files.readString(Path.of(path), StandardCharsets.UTF_8));
+      JsonNode root =
+          new ObjectMapper().readTree(Files.readString(Path.of(path), StandardCharsets.UTF_8));
 
       Map<String, JsonNode> outputs = new java.util.LinkedHashMap<>();
       // Unwrap Terraform's {value, type, sensitive} envelope.
@@ -499,7 +499,8 @@ public class TerraformSandboxService implements SandboxService {
     try (Stream<Path> entries = Files.list(moduleDir)) {
       for (Path source : entries.toList()) {
         if (Files.isRegularFile(source)) {
-          Files.copy(source, workDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+          Files.copy(
+              source, workDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
         }
       }
     }
