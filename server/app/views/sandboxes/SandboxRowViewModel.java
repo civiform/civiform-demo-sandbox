@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import lombok.Value;
 import models.SandboxInstance;
+import models.SandboxStatus;
 
 /**
  * Per-row view model for the sandbox list table.
@@ -30,12 +31,29 @@ public class SandboxRowViewModel {
   /** City name shortcut (avoids sandbox.getCityName() in template). */
   String cityName;
 
+  /** Whether the sandbox has been soft-deleted. */
+  boolean deleted;
+
+  /** Human-readable deletion date, e.g. "Oct 1, 2026". Null if not deleted. */
+  String deletedFormatted;
+
+  /** Whether the sandbox is still provisioning (not yet RUNNING). */
+  boolean provisioning;
+
   public static SandboxRowViewModel of(SandboxInstance sandbox) {
     long days = ChronoUnit.DAYS.between(Instant.now(), sandbox.getExpiresAt());
+    boolean isDeleted = sandbox.getStatus() == SandboxStatus.DELETED;
+    String deletedFmt = isDeleted && sandbox.getDeletedAt() != null
+        ? DISPLAY_FMT.format(sandbox.getDeletedAt())
+        : null;
+    boolean isProv = sandbox.getStatus() == SandboxStatus.PROVISIONING;
     return new SandboxRowViewModel(
         sandbox,
         Math.max(days, 0),
         DISPLAY_FMT.format(sandbox.getExpiresAt()),
-        sandbox.getCityName());
+        sandbox.getCityName(),
+        isDeleted,
+        deletedFmt,
+        isProv);
   }
 }

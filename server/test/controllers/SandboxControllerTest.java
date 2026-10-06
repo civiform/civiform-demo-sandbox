@@ -293,7 +293,7 @@ public class SandboxControllerTest extends WithApplication {
     // When RUNNING: no HTMX polling (done), but redirect script injected
     assertThat(body).doesNotContain("every 3s");
     assertThat(body).contains("window.location.href");
-    assertThat(body).contains("/sandboxes/sb-status3");
+    assertThat(body).contains("/sandboxes?ready=sb-status3");
   }
 
   @Test

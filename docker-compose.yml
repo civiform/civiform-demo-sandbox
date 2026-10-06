@@ -95,10 +95,8 @@ services:
   # container name in their /etc/hosts file for the web brower to load the auth url.
   # EG: 127.0.0.1 dev-oidc
   #
-  # DISABLED: civiform-oidc-provider image does not exist on Docker Hub (M6 audit).
-  # Sandboxes use CiviForm's built-in FAKE_IDP instead.
-  # Re-enable when a real OIDC image is published.
-  #
+  # NOTE: Commented out — civiform-oidc-provider image does not exist on Docker Hub.
+  # Sandboxes use CiviForm's built-in FAKE_IDP (STAGING_DISABLE_DEMO_MODE_LOGINS=false).
   # dev-oidc:
   #   image: civiform-oidc-provider
   #   restart: always
