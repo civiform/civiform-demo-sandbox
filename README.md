@@ -16,23 +16,22 @@ on demand. It is **not** a fork of CiviForm. The builder launches `civiform/civi
 Docker containers and passes environment variables to configure each instance.
 
 **Core user flow:**
-
 > Sales rep logs into the portal → fills out a wizard → container launches → PIN generated → prospect enters PIN → live CiviForm demo in an iframe wrapper with role switcher
 
 ---
 
 ## Architecture & Technology Stack
 
-| Layer             | Technology                                                       |
-| ----------------- | ---------------------------------------------------------------- |
-| Backend           | Play Framework 3.0 (Java 21) + Google Guice DI                   |
-| Templating        | Thymeleaf + HTMX (reactive status polling)                       |
-| Design system     | USWDS 3.x + Tailwind CSS                                         |
-| Frontend tooling  | Vite + TypeScript + Sass + PostCSS                               |
-| Container runtime | Docker socket (Sprint 1) → AWS ECS Fargate (Sprint 2+)           |
-| Database          | PostgreSQL — metadata store + per-sandbox **isolated databases** |
-| Testing           | JUnit 4 + AssertJ + Mockito + Playwright (browser tests)         |
-| Cloud             | **AWS only** (ECS Fargate + RDS). GCP is not used.               |
+| Layer | Technology |
+|---|---|
+| Backend | Play Framework 3.0 (Java 21) + Google Guice DI |
+| Templating | Thymeleaf + HTMX (reactive status polling) |
+| Design system | USWDS 3.x + Tailwind CSS |
+| Frontend tooling | Vite + TypeScript + Sass + PostCSS |
+| Container runtime | Docker socket (Sprint 1) → AWS ECS Fargate (Sprint 2+) |
+| Database | PostgreSQL — metadata store + per-sandbox **isolated databases** |
+| Testing | JUnit 4 + AssertJ + Mockito + Playwright (browser tests) |
+| Cloud | **AWS only** (ECS Fargate + RDS). GCP is not used. |
 
 ### Database Isolation
 
@@ -113,12 +112,12 @@ cf-sandbox-builder/
 Starts Postgres 16 and the builder app. On first run, SBT downloads dependencies
 and Vite compiles frontend assets — allow ~3 minutes.
 
-| Endpoint     | URL                             |
-| ------------ | ------------------------------- |
-| Login page   | http://localhost:9001/login     |
-| Dashboard    | http://localhost:9001/sandboxes |
-| Health check | http://localhost:9001/health    |
-| Ready check  | http://localhost:9001/ready     |
+| Endpoint | URL |
+|---|---|
+| Login page | http://localhost:9001/login |
+| Dashboard | http://localhost:9001/sandboxes |
+| Health check | http://localhost:9001/health |
+| Ready check | http://localhost:9001/ready |
 
 Default login credentials: `admin@civiform.dev` / password set via `DEMO_PORTAL_PASSWORD` env var (default: `demo`).
 
@@ -182,7 +181,6 @@ persistent demo banner with:
 ## PIN Session Cookie
 
 When a prospect enters the correct PIN:
-
 - Cookie `sb_access_<id>` is set: **HTTP-only**, SameSite=Lax, path `/sandboxes/<id>`, 30-day max-age
 - Returning visits to `/sandboxes/:id/access` skip the PIN form and redirect directly to the demo wrapper
 
@@ -190,17 +188,17 @@ When a prospect enters the correct PIN:
 
 ## Environment Variables (builder)
 
-| Variable               | Default                                            | Purpose                                        |
-| ---------------------- | -------------------------------------------------- | ---------------------------------------------- |
-| `APPLICATION_SECRET`   | `changeme`                                         | Play secret — override in production           |
-| `DB_JDBC_URL`          | `jdbc:postgresql://localhost:5432/sandbox_builder` | Builder Postgres                               |
-| `DB_USER`              | `postgres`                                         | Builder DB user                                |
-| `DB_PASSWORD`          | `example`                                          | Builder DB password                            |
-| `DOCKER_SOCKET_PATH`   | `unix:///var/run/docker.sock`                      | Docker socket (Sprint 1)                       |
-| `CIVIFORM_IMAGE`       | `civiform/civiform:latest`                         | CiviForm image to launch                       |
-| `SANDBOX_DB_HOST`      | `host.docker.internal`                             | How CiviForm containers reach builder Postgres |
-| `APP_BASE_URL`         | `http://localhost:9000`                            | Used in share links                            |
-| `DEMO_PORTAL_PASSWORD` | `demo`                                             | Login password for the demo portal             |
+| Variable | Default | Purpose |
+|---|---|---|
+| `APPLICATION_SECRET` | `changeme` | Play secret — override in production |
+| `DB_JDBC_URL` | `jdbc:postgresql://localhost:5432/sandbox_builder` | Builder Postgres |
+| `DB_USER` | `postgres` | Builder DB user |
+| `DB_PASSWORD` | `example` | Builder DB password |
+| `DOCKER_SOCKET_PATH` | `unix:///var/run/docker.sock` | Docker socket (Sprint 1) |
+| `CIVIFORM_IMAGE` | `civiform/civiform:latest` | CiviForm image to launch |
+| `SANDBOX_DB_HOST` | `host.docker.internal` | How CiviForm containers reach builder Postgres |
+| `APP_BASE_URL` | `http://localhost:9000` | Used in share links |
+| `DEMO_PORTAL_PASSWORD` | `demo` | Login password for the demo portal |
 
 ---
 
@@ -218,16 +216,16 @@ no real Docker socket required in CI.
 
 ## Sprint Roadmap
 
-| Sprint | Focus                                                                         | Status         |
-| ------ | ----------------------------------------------------------------------------- | -------------- |
-| **S1** | Docker MVP — provisioning loop, PIN gate, dashboard UI                        | ✅ Complete    |
+| Sprint | Focus | Status |
+|---|---|---|
+| **S1** | Docker MVP — provisioning loop, PIN gate, dashboard UI | ✅ Complete |
 | **S2** | Demo wrapper, wizard redesign, database-per-sandbox isolation, portal styling | 🔧 In Progress |
-| S3     | CiviForm seeding engine — pre-load showcase programs + city-specific programs | Planned        |
-| S4     | Demo banner, role switcher, ROI panel, JSON export (PR to civiform/civiform)  | Planned        |
-| S5     | 30-day teardown engine (EventBridge + Lambda + DLQ)                           | Planned        |
-| S6     | PDF Scaffolder + Discovery Engine (Gemini)                                    | Planned        |
-| S7     | City name injection, SMTP, cost guardrails, security hardening                | Planned        |
-| S8     | Integration tests, load tests, launch polish                                  | Planned        |
+| S3 | CiviForm seeding engine — pre-load showcase programs + city-specific programs | Planned |
+| S4 | Demo banner, role switcher, ROI panel, JSON export (PR to civiform/civiform) | Planned |
+| S5 | 30-day teardown engine (EventBridge + Lambda + DLQ) | Planned |
+| S6 | PDF Scaffolder + Discovery Engine (Gemini) | Planned |
+| S7 | City name injection, SMTP, cost guardrails, security hardening | Planned |
+| S8 | Integration tests, load tests, launch polish | Planned |
 
 Full sprint plan: [`_agents/plugins/cf-sandbox-builder/skills/mvp-sprint/SKILL.md`](_agents/plugins/cf-sandbox-builder/skills/mvp-sprint/SKILL.md)
 

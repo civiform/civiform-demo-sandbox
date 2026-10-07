@@ -171,27 +171,22 @@ public class DockerSandboxService implements SandboxService {
     CompletableFuture.runAsync(
         () -> {
           try {
-            log.info(
-                "[{}] Provisioning started (port={}, database={})", id, hostPort, databaseName);
+            log.info("[{}] Provisioning started (port={}, database={})", id, hostPort, databaseName);
 
             // 1. Create per-sandbox Postgres database before launching container
             provisionDatabase(databaseName, dbUser, dbPassword);
             log.info("[{}] Database provisioned", id);
 
             // 2. Build JDBC URL accessible from inside the container
-            String dbUrl = String.format("jdbc:postgresql://%s:5432/%s", dbHost, databaseName);
+            String dbUrl =
+                String.format(
+                    "jdbc:postgresql://%s:5432/%s",
+                    dbHost, databaseName);
 
             // 3. Launch the CiviForm Docker container
             String containerId =
                 launchContainer(
-                    id,
-                    instance.getCiviformVersion(),
-                    hostPort,
-                    dbUrl,
-                    dbUser,
-                    dbPassword,
-                    appSecret,
-                    instance.getCityName());
+                    id, instance.getCiviformVersion(), hostPort, dbUrl, dbUser, dbPassword, appSecret, instance.getCityName());
             repository.updateContainerId(id, containerId);
             log.info("[{}] Container launched: {}", id, containerId);
 
@@ -316,6 +311,9 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
+
+
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
@@ -323,15 +321,14 @@ public class DockerSandboxService implements SandboxService {
   /**
    * Provisions a dedicated Postgres database and user for a sandbox.
    *
-   * <p>Each sandbox gets its own database (not just a schema) on the shared Postgres instance. This
-   * provides credential-level isolation: a bug or misconfigured credential in one sandbox cannot
-   * access another sandbox's data. CiviForm assumes it owns its database and applies Play
-   * evolutions, so database-per-sandbox avoids multi-tenancy issues. Teardown is provable: DROP
-   * DATABASE is atomic and total.
+   * <p>Each sandbox gets its own database (not just a schema) on the shared Postgres instance.
+   * This provides credential-level isolation: a bug or misconfigured credential in one sandbox
+   * cannot access another sandbox's data. CiviForm assumes it owns its database and applies
+   * Play evolutions, so database-per-sandbox avoids multi-tenancy issues. Teardown is provable:
+   * DROP DATABASE is atomic and total.
    */
   private void provisionDatabase(String databaseName, String dbUser, String dbPassword) {
-    // Step 1: Create user and database using the builder's connection pool (connects to
-    // sandbox_builder db)
+    // Step 1: Create user and database using the builder's connection pool (connects to sandbox_builder db)
     db.withConnection(
         conn -> {
           try (Statement st = conn.createStatement()) {
@@ -358,8 +355,8 @@ public class DockerSandboxService implements SandboxService {
     // Uses the sandbox user (who is OWNER and can create extensions via pg_database_owner role).
     String newDbUrl = String.format("jdbc:postgresql://%s:5432/%s", dbHost, databaseName);
     try (java.sql.Connection extConn =
-            java.sql.DriverManager.getConnection(newDbUrl, dbUser, dbPassword);
-        Statement extSt = extConn.createStatement()) {
+             java.sql.DriverManager.getConnection(newDbUrl, dbUser, dbPassword);
+         Statement extSt = extConn.createStatement()) {
       extSt.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
       extSt.execute("CREATE EXTENSION IF NOT EXISTS btree_gin;");
     } catch (java.sql.SQLException e) {
@@ -371,8 +368,8 @@ public class DockerSandboxService implements SandboxService {
    * Drops the database and user for a deleted sandbox.
    *
    * <p>{@code WITH (FORCE)} (Postgres 13+) terminates any remaining connections and drops the
-   * database in one statement, closing the window where a client could reconnect between a separate
-   * pg_terminate_backend call and the drop.
+   * database in one statement, closing the window where a client could reconnect between a
+   * separate pg_terminate_backend call and the drop.
    */
   private void dropDatabase(String databaseName) {
     db.withConnection(

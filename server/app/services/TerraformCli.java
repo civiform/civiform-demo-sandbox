@@ -149,8 +149,7 @@ public class TerraformCli {
     Deque<String> tail = new ArrayDeque<>();
 
     try (BufferedReader reader =
-        new BufferedReader(
-            new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+        new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
 
       String line;
       // Draining the pipe as the process runs is not optional. The OS pipe buffer is
@@ -178,12 +177,7 @@ public class TerraformCli {
       int exit = process.exitValue();
       if (exit != 0) {
         throw new TerraformException(
-            "terraform "
-                + args.get(0)
-                + " failed (exit "
-                + exit
-                + "):\n"
-                + String.join("\n", tail));
+            "terraform " + args.get(0) + " failed (exit " + exit + "):\n" + String.join("\n", tail));
       }
 
       return full.toString();

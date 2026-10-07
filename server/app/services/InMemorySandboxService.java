@@ -15,8 +15,8 @@ import models.SandboxInstance;
 import models.SandboxStatus;
 
 /**
- * In-memory {@link SandboxService} for tests and local development without Docker. Keeps state in a
- * ConcurrentHashMap — resets on server restart.
+ * In-memory {@link SandboxService} for tests and local development without Docker.
+ * Keeps state in a ConcurrentHashMap — resets on server restart.
  *
  * <p>Sprint 1: replaced in production by {@link DockerSandboxService} via Guice binding.
  */
@@ -61,23 +61,22 @@ public class InMemorySandboxService implements SandboxService {
   public CompletionStage<SandboxInstance> createSandbox(CreateSandboxRequest request) {
     String id = "sb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     String subdomain = request.getSubdomain() != null ? request.getSubdomain() : "demo";
-    SandboxInstance instance =
-        SandboxInstance.builder()
-            .id(id)
-            .cityName(request.getCityName())
-            .subdomain(subdomain)
-            .civiformVersion("latest")
-            .status(SandboxStatus.PROVISIONING) // stays PROVISIONING — real impl updates async
-            .url("https://" + subdomain + ".sandbox.civiform.dev")
-            .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
-            .pin(request.getPin() != null ? request.getPin() : "000000")
-            .googleAnalyticsId(request.getGoogleAnalyticsId())
-            .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
-            .hostPort(10001)
-            .databaseName("sandbox_" + id.replace("-", "_"))
-            .createdAt(Instant.now())
-            .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
-            .build();
+    SandboxInstance instance = SandboxInstance.builder()
+        .id(id)
+        .cityName(request.getCityName())
+        .subdomain(subdomain)
+        .civiformVersion("latest")
+        .status(SandboxStatus.PROVISIONING) // stays PROVISIONING — real impl updates async
+        .url("https://" + subdomain + ".sandbox.civiform.dev")
+        .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
+        .pin(request.getPin() != null ? request.getPin() : "000000")
+        .googleAnalyticsId(request.getGoogleAnalyticsId())
+        .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
+        .hostPort(10001)
+        .databaseName("sandbox_" + id.replace("-", "_"))
+        .createdAt(Instant.now())
+        .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
+        .build();
     sandboxes.put(id, instance);
     return CompletableFuture.completedFuture(instance);
   }
@@ -90,13 +89,12 @@ public class InMemorySandboxService implements SandboxService {
     }
     // Soft-delete: mark as DELETED with timestamp so the dashboard can show the tombstone row.
     // PIN and admin email are cleared to match the scrubbed tombstone the JDBC path keeps.
-    SandboxInstance deleted =
-        existing.toBuilder()
-            .status(SandboxStatus.DELETED)
-            .deletedAt(Instant.now())
-            .pin("")
-            .adminEmail("")
-            .build();
+    SandboxInstance deleted = existing.toBuilder()
+        .status(SandboxStatus.DELETED)
+        .deletedAt(Instant.now())
+        .pin("")
+        .adminEmail("")
+        .build();
     sandboxes.put(id, deleted);
     return CompletableFuture.completedFuture(true);
   }
@@ -107,8 +105,9 @@ public class InMemorySandboxService implements SandboxService {
     if (existing == null) {
       return CompletableFuture.completedFuture(Optional.empty());
     }
-    SandboxInstance extended =
-        existing.toBuilder().expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days))).build();
+    SandboxInstance extended = existing.toBuilder()
+        .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
+        .build();
     sandboxes.put(id, extended);
     return CompletableFuture.completedFuture(Optional.of(extended));
   }
@@ -116,11 +115,9 @@ public class InMemorySandboxService implements SandboxService {
   @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.completedFuture(
-        Optional.ofNullable(sandboxes.get(sandboxId))
-            .filter(
-                sandbox -> {
-                  // Constant-time comparison to prevent timing attacks
-                  return MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
-                }));
+        Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
+          // Constant-time comparison to prevent timing attacks
+          return MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
+        }));
   }
 }
