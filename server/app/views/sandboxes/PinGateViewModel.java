@@ -12,4 +12,5 @@ public class PinGateViewModel implements BaseViewModel {
   String cityName;
   /** Non-null when the previously submitted PIN was incorrect. */
   String error;
+  String redirectUrl;
 }

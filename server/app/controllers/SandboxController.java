@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
+import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -20,8 +21,6 @@ import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.SandboxService;
-import views.sandboxes.DemoWrapperView;
-import views.sandboxes.DemoWrapperViewModel;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
 import views.sandboxes.SandboxDetailsView;
@@ -34,24 +33,25 @@ public class SandboxController extends Controller {
   private final SandboxService sandboxService;
   private final SandboxListView listView;
   private final SandboxDetailsView detailsView;
-  private final DemoWrapperView demoWrapperView;
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
+  /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
+  private final String sandboxDomain;
 
   @Inject
   public SandboxController(
       SandboxService sandboxService,
       SandboxListView listView,
       SandboxDetailsView detailsView,
-      DemoWrapperView demoWrapperView,
       PinGateView pinGateView,
-      FormFactory formFactory) {
+      FormFactory formFactory,
+      Config config) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
-    this.demoWrapperView = checkNotNull(demoWrapperView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
+    this.sandboxDomain = checkNotNull(config).getString("sandbox.domain");
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). Requires portal auth. */
@@ -204,21 +204,25 @@ public class SandboxController extends Controller {
   /** GET /sandboxes/:id/access — PIN gate page for prospects. */
   @AddCSRFToken
   public CompletionStage<Result> pinGate(Http.Request request, String id) {
-    // If the browser already has a valid access cookie for this sandbox, skip the PIN form
-    // and redirect directly to the live CiviForm URL.
-    if (hasAccessCookie(request, id)) {
-      return CompletableFuture.completedFuture(
-          redirect("/sandboxes/" + id + "/view"));
-    }
+    String redirectUrl = request.getQueryString("redirect");
 
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
       if (maybeSandbox.isEmpty()) {
         return notFound("Sandbox not found: " + id);
       }
+
+      if (hasAccessCookie(request, id)) {
+        String targetUrl = (redirectUrl != null && !redirectUrl.isEmpty())
+            ? "https://" + redirectUrl
+            : maybeSandbox.get().getUrl();
+        return redirect(targetUrl);
+      }
+
       PinGateViewModel model = PinGateViewModel.builder()
           .sandboxId(id)
           .cityName(maybeSandbox.get().getCityName())
           .error(null)
+          .redirectUrl(redirectUrl)
           .build();
       return ok(pinGateView.render(request, model)).as("text/html");
     });
@@ -227,9 +231,11 @@ public class SandboxController extends Controller {
   /**
    * POST /sandboxes/:id/access — validates the 6-digit PIN.
    *
-   * <p>Correct PIN → sets HTTP-only {@code sb_access_<id>} session cookie,
-   * then redirects to the demo wrapper view. The cookie lets returning prospects
-   * bypass the PIN form for the remainder of the sandbox lifetime.
+   * <p>Correct PIN → sets HTTP-only {@code sb_access_<id>} cookie on
+   * {@code .sandbox.civiform.dev}, then redirects to the live sandbox URL.
+   * The cookie is checked by the ALB listener rule, so subsequent direct
+   * visits to {@code city.sandbox.civiform.dev} are forwarded without
+   * hitting the PIN gate again.
    *
    * <p>Wrong PIN → re-renders PIN gate with error. No cookie is set.
    */
@@ -240,15 +246,22 @@ public class SandboxController extends Controller {
 
     return sandboxService.validatePin(id, pin).thenCompose(maybeSandbox -> {
       if (maybeSandbox.isPresent()) {
-        // Correct PIN — set HTTP-only access cookie and redirect to demo wrapper
+        // Correct PIN — set HTTP-only access cookie and redirect to sandbox URL
         Http.Cookie accessCookie = Http.Cookie.builder(accessCookieName(id), "granted")
             .withHttpOnly(true)
+            .withSecure(true)
             .withSameSite(Http.Cookie.SameSite.LAX)
-            .withPath("/sandboxes/" + id)
+            .withDomain("." + sandboxDomain)
+            .withPath("/")
             .withMaxAge(java.time.Duration.ofDays(30))
             .build();
+
+        String redirectHost = orDefault(form.get("redirect"), "");
+        String targetUrl = redirectHost.isEmpty()
+            ? maybeSandbox.get().getUrl()
+            : "https://" + redirectHost;
         return CompletableFuture.completedFuture(
-            redirect("/sandboxes/" + id + "/view").withCookies(accessCookie));
+            redirect(targetUrl).withCookies(accessCookie));
       }
       // Wrong PIN — re-render gate with error, no cookie set
       return sandboxService.getSandbox(id).thenApply(ms -> {
@@ -256,49 +269,14 @@ public class SandboxController extends Controller {
             .sandboxId(id)
             .cityName(ms.map(SandboxInstance::getCityName).orElse(""))
             .error("Incorrect PIN. Please try again.")
+            .redirectUrl(form.get("redirect"))
             .build();
         return badRequest(pinGateView.render(request, model)).as("text/html");
       });
     });
   }
 
-  /**
-   * GET /sandboxes/:id/view — fullscreen demo wrapper with banner + iframe.
-   *
-   * <p>Requires a valid {@code sb_access_<id>} cookie (set by PIN validation).
-   * If no cookie is present, redirects to the PIN gate. The wrapper shows a
-   * persistent dark banner with city name, days remaining, and a role switcher
-   * on top of the live CiviForm instance in an iframe.
-   */
-  public CompletionStage<Result> demoView(Http.Request request, String id) {
-    // Allow access if: (a) portal admin session, OR (b) prospect PIN cookie
-    boolean hasPortalAuth = AuthController.isAuthenticated(request);
-    boolean hasPinCookie = hasAccessCookie(request, id);
-    if (!hasPortalAuth && !hasPinCookie) {
-      return CompletableFuture.completedFuture(
-          redirect("/sandboxes/" + id + "/access"));
-    }
 
-    return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
-      if (maybeSandbox.isEmpty()) {
-        return notFound("Sandbox not found: " + id);
-      }
-      SandboxInstance sandbox = maybeSandbox.get();
-      Instant now = Instant.now();
-      boolean expired = sandbox.getExpiresAt().isBefore(now);
-      long daysRemaining = expired ? 0
-          : Duration.between(now, sandbox.getExpiresAt()).toDays();
-
-      DemoWrapperViewModel model = DemoWrapperViewModel.builder()
-          .cityName(sandbox.getCityName())
-          .sandboxId(id)
-          .sandboxUrl(sandbox.getUrl())
-          .daysRemaining(daysRemaining)
-          .expired(expired)
-          .build();
-      return ok(demoWrapperView.render(request, model)).as("text/html");
-    });
-  }
 
   /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
   @RequireCSRFCheck

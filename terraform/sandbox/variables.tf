@@ -56,8 +56,8 @@ variable "listener_priority" {
   type        = number
 
   validation {
-    condition     = var.listener_priority >= 1 && var.listener_priority <= 50000
-    error_message = "ALB listener rule priorities must be between 1 and 50000."
+    condition     = var.listener_priority >= 1 && var.listener_priority <= 49999
+    error_message = "ALB listener rule priorities must be between 1 and 49999."
   }
 }
 

@@ -112,7 +112,7 @@ public class SandboxControllerTest extends WithApplication {
   // ── POST /sandboxes/:id/access — PIN validation ───────────────────────────
 
   @Test
-  public void validateAccess_correctPin_redirectsToDemoView() {
+  public void validateAccess_correctPin_redirectsToSandboxUrl() {
     SandboxInstance sandbox = makeSandbox("sb-pin1", SandboxStatus.RUNNING);
     when(sandboxService.validatePin("sb-pin1", "482917"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
@@ -127,7 +127,8 @@ public class SandboxControllerTest extends WithApplication {
 
     assertThat(result.status()).isEqualTo(SEE_OTHER);
     assertThat(result.redirectLocation()).isPresent();
-    assertThat(result.redirectLocation().get()).isEqualTo("/sandboxes/sb-pin1/view");
+    // Now redirects to sandbox URL (no more /view iframe route)
+    assertThat(result.redirectLocation().get()).isEqualTo("http://localhost:10001");
   }
 
   @Test
@@ -149,7 +150,8 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(cookie).isPresent();
     assertThat(cookie.get().value()).isEqualTo("granted");
     assertThat(cookie.get().httpOnly()).isTrue();
-    assertThat(cookie.get().path()).isEqualTo("/sandboxes/sb-pin-cookie");
+    // Cookie scoped to all sandbox subdomains via root path
+    assertThat(cookie.get().path()).isEqualTo("/");
     // 30 days in seconds = 2592000
     assertThat(cookie.get().maxAge()).isEqualTo(2_592_000);
   }
@@ -205,21 +207,19 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     // Simulate a returning prospect who already has the access cookie
-    Http.RequestBuilder request =
-        Helpers.fakeRequest()
-            .method("GET")
-            .uri("/sandboxes/sb-bypass/access")
-            .cookie(
-                play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "granted")
-                    .withHttpOnly(true)
-                    .withPath("/sandboxes/sb-bypass")
-                    .build());
+    Http.RequestBuilder request = Helpers.fakeRequest()
+        .method("GET")
+        .uri("/sandboxes/sb-bypass/access")
+        .cookie(play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "granted")
+            .withHttpOnly(true)
+            .withPath("/")
+            .build());
 
     Result result = Helpers.route(app, request);
 
-    // Cookie present → skip form, redirect straight to the demo wrapper view
+    // Cookie present → skip form, redirect straight to sandbox URL (no more iframe /view)
     assertThat(result.status()).isEqualTo(SEE_OTHER);
-    assertThat(result.redirectLocation().orElse("")).isEqualTo("/sandboxes/sb-bypass/view");
+    assertThat(result.redirectLocation().orElse("")).isEqualTo("http://localhost:10001");
   }
 
   @Test

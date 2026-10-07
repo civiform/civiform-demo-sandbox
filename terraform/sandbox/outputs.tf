@@ -15,8 +15,8 @@ output "target_group_arn" {
 }
 
 output "listener_rule_arn" {
-  description = "ALB listener rule routing this sandbox's hostname."
-  value       = aws_lb_listener_rule.sandbox.arn
+  description = "ALB listener rule (allow) routing this sandbox's hostname when cookie is present."
+  value       = aws_lb_listener_rule.sandbox_allow.arn
 }
 
 output "ecs_service_name" {

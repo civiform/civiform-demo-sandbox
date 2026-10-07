@@ -269,7 +269,10 @@ module "civiform_service" {
 # certificate covers the same wildcard, so a sandbox becomes reachable the
 # instant this rule exists — no DNS write, no propagation wait, no certificate
 # issuance. That removes the largest variable-latency step from provisioning.
-resource "aws_lb_listener_rule" "sandbox" {
+# Two rules implement PIN gate cookie enforcement:
+# 1. Forward to CiviForm if the sandbox-specific access cookie is present.
+# 2. Redirect to the PIN gate to acquire that cookie otherwise.
+resource "aws_lb_listener_rule" "sandbox_allow" {
   listener_arn = var.alb_listener_arn
 
   # Allocated from a Postgres sequence in the builder. ALB rule priorities must
@@ -288,5 +291,38 @@ resource "aws_lb_listener_rule" "sandbox" {
     }
   }
 
-  tags = { Name = "${var.sandbox_id}-rule" }
+  condition {
+    http_header {
+      http_header_name = "cookie"
+      values           = ["*sb_access_${replace(var.sandbox_id, "-", "_")}=granted*"]
+    }
+  }
+
+  tags = { Name = "${var.sandbox_id}-allow" }
+}
+
+resource "aws_lb_listener_rule" "sandbox_redirect" {
+  listener_arn = var.alb_listener_arn
+
+  priority = var.listener_priority + 1
+
+  action {
+    type = "redirect"
+    redirect {
+      host        = var.base_domain
+      path        = "/sandboxes/${var.sandbox_id}/access"
+      query       = "redirect=#{host}"
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_302"
+    }
+  }
+
+  condition {
+    host_header {
+      values = [local.fqdn]
+    }
+  }
+
+  tags = { Name = "${var.sandbox_id}-redirect" }
 }
