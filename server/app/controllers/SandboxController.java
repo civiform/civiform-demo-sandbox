@@ -176,8 +176,9 @@ public class SandboxController extends Controller {
       SandboxInstance sandbox = maybeSandbox.get();
       String status = sandbox.getStatus().name();
       boolean isRunning = "RUNNING".equals(status);
-      boolean isFailed  = "FAILED".equals(status);
-      boolean isDone    = isRunning || isFailed;
+      boolean isFailed  = "FAILED".equals(status) || "DELETE_FAILED".equals(status);
+      boolean isDeleted = "DELETED".equals(status);
+      boolean isDone    = isRunning || isFailed || isDeleted;
 
       String badgeClass = isRunning ? "cf-badge-active"
           : isFailed ? "cf-badge-error"

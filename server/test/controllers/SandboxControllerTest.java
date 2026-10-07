@@ -313,6 +313,26 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
+  public void statusFragment_failedAndDeleteFailedStatus_stopsPollingAndRendersErrorBadge() {
+    for (SandboxStatus errorStatus :
+        new SandboxStatus[] {SandboxStatus.FAILED, SandboxStatus.DELETE_FAILED}) {
+      SandboxInstance sandbox = makeSandbox("sb-err", errorStatus);
+      when(sandboxService.getSandbox("sb-err"))
+          .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+      Http.RequestBuilder request =
+          Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-err/status");
+
+      Result result = Helpers.route(app, request);
+
+      String body = contentAsString(result);
+      assertThat(body).contains("cf-badge-error");
+      assertThat(body).contains(errorStatus.name());
+      assertThat(body).doesNotContain("hx-trigger");
+    }
+  }
+
+  @Test
   public void statusFragment_unknownSandbox_returns404() {
     when(sandboxService.getSandbox("nonexistent"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
@@ -471,6 +491,28 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(OK);
     String body = contentAsString(result);
     assertThat(body).contains("id=\"sandbox-row-sb-run1\"");
+    assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
+  }
+
+  @Test
+  public void index_failedAndDeleteFailedRows_omitHtmxPollingAttributes() {
+    SandboxInstance failed = makeSandbox("sb-fail1", SandboxStatus.FAILED);
+    SandboxInstance deleteFailed = makeSandbox("sb-delfail1", SandboxStatus.DELETE_FAILED);
+    when(sandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(failed, deleteFailed)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(OK);
+    String body = contentAsString(result);
+    assertThat(body).contains("id=\"sandbox-row-sb-fail1\"");
+    assertThat(body).contains("id=\"sandbox-row-sb-delfail1\"");
     assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
   }
 
