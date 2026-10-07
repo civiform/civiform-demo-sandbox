@@ -385,6 +385,8 @@
 
         <!-- Wizard Form -->
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
+          <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+
           <!-- Step 1: CiviForm setup -->
           <div
             id="create-step-panel-1"
@@ -905,6 +907,7 @@
         Specify the number of days you want to extend this sandbox demo by.
       </p>
       <form id="extend-form" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <div class="mb-5">
           <label
             for="extend-days"
@@ -961,6 +964,7 @@
         undone.
       </p>
       <form id="delete-form" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <button
           type="submit"
           class="usa-button usa-button--secondary w-full"
