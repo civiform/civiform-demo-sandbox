@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -81,6 +82,13 @@ public class TerraformSandboxService implements SandboxService {
   /** Dedicated pool. Terraform runs are long and blocking; Play's pool must not be used. */
   private final Executor provisioningPool = Executors.newCachedThreadPool();
 
+  /**
+   * Per-sandbox tail of in-flight background work. Different sandboxes run in parallel, but two
+   * operations for the <em>same</em> sandbox share one S3 state lock and must run sequentially.
+   */
+  private final ConcurrentHashMap<String, CompletableFuture<Void>> inFlight =
+      new ConcurrentHashMap<>();
+
   @Inject
   public TerraformSandboxService(SandboxRepository repository, Config config) {
     this(
@@ -103,7 +111,8 @@ public class TerraformSandboxService implements SandboxService {
     this.awsRegion = config.getString("sandbox.aws.region");
     this.civiformImageTag = config.getString("sandbox.terraform.civiformImageTag");
 
-    this.platformOutputs = loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
+    this.platformOutputs =
+        loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
   }
 
   @Override
@@ -155,7 +164,7 @@ public class TerraformSandboxService implements SandboxService {
     // immediately, while provisioning continues in the background.
     repository.save(instance);
 
-    CompletableFuture.runAsync(() -> provision(instance, dbUser, dbPassword), provisioningPool);
+    enqueueForSandbox(id, () -> provision(instance, dbUser, dbPassword));
 
     return CompletableFuture.completedFuture(instance);
   }
@@ -199,8 +208,12 @@ public class TerraformSandboxService implements SandboxService {
           out.get("listener_rule_arn").asText(),
           out.get("task_definition_arn").asText());
 
-      repository.updateStatus(id, SandboxStatus.RUNNING);
-      log.info("[{}] Status → RUNNING at {}", id, out.get("sandbox_url").asText());
+      // If a delete was requested while apply was running, leave DELETING in place —
+      // the queued destroy runs next.
+      if (!isDeleting(id)) {
+        repository.updateStatus(id, SandboxStatus.RUNNING);
+        log.info("[{}] Status → RUNNING at {}", id, out.get("sandbox_url").asText());
+      }
 
     } catch (Exception e) {
       // Status only. The row, the state file, and any half-created AWS resources are
@@ -208,7 +221,9 @@ public class TerraformSandboxService implements SandboxService {
       // or destroyed, and discarding the state would strand whatever did get created
       // with no record that it exists.
       log.error("[{}] Provisioning failed: {}", id, e.getMessage(), e);
-      repository.updateStatus(id, SandboxStatus.FAILED);
+      if (!isDeleting(id)) {
+        repository.updateStatus(id, SandboxStatus.FAILED);
+      }
     } finally {
       deleteRecursively(workDir);
     }
@@ -216,55 +231,97 @@ public class TerraformSandboxService implements SandboxService {
 
   @Override
   public CompletionStage<Boolean> deleteSandbox(String id) {
-    return CompletableFuture.supplyAsync(
-        () -> {
-          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
-          if (maybeSandbox.isEmpty()) {
-            return false;
-          }
-          SandboxInstance sandbox = maybeSandbox.get();
+    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+    if (maybeSandbox.isEmpty()) {
+      return CompletableFuture.completedFuture(false);
+    }
+    SandboxInstance sandbox = maybeSandbox.get();
 
-          // A DELETED row is a tombstone: everything is already gone. Re-running teardown
-          // would fail the DROP DATABASE and flip the tombstone to DELETE_FAILED, which
-          // falsely signals that something is still out there to clean up.
-          if (sandbox.getStatus() == SandboxStatus.DELETED) {
-            return false;
-          }
+    // A DELETED row is a tombstone: everything is already gone. A DELETING row already has
+    // a teardown running in the background; launching a second one would collide on the S3
+    // state lock (HTTP 412 PreconditionFailed on the .tflock object) and flip the row to
+    // DELETE_FAILED while the first teardown is still succeeding.
+    if (sandbox.getStatus() == SandboxStatus.DELETED
+        || sandbox.getStatus() == SandboxStatus.DELETING) {
+      return CompletableFuture.completedFuture(false);
+    }
 
-          Path workDir = null;
-          try {
-            workDir = createWorkspace(id);
-            Path varFile = workDir.resolve("sandbox.tfvars.json");
-            writeTfVars(varFile, sandbox, sandbox.getDatabaseName(), DESTROY_PLACEHOLDER_PASSWORD);
+    // Persisted before returning, matching createSandbox: the redirect renders DELETING
+    // immediately instead of blocking the HTTP response for ~3 minutes while the Fargate
+    // task's ENI detaches, and any duplicate delete request is rejected by the guard above.
+    repository.updateStatus(id, SandboxStatus.DELETING);
 
-            terraform.init(workDir, stateBucket, stateKey(id), awsRegion);
-            terraform.destroy(workDir, varFile, line -> log.debug("[{}] {}", id, line));
-            log.info("[{}] Terraform destroy complete", id);
+    enqueueForSandbox(id, () -> destroy(sandbox));
 
-          } catch (Exception e) {
-            // Keep the row. It holds the database name and listener priority, which are
-            // the only records of what is still running in AWS.
-            log.error("[{}] Terraform destroy failed: {}", id, e.getMessage(), e);
-            repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
-            return false;
-          } finally {
-            deleteRecursively(workDir);
-          }
+    return CompletableFuture.completedFuture(true);
+  }
 
-          // Dropped after destroy, not before: the ECS task holds connections open and
-          // DROP DATABASE would contend with them.
-          try {
-            dropDatabase(sandbox.getDatabaseName());
-            log.info("[{}] Database dropped", id);
-          } catch (Exception e) {
-            log.error("[{}] Could not drop database, keeping record for retry: {}", id, e.getMessage(), e);
-            repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
-            return false;
-          }
+  /** The long-running half of deletion. Runs on {@link #provisioningPool}. */
+  private void destroy(SandboxInstance sandbox) {
+    String id = sandbox.getId();
+    Path workDir = null;
 
-          return repository.softDelete(id, Instant.now());
-        },
-        provisioningPool);
+    try {
+      log.info("[{}] Teardown started", id);
+      workDir = createWorkspace(id);
+      Path varFile = workDir.resolve("sandbox.tfvars.json");
+      writeTfVars(varFile, sandbox, sandbox.getDatabaseName(), DESTROY_PLACEHOLDER_PASSWORD);
+
+      terraform.init(workDir, stateBucket, stateKey(id), awsRegion);
+      terraform.destroy(workDir, varFile, line -> log.debug("[{}] {}", id, line));
+      log.info("[{}] Terraform destroy complete", id);
+
+    } catch (Exception e) {
+      // Keep the row. It holds the database name and listener priority, which are
+      // the only records of what is still running in AWS.
+      log.error("[{}] Terraform destroy failed: {}", id, e.getMessage(), e);
+      repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
+      return;
+    } finally {
+      deleteRecursively(workDir);
+    }
+
+    // Dropped after destroy, not before: the ECS task holds connections open and
+    // DROP DATABASE would contend with them.
+    try {
+      dropDatabase(sandbox.getDatabaseName());
+      log.info("[{}] Database dropped", id);
+    } catch (Exception e) {
+      log.error(
+          "[{}] Could not drop database, keeping record for retry: {}", id, e.getMessage(), e);
+      repository.updateStatus(id, SandboxStatus.DELETE_FAILED);
+      return;
+    }
+
+    repository.softDelete(id, Instant.now());
+  }
+
+  /**
+   * Schedules {@code work} on {@link #provisioningPool}, chained after any job already running for
+   * the same sandbox.
+   *
+   * <p>Different sandboxes have independent state keys and run concurrently. Two jobs for the same
+   * sandbox — e.g. a delete requested while provisioning is still mid-apply — share a state lock
+   * and must run sequentially rather than race against S3.
+   */
+  private void enqueueForSandbox(String id, Runnable work) {
+    CompletableFuture<Void> next =
+        inFlight.compute(
+            id,
+            (k, previous) ->
+                previous == null
+                    ? CompletableFuture.runAsync(work, provisioningPool)
+                    : previous.handleAsync(
+                        (ignored, ex) -> {
+                          work.run();
+                          return null;
+                        },
+                        provisioningPool));
+    next.whenComplete((r, e) -> inFlight.remove(id, next));
+  }
+
+  private boolean isDeleting(String id) {
+    return repository.findById(id).map(s -> s.getStatus() == SandboxStatus.DELETING).orElse(false);
   }
 
   @Override
@@ -298,6 +355,7 @@ public class TerraformSandboxService implements SandboxService {
 
           // An expired or torn-down sandbox must not be reachable even with the right PIN.
           if (sandbox.getStatus() == SandboxStatus.DELETED
+              || sandbox.getStatus() == SandboxStatus.DELETING
               || sandbox.getExpiresAt().isBefore(Instant.now())) {
             return Optional.<SandboxInstance>empty();
           }
@@ -405,7 +463,8 @@ public class TerraformSandboxService implements SandboxService {
    */
   private static Map<String, JsonNode> loadPlatformOutputs(String path) {
     try {
-      JsonNode root = new ObjectMapper().readTree(Files.readString(Path.of(path), StandardCharsets.UTF_8));
+      JsonNode root =
+          new ObjectMapper().readTree(Files.readString(Path.of(path), StandardCharsets.UTF_8));
 
       Map<String, JsonNode> outputs = new java.util.LinkedHashMap<>();
       // Unwrap Terraform's {value, type, sensitive} envelope.
@@ -440,7 +499,8 @@ public class TerraformSandboxService implements SandboxService {
     try (Stream<Path> entries = Files.list(moduleDir)) {
       for (Path source : entries.toList()) {
         if (Files.isRegularFile(source)) {
-          Files.copy(source, workDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+          Files.copy(
+              source, workDir.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
         }
       }
     }
