@@ -19,6 +19,9 @@ public class SandboxRowViewModel {
   private static final DateTimeFormatter DISPLAY_FMT =
       DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
+  /** Days after expiry before autodeletion runs. */
+  private static final long AUTODELETION_GRACE_DAYS = 7;
+
   /** The underlying sandbox. */
   SandboxInstance sandbox;
 
@@ -40,6 +43,9 @@ public class SandboxRowViewModel {
   /** Whether the sandbox is still provisioning (not yet RUNNING). */
   boolean provisioning;
 
+  /** Days until autodeletion (only meaningful when expired). 0 = imminent. */
+  long autoDeletionDays;
+
   public static SandboxRowViewModel of(SandboxInstance sandbox) {
     long days = ChronoUnit.DAYS.between(Instant.now(), sandbox.getExpiresAt());
     boolean isDeleted = sandbox.getStatus() == SandboxStatus.DELETED;
@@ -47,6 +53,9 @@ public class SandboxRowViewModel {
         ? DISPLAY_FMT.format(sandbox.getDeletedAt())
         : null;
     boolean isProv = sandbox.getStatus() == SandboxStatus.PROVISIONING;
+    long autoDeleteDays = days < 0
+        ? Math.max(0, AUTODELETION_GRACE_DAYS + days)
+        : AUTODELETION_GRACE_DAYS;
     return new SandboxRowViewModel(
         sandbox,
         Math.max(days, 0),
@@ -54,6 +63,7 @@ public class SandboxRowViewModel {
         sandbox.getCityName(),
         isDeleted,
         deletedFmt,
-        isProv);
+        isProv,
+        autoDeleteDays);
   }
 }

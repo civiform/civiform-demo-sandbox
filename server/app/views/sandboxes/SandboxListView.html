@@ -200,8 +200,9 @@
               >
                 Expired Aug 18, 2026
               </div>
-              <div class="text-xs text-red-600 font-medium mt-1">
-                Autodeletion pending
+              <div class="text-xs text-red-600 font-medium mt-1"
+                   th:text="${sb.autoDeletionDays > 0} ? 'Autodeletion in ' + ${sb.autoDeletionDays} + ' days' : 'Autodeletion imminent'">
+                Autodeletion in 7 days
               </div>
             </div>
             <div th:if="${sb.deleted}">
@@ -955,10 +956,10 @@
       >
         ×
       </button>
-      <h2 id="delete-modal-title" class="text-lg font-bold text-gray-900 mb-2">
+      <h2 id="delete-modal-title" class="text-xl font-bold text-gray-900 mb-3">
         Delete demo?
       </h2>
-      <p class="text-sm text-gray-600 mb-6">
+      <p class="text-sm text-gray-700 mb-6">
         This will permanently delete the demo for
         <strong id="delete-city-name"></strong> from AWS. This cannot be
         undone.
@@ -967,7 +968,8 @@
         <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
         <button
           type="submit"
-          class="usa-button usa-button--secondary w-full"
+          class="usa-button w-full"
+          style="background-color: #c0392b; width: 100%"
         >
           Delete demo
         </button>
