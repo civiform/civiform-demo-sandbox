@@ -86,11 +86,16 @@ public class SandboxController extends Controller {
   }
 
   /**
-   * POST /sandboxes — create a new sandbox.
+   * POST /sandboxes — create a new sandbox. Requires portal auth.
    * Redirects back to the dashboard list with a flash banner (spec: "Demo provisioning initiated").
    */
   @RequireCSRFCheck
   public CompletionStage<Result> create(Http.Request request) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
+
     CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
     return sandboxService.createSandbox(sandboxRequest)
         .thenApply(instance -> {
@@ -144,9 +149,14 @@ public class SandboxController extends Controller {
   }
 
 
-  /** GET /sandboxes/:id — detail page or JSON. */
+  /** GET /sandboxes/:id — detail page or JSON. Requires portal auth. */
   @AddCSRFToken
   public CompletionStage<Result> show(Http.Request request, String id) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
+
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
       if (maybeSandbox.isEmpty()) {
         return notFound("Sandbox not found: " + id);
@@ -165,10 +175,15 @@ public class SandboxController extends Controller {
 
   /**
    * GET /sandboxes/:id/status — HTMX partial: status badge only, no layout wrapper.
-   * Returns bare HTML that HTMX swaps in. Stops self-polling once RUNNING or FAILED.
-   * Auto-navigates to detail page when RUNNING.
+   * Requires portal auth. Returns bare HTML that HTMX swaps in. Stops self-polling once
+   * RUNNING or FAILED. Auto-navigates to detail page when RUNNING.
    */
   public CompletionStage<Result> statusFragment(Http.Request request, String id) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
+
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
       if (maybeSandbox.isEmpty()) {
         return notFound();
@@ -301,9 +316,14 @@ public class SandboxController extends Controller {
     });
   }
 
-  /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
+  /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. Requires portal auth. */
   @RequireCSRFCheck
   public CompletionStage<Result> delete(Http.Request request, String id) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
+
     return sandboxService
         .getSandbox(id)
         .thenCompose(
@@ -326,10 +346,15 @@ public class SandboxController extends Controller {
 
   /**
    * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
-   * Redirects back to the dashboard with the updated sandbox visible.
+   * Requires portal auth. Redirects back to the dashboard with the updated sandbox visible.
    */
   @RequireCSRFCheck
   public CompletionStage<Result> extend(Http.Request request, String id) {
+    if (!AuthController.isAuthenticated(request)) {
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.AuthController.login()));
+    }
+
     DynamicForm form = formFactory.form().bindFromRequest(request);
     String daysStr = orDefault(form.get("days"), "30");
     int days;
