@@ -294,7 +294,7 @@ resource "aws_lb_listener_rule" "sandbox_allow" {
   condition {
     http_header {
       http_header_name = "cookie"
-      values           = ["*sb_access_${replace(var.sandbox_id, "-", "_")}=granted*"]
+      values           = ["*sb_access_${replace(var.sandbox_id, "-", "_")}=${var.access_token}*"]
     }
   }
 
@@ -311,7 +311,7 @@ resource "aws_lb_listener_rule" "sandbox_redirect" {
     redirect {
       host        = var.base_domain
       path        = "/sandboxes/${var.sandbox_id}/access"
-      query       = "redirect=#{host}"
+      query       = ""
       port        = "443"
       protocol    = "HTTPS"
       status_code = "HTTP_302"

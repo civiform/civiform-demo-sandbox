@@ -40,7 +40,6 @@
     <!-- PIN form -->
     <form th:action="|/sandboxes/${model.sandboxId}/access|" method="POST" class="w-full">
       <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-      <input type="hidden" name="redirect" th:value="${model.redirectUrl}" />
 
       <div class="mb-6">
         <label for="pin" class="usa-label text-sm text-gray-500">Access PIN</label>

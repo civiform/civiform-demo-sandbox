@@ -132,28 +132,45 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
-  public void validateAccess_correctPin_setsHttpOnlyAccessCookie() {
-    SandboxInstance sandbox = makeSandbox("sb-pin-cookie", SandboxStatus.RUNNING);
-    when(sandboxService.validatePin("sb-pin-cookie", "482917"))
+  public void validateAccess_correctPin_cookieHasSecretTokenValue() {
+    SandboxInstance sandbox = makeSandbox("sb-cookie", SandboxStatus.RUNNING);
+    when(sandboxService.validatePin("sb-cookie", "482917"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     Http.RequestBuilder request =
         Helpers.fakeRequest()
             .method("POST")
-            .uri("/sandboxes/sb-pin-cookie/access")
+            .uri("/sandboxes/sb-cookie/access")
             .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"));
 
     Result result = Helpers.route(app, request);
 
-    // Cookie must be present, HTTP-only, named correctly
-    Optional<play.mvc.Http.Cookie> cookie = result.cookie("sb_access_sb_pin_cookie");
-    assertThat(cookie).isPresent();
-    assertThat(cookie.get().value()).isEqualTo("granted");
-    assertThat(cookie.get().httpOnly()).isTrue();
-    // Cookie scoped to all sandbox subdomains via root path
-    assertThat(cookie.get().path()).isEqualTo("/");
-    // 30 days in seconds = 2592000
-    assertThat(cookie.get().maxAge()).isEqualTo(2_592_000);
+    // Cookie value must be the sandbox's secret access token, not "granted"
+    assertThat(result.cookie("sb_access_sb_cookie")).isPresent();
+    assertThat(result.cookie("sb_access_sb_cookie").get().value())
+        .isEqualTo("test-secret-token-sb-cookie");
+  }
+
+  @Test
+  public void validateAccess_correctPin_cookieHasSecureFlags() {
+    SandboxInstance sandbox = makeSandbox("sb-flags", SandboxStatus.RUNNING);
+    when(sandboxService.validatePin("sb-flags", "482917"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-flags/access")
+            .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917"));
+
+    Result result = Helpers.route(app, request);
+
+    Http.Cookie cookie = result.cookie("sb_access_sb_flags").get();
+    assertThat(cookie.httpOnly()).isTrue();
+    assertThat(cookie.secure()).isTrue();
+    assertThat(cookie.sameSite())
+        .isPresent()
+        .hasValue(Http.Cookie.SameSite.LAX);
   }
 
   @Test
@@ -210,7 +227,7 @@ public class SandboxControllerTest extends WithApplication {
     Http.RequestBuilder request = Helpers.fakeRequest()
         .method("GET")
         .uri("/sandboxes/sb-bypass/access")
-        .cookie(play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "granted")
+        .cookie(play.mvc.Http.Cookie.builder("sb_access_sb_bypass", "test-secret-token-sb-bypass")
             .withHttpOnly(true)
             .withPath("/")
             .build());
@@ -484,6 +501,7 @@ public class SandboxControllerTest extends WithApplication {
         .status(status)
         .url("http://localhost:10001")
         .pin("482917")
+        .accessToken("test-secret-token-" + id)
         .hostPort(10001)
         .databaseName("sandbox_" + id.replace("-", "_"))
         .adminEmail("admin@test.com")

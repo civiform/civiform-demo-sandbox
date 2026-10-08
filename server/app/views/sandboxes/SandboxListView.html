@@ -216,7 +216,7 @@
             <div th:if="${!sb.deleted}" class="flex items-center gap-2 flex-wrap">
               <!-- Launch → opens CiviForm in new tab -->
               <a
-                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? |/sandboxes/${sb.sandbox.id}/view| : '#'"
+                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? ${sb.sandbox.url} : '#'"
                 target="_blank"
                 rel="noopener"
                 th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
