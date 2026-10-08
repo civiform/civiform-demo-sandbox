@@ -37,7 +37,11 @@ services:
       # works. Hardcoding a value here would override application.conf, since
       # `${?SANDBOX_RUNTIME}` is applied after the literal default.
       - SANDBOX_RUNTIME=${SANDBOX_RUNTIME:-docker}
-      - DEMO_PORTAL_PASSWORD=demo
+      - DEMO_PORTAL_PASSWORD
+      - AUTH0_DOMAIN
+      - AUTH0_CLIENT_ID
+      - AUTH0_CLIENT_SECRET
+      - AUTH0_CALLBACK_URL
       # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
       # In AWS these are set on the ECS task definition, with the RDS admin
       # password sourced from Secrets Manager rather than plain env.
