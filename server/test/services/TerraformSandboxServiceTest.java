@@ -339,6 +339,45 @@ public class TerraformSandboxServiceTest {
     verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.DELETE_FAILED));
   }
 
+  @Test
+  public void deleteSandbox_deleteFailedSandboxCanBeRetried() throws Exception {
+    SandboxInstance deleteFailed =
+        live("123456").toBuilder()
+            .status(SandboxStatus.DELETE_FAILED)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleteFailed));
+
+    // After a restart flips an interrupted DELETING row to DELETE_FAILED, the
+    // operator must be able to retry deleting it.
+    assertThat(newService().deleteSandbox("sb-abcd1234").toCompletableFuture().get()).isTrue();
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+  }
+
+  @Test
+  public void deleteSandbox_failedProvisionSandboxCanBeDeleted() throws Exception {
+    SandboxInstance failed =
+        live("123456").toBuilder()
+            .status(SandboxStatus.FAILED)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(failed));
+
+    // After a restart flips an interrupted PROVISIONING row to FAILED, the
+    // operator must be able to tear down any partially-created resources.
+    assertThat(newService().deleteSandbox("sb-abcd1234").toCompletableFuture().get()).isTrue();
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+  }
+
+  @Test
+  public void construction_failsInterruptedOperationsOnStartup() {
+    newService();
+
+    // Any PROVISIONING or DELETING rows left behind by a previous process are
+    // transitioned to FAILED / DELETE_FAILED when the service starts up.
+    verify(repository).failInterruptedOperations();
+  }
+
   // ── extendSandbox ───────────────────────────────────────────────────────────
 
   @Test
