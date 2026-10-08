@@ -38,6 +38,13 @@ public class SandboxInstance {
   /** 6-digit PIN gate code — set by the sales rep at creation time. */
   private String pin;
 
+  /**
+   * Random per-sandbox access token used as the cookie value.
+   * Prevents cookie forgery: knowing the sandbox ID alone is not enough.
+   * Generated at creation time via {@code UUID.randomUUID()}.
+   */
+  private String accessToken;
+
   /** Docker container ID or ECS task ARN — set once provisioning starts. */
   private String containerId;
 

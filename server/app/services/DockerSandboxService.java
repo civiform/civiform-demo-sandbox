@@ -165,6 +165,7 @@ public class DockerSandboxService implements SandboxService {
             .url("http://localhost:" + hostPort)
             .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
             .pin(pin)
+            .accessToken(UUID.randomUUID().toString())
             .googleAnalyticsId(request.getGoogleAnalyticsId())
             .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .hostPort(hostPort)

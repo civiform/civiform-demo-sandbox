@@ -157,6 +157,7 @@ public class TerraformSandboxService implements SandboxService {
             .url(url)
             .adminEmail(request.getAdminEmail() != null ? request.getAdminEmail() : "")
             .pin(request.getPin())
+            .accessToken(UUID.randomUUID().toString())
             .googleAnalyticsId(request.getGoogleAnalyticsId())
             .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .databaseName(databaseName)
@@ -390,6 +391,7 @@ public class TerraformSandboxService implements SandboxService {
     vars.put("subdomain", instance.getSubdomain());
     vars.put("admin_email", instance.getAdminEmail());
     vars.put("listener_priority", instance.getListenerPriority());
+    vars.put("access_token", instance.getAccessToken());
     vars.put("civiform_image_tag", instance.getCiviformVersion());
 
     vars.put("db_address", platformOutput("rds_endpoint").asText());

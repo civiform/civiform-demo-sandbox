@@ -31,7 +31,7 @@ CREATE SEQUENCE IF NOT EXISTS sandbox_port_seq
 -- sandbox count, so exhaustion should be a loud error rather than a collision.
 CREATE SEQUENCE IF NOT EXISTS sandbox_listener_priority_seq
   START 1000
-  INCREMENT 1
+  INCREMENT 2
   MINVALUE 1000
   MAXVALUE 50000
   NO CYCLE;
@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
   url             VARCHAR(512)  NOT NULL DEFAULT '',
   admin_email     VARCHAR(255)  NOT NULL DEFAULT '',
   pin             VARCHAR(6)    NOT NULL,
+  access_token    VARCHAR(64)   NOT NULL DEFAULT '',  -- Per-sandbox cookie secret
   container_id    VARCHAR(128),          -- Docker container ID (set after launch)
   host_port       INTEGER       NOT NULL,
   database_name   VARCHAR(128)  NOT NULL, -- Per-sandbox Postgres database name

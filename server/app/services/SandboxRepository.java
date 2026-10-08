@@ -70,10 +70,10 @@ public class SandboxRepository {
       try (PreparedStatement ps = conn.prepareStatement(
           "INSERT INTO sandbox_instances "
               + "(id, city_name, subdomain, civiform_version, status, url, admin_email, "
-              + " pin, container_id, host_port, database_name, target_group_arn, "
+              + " pin, access_token, container_id, host_port, database_name, target_group_arn, "
               + " listener_rule_arn, listener_priority, google_analytics_id, "
               + " google_analytics_url, created_at, expires_at, deleted_at) "
-              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+              + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
         ps.setString(1, instance.getId());
         ps.setString(2, instance.getCityName());
         ps.setString(3, instance.getSubdomain());
@@ -82,19 +82,20 @@ public class SandboxRepository {
         ps.setString(6, instance.getUrl());
         ps.setString(7, instance.getAdminEmail());
         ps.setString(8, instance.getPin());
-        ps.setString(9, instance.getContainerId());
-        ps.setInt(10, instance.getHostPort());
-        ps.setString(11, instance.getDatabaseName());
-        ps.setString(12, instance.getTargetGroupArn());
-        ps.setString(13, instance.getListenerRuleArn());
+        ps.setString(9, instance.getAccessToken());
+        ps.setString(10, instance.getContainerId());
+        ps.setInt(11, instance.getHostPort());
+        ps.setString(12, instance.getDatabaseName());
+        ps.setString(13, instance.getTargetGroupArn());
+        ps.setString(14, instance.getListenerRuleArn());
         // setObject rather than setInt: the column is nullable and Docker sandboxes
         // legitimately have no listener rule. setInt would coerce null to 0.
-        ps.setObject(14, instance.getListenerPriority(), java.sql.Types.INTEGER);
-        ps.setString(15, instance.getGoogleAnalyticsId());
-        ps.setString(16, instance.getGoogleAnalyticsUrl());
-        ps.setTimestamp(17, instance.getCreatedAt() != null ? Timestamp.from(instance.getCreatedAt()) : null);
-        ps.setTimestamp(18, instance.getExpiresAt() != null ? Timestamp.from(instance.getExpiresAt()) : null);
-        ps.setTimestamp(19, instance.getDeletedAt() != null ? Timestamp.from(instance.getDeletedAt()) : null);
+        ps.setObject(15, instance.getListenerPriority(), java.sql.Types.INTEGER);
+        ps.setString(16, instance.getGoogleAnalyticsId());
+        ps.setString(17, instance.getGoogleAnalyticsUrl());
+        ps.setTimestamp(18, instance.getCreatedAt() != null ? Timestamp.from(instance.getCreatedAt()) : null);
+        ps.setTimestamp(19, instance.getExpiresAt() != null ? Timestamp.from(instance.getExpiresAt()) : null);
+        ps.setTimestamp(20, instance.getDeletedAt() != null ? Timestamp.from(instance.getDeletedAt()) : null);
         ps.executeUpdate();
       }
       return null;
@@ -252,7 +253,7 @@ public class SandboxRepository {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "UPDATE sandbox_instances "
-              + "SET status = ?, deleted_at = ?, pin = '', admin_email = '' "
+              + "SET status = ?, deleted_at = ?, pin = '', access_token = '', admin_email = '' "
               + "WHERE id = ?")) {
         ps.setString(1, SandboxStatus.DELETED.name());
         ps.setTimestamp(2, Timestamp.from(deletedAt));
@@ -272,6 +273,7 @@ public class SandboxRepository {
         .url(rs.getString("url"))
         .adminEmail(rs.getString("admin_email"))
         .pin(rs.getString("pin"))
+        .accessToken(rs.getString("access_token"))
         .containerId(rs.getString("container_id"))
         .hostPort(rs.getInt("host_port"))
         .databaseName(rs.getString("database_name"))
