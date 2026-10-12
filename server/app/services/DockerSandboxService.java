@@ -72,6 +72,7 @@ public class DockerSandboxService implements SandboxService {
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = buildDockerClient(config.getString("docker.socketPath"));
+    reconcileInterruptedOperations();
   }
 
   /**
@@ -93,6 +94,14 @@ public class DockerSandboxService implements SandboxService {
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = checkNotNull(dockerClient);
+    reconcileInterruptedOperations();
+  }
+
+  private void reconcileInterruptedOperations() {
+    int recovered = this.repository.failInterruptedOperations();
+    if (recovered > 0) {
+      log.warn("Marked {} interrupted sandbox operation(s) as failed after restart", recovered);
+    }
   }
 
   /**

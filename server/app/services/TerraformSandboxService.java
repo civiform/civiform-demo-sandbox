@@ -113,6 +113,11 @@ public class TerraformSandboxService implements SandboxService {
 
     this.platformOutputs =
         loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
+
+    int recovered = this.repository.failInterruptedOperations();
+    if (recovered > 0) {
+      log.warn("Marked {} interrupted sandbox operation(s) as failed after restart", recovered);
+    }
   }
 
   @Override

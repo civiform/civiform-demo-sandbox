@@ -453,6 +453,13 @@ public class DockerSandboxServiceTest {
     assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.FAILED);
   }
 
+  @Test
+  public void construction_failsInterruptedOperationsOnStartup() {
+    // setUp() constructs `service` — verify that construction reconciled any
+    // in-flight PROVISIONING / DELETING rows left behind by a restart.
+    verify(repository).failInterruptedOperations();
+  }
+
   // ── APPLICATION_SECRET length ─────────────────────────────────────────────
 
   @Test

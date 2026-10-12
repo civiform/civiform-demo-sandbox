@@ -48,12 +48,13 @@
           >RUNNING</span
         >
         <span
-          th:if="${model.sandbox.status.name() == 'FAILED'}"
+          th:if="${model.sandbox.status.name() == 'FAILED' or model.sandbox.status.name() == 'DELETE_FAILED'}"
           class="cf-badge-error"
+          th:text="${model.sandbox.status}"
           >FAILED</span
         >
         <span
-          th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED'}"
+          th:if="${model.sandbox.status.name() != 'RUNNING' and model.sandbox.status.name() != 'FAILED' and model.sandbox.status.name() != 'DELETE_FAILED'}"
           class="cf-badge-pending"
           th:id="'status-badge'"
           th:hx-get="${'/sandboxes/' + model.sandbox.id + '/status'}"
