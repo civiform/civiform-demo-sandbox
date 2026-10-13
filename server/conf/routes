@@ -11,6 +11,8 @@ GET     /ready                      controllers.HealthCheckController.ready()
 # Auth
 GET     /login                      controllers.AuthController.login(request: Request)
 POST    /login                      controllers.AuthController.authenticate(request: Request)
+GET     /login/auth0                controllers.AuthController.loginWithAuth0(request: Request)
+GET     /callback                   controllers.AuthController.callback(request: Request)
 GET     /logout                     controllers.AuthController.logout(request: Request)
 
 # Home / Dashboard

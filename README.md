@@ -144,8 +144,10 @@ Default login credentials: `admin@civiform.dev` / password set via `DEMO_PORTAL_
 
 ```
 GET  /login                      AuthController.login          (login page)
-POST /login                      AuthController.authenticate   (password auth → session)
-GET  /logout                     AuthController.logout         (clear session → /login)
+POST /login                      AuthController.authenticate   (local password fallback → session)
+GET  /login/auth0                AuthController.loginWithAuth0 (redirect to Auth0 Universal Login)
+GET  /callback                   AuthController.callback       (Auth0 OIDC callback → session)
+GET  /logout                     AuthController.logout         (clear session → Auth0/login)
 
 GET  /                           SandboxController.index       (redirects to /sandboxes)
 GET  /sandboxes                  SandboxController.index       (dashboard — sandbox list)
@@ -162,6 +164,35 @@ GET  /sandboxes/:id/view         SandboxController.demoView    (iframe wrapper +
 GET  /health                     HealthCheckController.health
 GET  /ready                      HealthCheckController.ready
 ```
+
+---
+
+## Portal Authentication (Auth0 or Development Password)
+
+Only **one** authentication method is active at a time in `AuthController`:
+
+1. **Auth0 OIDC (Active when `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` are set)**:
+   - Displays only the **Continue with Auth0** button on `/login` and disables `POST /login` password authentication.
+   - **Tenant**: `civiform-sandbox-builder`
+   - **Role-based Allowlist**: Access is restricted to users assigned the **`Sandbox builder users`** role in the Auth0 Dashboard (**User Management → Roles**).
+   - **Auth0 Post-Login Action**: A custom Post-Login Action checks that the authenticating user has the `Sandbox builder users` role before issuing a code. If the user lacks the role, Auth0 denies login and redirects back to `/callback?error=access_denied`, which the portal surfaces on the login page:
+     ```javascript
+     exports.onExecutePostLogin = async (event, api) => {
+       // Define the required role(s) to allow login
+       const allowedRoles = ['Sandbox builder users'];
+
+       // Check if the user has any of the roles
+       const userRoles = event.authorization?.roles || [];
+       const hasRequiredRole = userRoles.some(role => allowedRoles.includes(role));
+
+       // If the user does not have the required role, deny access
+       if (!hasRequiredRole) {
+         api.access.deny('Access denied: You do not have the required role to log in.');
+       }
+     };
+     ```
+2. **Development Email/Password (Active when Auth0 is not configured)**:
+   - Displays only the email/password form on `/login` (`admin@civiform.dev` + `DEMO_PORTAL_PASSWORD`) and disables `/login/auth0` and `/callback`.
 
 ---
 
@@ -197,8 +228,12 @@ When a prospect enters the correct PIN:
 | `DOCKER_SOCKET_PATH` | `unix:///var/run/docker.sock` | Docker socket (Sprint 1) |
 | `CIVIFORM_IMAGE` | `civiform/civiform:latest` | CiviForm image to launch |
 | `SANDBOX_DB_HOST` | `host.docker.internal` | How CiviForm containers reach builder Postgres |
-| `APP_BASE_URL` | `http://localhost:9000` | Used in share links |
-| `DEMO_PORTAL_PASSWORD` | `demo` | Login password for the demo portal |
+| `APP_BASE_URL` | `http://localhost:9001` | Base URL used in share links and Auth0 redirects |
+| `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
+| `AUTH0_DOMAIN` | *(empty)* | Auth0 tenant domain (e.g. `civiform-sandbox-builder.us.auth0.com`) |
+| `AUTH0_CLIENT_ID` | *(empty)* | Auth0 application Client ID |
+| `AUTH0_CLIENT_SECRET` | *(empty)* | Auth0 application Client Secret |
+| `AUTH0_CALLBACK_URL` | `${APP_BASE_URL}/callback` | Override for the Auth0 OIDC callback URL |
 
 ---
 
