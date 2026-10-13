@@ -54,14 +54,9 @@ public class SandboxController extends Controller {
     this.formFactory = checkNotNull(formFactory);
   }
 
-  /** GET /sandboxes — list all sandboxes (JSON or HTML). Requires portal auth. */
+  /** GET /sandboxes — list all sandboxes (JSON or HTML). */
   @AddCSRFToken
   public CompletionStage<Result> index(Http.Request request) {
-    if (!AuthController.isAuthenticated(request)) {
-      return CompletableFuture.completedFuture(
-          redirect(controllers.routes.AuthController.login()));
-    }
-
     // If redirected from status poll with ?ready=<id>, look up the sandbox name
     // and surface a success flash: "<City> demo is live!"
     String readyId = request.getQueryString("ready");
@@ -165,8 +160,8 @@ public class SandboxController extends Controller {
 
   /**
    * GET /sandboxes/:id/status — HTMX partial: status badge only, no layout wrapper.
-   * Returns bare HTML that HTMX swaps in. Stops self-polling once RUNNING or FAILED.
-   * Auto-navigates to detail page when RUNNING.
+   * Returns bare HTML that HTMX swaps in. Stops self-polling once
+   * RUNNING or FAILED. Auto-navigates to detail page when RUNNING.
    */
   public CompletionStage<Result> statusFragment(Http.Request request, String id) {
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {

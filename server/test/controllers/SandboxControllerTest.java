@@ -62,6 +62,25 @@ public class SandboxControllerTest extends WithApplication {
   // ── POST /sandboxes — create sandbox ──────────────────────────────────────
 
   @Test
+  public void create_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Burlington, VT",
+                    "subdomain", "burlington-vt",
+                    "pin", "482917",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
   public void create_redirectsToDashboardListWithFlash() {
     SandboxInstance created = makeSandbox("sb-abc123", SandboxStatus.PROVISIONING);
     when(sandboxService.createSandbox(any(services.CreateSandboxRequest.class)))
@@ -71,6 +90,7 @@ public class SandboxControllerTest extends WithApplication {
         Helpers.fakeRequest()
             .method("POST")
             .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
             .bodyForm(
                 com.google.common.collect.ImmutableMap.of(
                     "cityName", "Burlington, VT",
@@ -96,6 +116,7 @@ public class SandboxControllerTest extends WithApplication {
         Helpers.fakeRequest()
             .method("POST")
             .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
             .bodyForm(
                 com.google.common.collect.ImmutableMap.of(
                     "cityName", "Portland, OR",
@@ -241,13 +262,27 @@ public class SandboxControllerTest extends WithApplication {
   // ── GET /sandboxes/:id/status — HTMX partial fragment ────────────────────
 
   @Test
+  public void statusFragment_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-status1/status");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
   public void statusFragment_returnsHtmlFragment_notFullPage() {
     SandboxInstance sandbox = makeSandbox("sb-status1", SandboxStatus.PROVISIONING);
     when(sandboxService.getSandbox("sb-status1"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     Http.RequestBuilder request =
-        Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-status1/status");
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/sb-status1/status")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -267,7 +302,10 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     Http.RequestBuilder request =
-        Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-status2/status");
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/sb-status2/status")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -285,7 +323,10 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     Http.RequestBuilder request =
-        Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-status3/status");
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/sb-status3/status")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -303,7 +344,10 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     Http.RequestBuilder request =
-        Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-status4/status");
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/sb-status4/status")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -321,7 +365,10 @@ public class SandboxControllerTest extends WithApplication {
           .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
       Http.RequestBuilder request =
-          Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-err/status");
+          Helpers.fakeRequest()
+              .method("GET")
+              .uri("/sandboxes/sb-err/status")
+              .session(AuthController.SESSION_KEY, "true");
 
       Result result = Helpers.route(app, request);
 
@@ -338,7 +385,10 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
     Http.RequestBuilder request =
-        Helpers.fakeRequest().method("GET").uri("/sandboxes/nonexistent/status");
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/nonexistent/status")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -348,12 +398,26 @@ public class SandboxControllerTest extends WithApplication {
   // ── GET /sandboxes/:id — detail page ─────────────────────────────────────
 
   @Test
+  public void show_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request = Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-show1");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
   public void show_existingSandbox_returns200WithHtml() {
     SandboxInstance sandbox = makeSandbox("sb-show1", SandboxStatus.RUNNING);
     when(sandboxService.getSandbox("sb-show1"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    Http.RequestBuilder request = Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-show1");
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/sb-show1")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
@@ -365,11 +429,39 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("nope"))
         .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
 
-    Http.RequestBuilder request = Helpers.fakeRequest().method("GET").uri("/sandboxes/nope");
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes/nope")
+            .session(AuthController.SESSION_KEY, "true");
 
     Result result = Helpers.route(app, request);
 
     assertThat(result.status()).isEqualTo(NOT_FOUND);
+  }
+
+  // ── POST /sandboxes/:id/delete & extend ───────────────────────────────────
+
+  @Test
+  public void delete_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest().method("POST").uri("/sandboxes/sb-del1/delete");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
+  public void extend_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest().method("POST").uri("/sandboxes/sb-ext1/extend");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
   }
 
   // ── GET /sandboxes/:id/access — PIN gate page ─────────────────────────────
