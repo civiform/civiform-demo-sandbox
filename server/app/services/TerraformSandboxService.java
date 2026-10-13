@@ -71,6 +71,7 @@ public class TerraformSandboxService implements SandboxService {
   private final SandboxRepository repository;
   private final TerraformCli terraform;
   private final Config config;
+  private final SeedingEngine seedingEngine;
 
   private final Path moduleDir;
   private final String stateBucket;
@@ -90,21 +91,23 @@ public class TerraformSandboxService implements SandboxService {
       new ConcurrentHashMap<>();
 
   @Inject
-  public TerraformSandboxService(SandboxRepository repository, Config config) {
+  public TerraformSandboxService(SandboxRepository repository, Config config, SeedingEngine seedingEngine) {
     this(
         repository,
         config,
         new TerraformCli(
             config.getString("sandbox.terraform.binary"),
-            Duration.ofMinutes(config.getInt("sandbox.terraform.timeoutMinutes"))));
+            Duration.ofMinutes(config.getInt("sandbox.terraform.timeoutMinutes"))),
+        seedingEngine);
   }
 
   /** Test seam: accepts a stubbed {@link TerraformCli} so no Terraform binary is required. */
   protected TerraformSandboxService(
-      SandboxRepository repository, Config config, TerraformCli terraform) {
+      SandboxRepository repository, Config config, TerraformCli terraform, SeedingEngine seedingEngine) {
     this.repository = checkNotNull(repository);
     this.config = checkNotNull(config);
     this.terraform = checkNotNull(terraform);
+    this.seedingEngine = checkNotNull(seedingEngine);
 
     this.moduleDir = Path.of(config.getString("sandbox.terraform.moduleDir"));
     this.stateBucket = config.getString("sandbox.terraform.stateBucket");
@@ -216,6 +219,19 @@ public class TerraformSandboxService implements SandboxService {
       // If a delete was requested while apply was running, leave DELETING in place —
       // the queued destroy runs next.
       if (!isDeleting(id)) {
+        // Seed demo programs
+        try {
+          SandboxInstance readyInstance = repository.findById(id).orElse(instance);
+          boolean seeded = seedingEngine.seedSandbox(readyInstance).toCompletableFuture().get();
+          if (seeded) {
+            log.info("[{}] Demo programs seeded successfully", id);
+          } else {
+            log.warn("[{}] Seeding returned false — sandbox will run without demo programs", id);
+          }
+        } catch (Exception e) {
+          log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
+        }
+
         repository.updateStatus(id, SandboxStatus.RUNNING);
         log.info("[{}] Status → RUNNING at {}", id, out.get("sandbox_url").asText());
       }

@@ -9,6 +9,7 @@ import play.Logger.ALogger;
 import services.DockerSandboxService;
 import services.SandboxRepository;
 import services.SandboxService;
+import services.SeedingEngine;
 import services.TerraformSandboxService;
 
 public class MainModule extends AbstractModule {
@@ -25,6 +26,7 @@ public class MainModule extends AbstractModule {
   @Override
   protected void configure() {
     bind(SandboxRepository.class).asEagerSingleton();
+    bind(SeedingEngine.class).asEagerSingleton();
     bind(SandboxService.class).to(sandboxServiceClass()).asEagerSingleton();
   }
 

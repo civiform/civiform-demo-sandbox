@@ -59,16 +59,18 @@ public class DockerSandboxService implements SandboxService {
   private final DockerClient dockerClient;
   private final String civiformImage;
   private final String dbHost;
+  private final SeedingEngine seedingEngine;
 
   /** Background thread pool for async provisioning (separate from Play HTTP pool). */
   private final Executor provisioningPool = Executors.newCachedThreadPool();
 
   @Inject
   public DockerSandboxService(
-      SandboxRepository repository, Database db, WSClient ws, Config config) {
+      SandboxRepository repository, Database db, WSClient ws, Config config, SeedingEngine seedingEngine) {
     this.repository = checkNotNull(repository);
     this.db = checkNotNull(db);
     this.ws = checkNotNull(ws);
+    this.seedingEngine = checkNotNull(seedingEngine);
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = buildDockerClient(config.getString("docker.socketPath"));
@@ -87,10 +89,12 @@ public class DockerSandboxService implements SandboxService {
       Database db,
       WSClient ws,
       Config config,
-      DockerClient dockerClient) {
+      DockerClient dockerClient,
+      SeedingEngine seedingEngine) {
     this.repository = checkNotNull(repository);
     this.db = checkNotNull(db);
     this.ws = checkNotNull(ws);
+    this.seedingEngine = checkNotNull(seedingEngine);
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = checkNotNull(dockerClient);
@@ -209,7 +213,19 @@ public class DockerSandboxService implements SandboxService {
 
             log.warn("Sandbox is available at http://localhost:{}", hostPort);
 
-            // 5. Mark RUNNING
+            // 5. Seed demo programs
+            try {
+              boolean seeded = seedingEngine.seedSandbox(instance).toCompletableFuture().get();
+              if (seeded) {
+                log.info("[{}] Demo programs seeded successfully", id);
+              } else {
+                log.warn("[{}] Seeding returned false — sandbox will run without demo programs", id);
+              }
+            } catch (Exception e) {
+              log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
+            }
+
+            // 6. Mark RUNNING
             repository.updateStatus(id, SandboxStatus.RUNNING);
             log.info("[{}] Status → RUNNING", id);
 

@@ -1,0 +1,150 @@
+{
+  "program": {
+    "adminName": "quick-relief-application",
+    "adminDescription": "A streamlined quick-application program designed for emergency utility relief and transit voucher subsidies.",
+    "externalLink": "",
+    "displayMode": "PUBLIC",
+    "programType": "DEFAULT",
+    "localizedName": {
+      "translations": {
+        "en_US": "Quick Relief Application"
+      }
+    },
+    "localizedDescription": {
+      "translations": {
+        "en_US": "Fast-track application for emergency utility bill assistance and transit vouchers. Most applicants complete this form in under 5 minutes."
+      }
+    },
+    "blockDefinitions": [
+      {
+        "id": 1,
+        "name": "Applicant Information",
+        "description": "Applicant Information",
+        "localizedName": {
+          "translations": {
+            "en_US": "Applicant Information"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "Please provide your details to apply for emergency relief"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "applicant_full_name",
+            "optional": false
+          },
+          {
+            "questionName": "applicant_contact_email",
+            "optional": false
+          },
+          {
+            "questionName": "relief_type",
+            "optional": false
+          },
+          {
+            "questionName": "monthly_income",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  },
+  "questions": [
+    {
+      "type": "text",
+      "config": {
+        "name": "applicant_full_name",
+        "description": "The applicant's full legal name",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your full legal name?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter your first and last name as they appear on your official ID."
+          }
+        }
+      }
+    },
+    {
+      "type": "email",
+      "config": {
+        "name": "applicant_contact_email",
+        "description": "The applicant's email address for notifications",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your email address?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "We will email you updates regarding your relief application."
+          }
+        }
+      }
+    },
+    {
+      "type": "radio_button",
+      "config": {
+        "name": "relief_type",
+        "description": "The type of emergency relief assistance requested",
+        "questionText": {
+          "translations": {
+            "en_US": "What type of relief do you need?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Select the assistance program that matches your immediate needs."
+          }
+        },
+        "options": [
+          {
+            "id": 1,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Emergency Utility Bill Assistance"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Transit Voucher"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Both"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "currency",
+      "config": {
+        "name": "monthly_income",
+        "description": "The applicant's total monthly household income",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your total monthly income?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter your estimated monthly income before taxes in US dollars."
+          }
+        }
+      }
+    }
+  ]
+}

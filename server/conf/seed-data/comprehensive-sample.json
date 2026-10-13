@@ -1,0 +1,470 @@
+{
+  "program": {
+    "adminName": "comprehensive-benefits-program",
+    "adminDescription": "A comprehensive multi-part assistance program providing support for healthcare, food assistance, and childcare subsidies.",
+    "externalLink": "",
+    "displayMode": "PUBLIC",
+    "programType": "DEFAULT",
+    "localizedName": {
+      "translations": {
+        "en_US": "Comprehensive Benefits Program"
+      }
+    },
+    "localizedDescription": {
+      "translations": {
+        "en_US": "Apply for healthcare coverage, food assistance (SNAP), and childcare subsidies — all in one application. CiviForm pre-fills shared fields so you only enter your information once."
+      }
+    },
+    "blockDefinitions": [
+      {
+        "id": 1,
+        "name": "Personal Information",
+        "description": "Personal Information",
+        "localizedName": {
+          "translations": {
+            "en_US": "Personal Information"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "Tell us about yourself"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "applicant_first_name",
+            "optional": false
+          },
+          {
+            "questionName": "applicant_last_name",
+            "optional": false
+          },
+          {
+            "questionName": "applicant_date_of_birth",
+            "optional": false
+          },
+          {
+            "questionName": "applicant_email",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "Contact & Address",
+        "description": "Contact & Address",
+        "localizedName": {
+          "translations": {
+            "en_US": "Contact & Address"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "How can we reach you and where do you live?"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "applicant_phone",
+            "optional": false
+          },
+          {
+            "questionName": "applicant_address",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "name": "Household & Income",
+        "description": "Household & Income",
+        "localizedName": {
+          "translations": {
+            "en_US": "Household & Income"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "Tell us about your household members and finances"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "household_size",
+            "optional": false
+          },
+          {
+            "questionName": "annual_household_income",
+            "optional": false
+          },
+          {
+            "questionName": "employment_status",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "Benefits Selection",
+        "description": "Benefits Selection",
+        "localizedName": {
+          "translations": {
+            "en_US": "Benefits Selection"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "Select the assistance programs you need"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "benefits_selection",
+            "optional": false
+          },
+          {
+            "questionName": "current_benefits",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "name": "Supporting Documents",
+        "description": "Supporting Documents",
+        "localizedName": {
+          "translations": {
+            "en_US": "Supporting Documents"
+          }
+        },
+        "localizedDescription": {
+          "translations": {
+            "en_US": "Upload documents to support your application"
+          }
+        },
+        "questionDefinitions": [
+          {
+            "questionName": "proof_of_income",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  },
+  "questions": [
+    {
+      "type": "text",
+      "config": {
+        "name": "applicant_first_name",
+        "description": "The applicant's legal first name",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your first name?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter your legal first name as it appears on your ID."
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "config": {
+        "name": "applicant_last_name",
+        "description": "The applicant's legal last name",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your last name?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter your legal last name as it appears on your ID."
+          }
+        }
+      }
+    },
+    {
+      "type": "date",
+      "config": {
+        "name": "applicant_date_of_birth",
+        "description": "The applicant's date of birth",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your date of birth?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Please enter your birth date (MM/DD/YYYY)."
+          }
+        }
+      }
+    },
+    {
+      "type": "email",
+      "config": {
+        "name": "applicant_email",
+        "description": "The applicant's email address",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your email address?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "We will send application updates and confirmation to this email."
+          }
+        }
+      }
+    },
+    {
+      "type": "phone",
+      "config": {
+        "name": "applicant_phone",
+        "description": "The applicant's primary phone number",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your primary phone number?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Include area code (e.g., (555) 123-4567)."
+          }
+        }
+      }
+    },
+    {
+      "type": "address",
+      "config": {
+        "name": "applicant_address",
+        "description": "The applicant's residential address",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your residential address?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter your current home address. P.O. boxes are not eligible for residency verification."
+          }
+        }
+      }
+    },
+    {
+      "type": "number",
+      "config": {
+        "name": "household_size",
+        "description": "Total number of people living in the household",
+        "questionText": {
+          "translations": {
+            "en_US": "How many people live in your household?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Include yourself, your spouse or partner, children, and any other dependents."
+          }
+        }
+      }
+    },
+    {
+      "type": "currency",
+      "config": {
+        "name": "annual_household_income",
+        "description": "Total gross annual income for all household members",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your total annual household income before taxes?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Enter the total combined yearly income for all household members in US dollars."
+          }
+        }
+      }
+    },
+    {
+      "type": "dropdown",
+      "config": {
+        "name": "employment_status",
+        "description": "Current employment status of the primary applicant",
+        "questionText": {
+          "translations": {
+            "en_US": "What is your current employment status?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Select the option that best describes your primary work situation."
+          }
+        },
+        "options": [
+          {
+            "id": 1,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Employed Full-Time"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Employed Part-Time"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Self-Employed"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Unemployed"
+              }
+            }
+          },
+          {
+            "id": 5,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Retired"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Student"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "checkbox",
+      "config": {
+        "name": "benefits_selection",
+        "description": "Specific assistance programs applicant is requesting",
+        "questionText": {
+          "translations": {
+            "en_US": "Which benefits are you applying for?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Select all programs that apply to your current needs."
+          }
+        },
+        "options": [
+          {
+            "id": 1,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Healthcare Coverage"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Food Assistance (SNAP)"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Childcare Subsidies"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Housing Assistance"
+              }
+            }
+          },
+          {
+            "id": 5,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Utility Assistance"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "radio_button",
+      "config": {
+        "name": "current_benefits",
+        "description": "Whether applicant currently receives government benefits",
+        "questionText": {
+          "translations": {
+            "en_US": "Do you currently receive any government benefits?"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Select Yes if anyone in your household is currently enrolled in a government assistance program."
+          }
+        },
+        "options": [
+          {
+            "id": 1,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "Yes"
+              }
+            }
+          },
+          {
+            "id": 2,
+            "localizedOptionText": {
+              "translations": {
+                "en_US": "No"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "fileupload",
+      "config": {
+        "name": "proof_of_income",
+        "description": "Proof of income documentation",
+        "questionText": {
+          "translations": {
+            "en_US": "Please upload proof of your income"
+          }
+        },
+        "questionHelpText": {
+          "translations": {
+            "en_US": "Accepted documents include recent pay stubs, W-2 forms, or tax returns (PDF, PNG, JPG)."
+          }
+        }
+      }
+    }
+  ]
+}

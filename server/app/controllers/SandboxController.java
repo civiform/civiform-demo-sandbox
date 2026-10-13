@@ -171,13 +171,17 @@ public class SandboxController extends Controller {
       SandboxInstance sandbox = maybeSandbox.get();
       String status = sandbox.getStatus().name();
       boolean isRunning = "RUNNING".equals(status);
+      boolean isSeeding = "SEEDING".equals(status);
       boolean isFailed  = "FAILED".equals(status) || "DELETE_FAILED".equals(status);
       boolean isDeleted = "DELETED".equals(status);
       boolean isDone    = isRunning || isFailed || isDeleted;
 
       String badgeClass = isRunning ? "cf-badge-active"
           : isFailed ? "cf-badge-error"
+          : isSeeding ? "cf-badge-seeding"
           : "cf-badge-pending";
+
+      String displayStatus = isSeeding ? "Loading demo programs..." : status;
 
       // When still provisioning, HTMX will replace this element every 3s
       String hxAttrs = isDone ? "" :
@@ -191,7 +195,7 @@ public class SandboxController extends Controller {
           : "";
 
       String html = "<span class=\"" + badgeClass + "\"" + hxAttrs + ">"
-          + status + "</span>" + redirectScript;
+          + displayStatus + "</span>" + redirectScript;
 
       return ok(html).as("text/html");
     });

@@ -2,6 +2,8 @@ package models;
 
 public enum SandboxStatus {
   PROVISIONING,
+  /** Container is healthy; demo programs are being loaded via the CiviForm admin API. */
+  SEEDING,
   RUNNING,
   STOPPED,
   FAILED,
