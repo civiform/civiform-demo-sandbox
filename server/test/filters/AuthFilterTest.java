@@ -36,6 +36,7 @@ public class AuthFilterTest extends WithApplication {
   public void isPublicEndpoint_allowsPublicPaths() {
     assertThat(AuthFilter.isPublicEndpoint("/login")).isTrue();
     assertThat(AuthFilter.isPublicEndpoint("/login/")).isTrue();
+    assertThat(AuthFilter.isPublicEndpoint("/login/auth0")).isTrue();
     assertThat(AuthFilter.isPublicEndpoint("/callback")).isTrue();
     assertThat(AuthFilter.isPublicEndpoint("/logout")).isTrue();
     assertThat(AuthFilter.isPublicEndpoint("/health")).isTrue();

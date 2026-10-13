@@ -24,7 +24,7 @@ public final class AuthFilter extends Filter {
 
   /** Exact paths that do not require portal authentication. */
   private static final ImmutableSet<String> PUBLIC_PATHS =
-      ImmutableSet.of("/login", "/callback", "/logout", "/health", "/ready");
+      ImmutableSet.of("/login", "/login/auth0", "/callback", "/logout", "/health", "/ready");
 
   /** Path prefixes that do not require portal authentication. */
   private static final ImmutableSet<String> PUBLIC_PREFIXES =

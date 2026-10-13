@@ -37,7 +37,7 @@ services:
       # works. Hardcoding a value here would override application.conf, since
       # `${?SANDBOX_RUNTIME}` is applied after the literal default.
       - SANDBOX_RUNTIME=${SANDBOX_RUNTIME:-docker}
-      - DEMO_PORTAL_PASSWORD
+      - DEMO_PORTAL_PASSWORD=${DEMO_PORTAL_PASSWORD:-demo}
       - AUTH0_DOMAIN
       - AUTH0_CLIENT_ID
       - AUTH0_CLIENT_SECRET
