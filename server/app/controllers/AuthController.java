@@ -28,7 +28,7 @@ import views.auth.LoginViewModel;
  */
 public final class AuthController extends Controller {
 
-  static final String SESSION_KEY = "portal_authed";
+  public static final String SESSION_KEY = "portal_authed";
   static final String ADMIN_EMAIL = "admin@civiform.dev";
 
   private final LoginView loginView;
@@ -91,7 +91,7 @@ public final class AuthController extends Controller {
   }
 
   /** Returns true if the request carries a valid portal session cookie. */
-  public static boolean isAuthenticated(Http.Request request) {
+  public static boolean isAuthenticated(Http.RequestHeader request) {
     return "true".equals(request.session().get(SESSION_KEY).orElse(null));
   }
 
