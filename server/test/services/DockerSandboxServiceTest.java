@@ -60,6 +60,7 @@ public class DockerSandboxServiceTest {
   private Database db;
   private WSClient ws;
   private DockerClient dockerClient;
+  private SeedingEngine seedingEngine;
   private Config config;
 
   // ── system under test (created fresh per test) ────────────────────────────
@@ -81,8 +82,9 @@ public class DockerSandboxServiceTest {
         Database db,
         WSClient ws,
         Config config,
-        DockerClient injectedDockerClient) {
-      super(repository, db, ws, config, injectedDockerClient);
+        DockerClient injectedDockerClient,
+        SeedingEngine seedingEngine) {
+      super(repository, db, ws, config, injectedDockerClient, seedingEngine);
     }
   }
 
@@ -92,6 +94,11 @@ public class DockerSandboxServiceTest {
     db = mock(Database.class);
     ws = mock(WSClient.class);
     dockerClient = mock(DockerClient.class);
+    seedingEngine = mock(SeedingEngine.class);
+
+    // Stub seeding to succeed by default (non-fatal, returns true)
+    when(seedingEngine.seedSandbox(any(SandboxInstance.class)))
+        .thenReturn(CompletableFuture.completedFuture(true));
 
     config =
         ConfigFactory.parseString(
@@ -105,7 +112,7 @@ public class DockerSandboxServiceTest {
     AtomicInteger portCounter = new AtomicInteger(10000);
     when(repository.nextPort()).thenAnswer(inv -> portCounter.getAndIncrement());
 
-    service = new DockerSandboxServiceTestable(repository, db, ws, config, dockerClient);
+    service = new DockerSandboxServiceTestable(repository, db, ws, config, dockerClient, seedingEngine);
   }
 
   // ── createSandbox() ────────────────────────────────────────────────────────
