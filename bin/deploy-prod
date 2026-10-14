@@ -1,0 +1,60 @@
+#! /usr/bin/env bash
+#
+# Builds the production cf-sandbox-builder Docker image, pushes it to the
+# platform ECR repository, and triggers a rolling deployment of the ECS service.
+#
+# Usage:
+#   ./bin/deploy-prod [IMAGE_TAG]
+#
+# Defaults:
+#   AWS_REGION: us-east-1
+#   IMAGE_TAG:  latest
+
+source bin/lib.sh
+
+REGION="${AWS_REGION:-us-east-1}"
+IMAGE_TAG="${1:-latest}"
+CLUSTER_NAME="${ECS_CLUSTER_NAME:-civiform-sandbox-cluster}"
+SERVICE_NAME="${ECS_SERVICE_NAME:-civiform-sandbox-builder}"
+
+for tool in aws docker; do
+  command -v "$tool" >/dev/null || {
+    echo "error: $tool is not installed or not on PATH" >&2
+    exit 1
+  }
+done
+
+ECR_URI="$(aws ecr describe-repositories \
+  --region "$REGION" \
+  --repository-names civiform-sandbox-builder \
+  --query 'repositories[0].repositoryUri' \
+  --output text)"
+
+if [[ -z "$ECR_URI" || "$ECR_URI" == "None" ]]; then
+  echo "error: ECR repository 'civiform-sandbox-builder' not found in ${REGION}." >&2
+  echo "       Run 'terraform -chdir=terraform apply' first." >&2
+  exit 1
+fi
+
+ECR_REGISTRY="${ECR_URI%%/*}"
+
+echo "1/4 Building production image (linux/amd64)..."
+docker build --platform linux/amd64 -t "${ECR_URI}:${IMAGE_TAG}" -f prod.Dockerfile .
+
+echo "2/4 Authenticating Docker with ECR (${ECR_REGISTRY})..."
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+echo "3/4 Pushing ${ECR_URI}:${IMAGE_TAG}..."
+docker push "${ECR_URI}:${IMAGE_TAG}"
+
+echo "4/4 Triggering ECS deployment on ${CLUSTER_NAME}/${SERVICE_NAME}..."
+aws ecs update-service \
+  --region "$REGION" \
+  --cluster "$CLUSTER_NAME" \
+  --service "$SERVICE_NAME" \
+  --force-new-deployment \
+  >/dev/null
+
+echo "Deployment initiated! Track status with:"
+echo "  aws ecs describe-services --region ${REGION} --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --query 'services[0].deployments'"

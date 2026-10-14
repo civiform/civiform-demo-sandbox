@@ -33,7 +33,7 @@ COPY --from=builder /cf-sandbox-builder-0.0.1 /cf-sandbox-builder-0.0.1
 
 RUN set -o pipefail && \
     apk update && \
-    apk add --no-cache bash curl unzip
+    apk add --no-cache bash curl git unzip
 
 # ── Terraform ─────────────────────────────────────────────────────────────────
 # Installed in the runner, not the builder stage: TerraformSandboxService shells

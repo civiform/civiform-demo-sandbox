@@ -98,6 +98,7 @@ public class DockerSandboxService implements SandboxService {
   }
 
   private void reconcileInterruptedOperations() {
+    this.repository.ensureSchemaInitialized();
     int recovered = this.repository.failInterruptedOperations();
     if (recovered > 0) {
       log.warn("Marked {} interrupted sandbox operation(s) as failed after restart", recovered);
