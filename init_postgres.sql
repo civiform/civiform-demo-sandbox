@@ -1,13 +1,18 @@
--- This script runs inside the sandbox_builder database (POSTGRES_DB=sandbox_builder).
--- The postgres user and sandbox_builder database are created by the Docker entrypoint
--- before this script runs. Statements below are idempotent.
+-- This script initializes the builder metadata database (run by the Docker Postgres entrypoint on
+-- fresh local volumes and by SandboxRepository.ensureSchemaInitialized() on every builder startup).
+-- Statements below must remain idempotent.
 
 -- ============================================================
 -- Harden the metadata database: revoke PUBLIC connect
--- The sandbox_builder database holds PINs and admin emails.
+-- The metadata database holds PINs and admin emails.
 -- Sandbox user credentials must not be able to connect to it.
+-- Dynamic SQL is used because the database is named sandbox_builder locally
+-- and civiform_sandbox on AWS RDS.
 -- ============================================================
-REVOKE CONNECT, TEMPORARY ON DATABASE sandbox_builder FROM PUBLIC;
+DO $$
+BEGIN
+  EXECUTE format('REVOKE CONNECT, TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
+END $$;
 
 -- ============================================================
 -- Port allocation sequence (atomic, thread-safe)

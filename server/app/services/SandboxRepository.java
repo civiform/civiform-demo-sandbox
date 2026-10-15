@@ -1,6 +1,11 @@
 package services;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -115,50 +120,33 @@ public class SandboxRepository {
   }
 
   /**
-   * Ensures the builder metadata schema (sequences, table, and partial unique index) exists.
+   * Ensures the builder metadata schema (sequences, table, and partial unique index) exists by
+   * executing {@code init_postgres.sql}.
    *
-   * <p>All statements use {@code IF NOT EXISTS} so this is idempotent and safe to run on every
-   * startup. Running it here means a fresh RDS database in AWS needs no manual {@code psql -f
-   * init_postgres.sql} bootstrap step or bastion tunnel before the builder can boot.
+   * <p>All statements in {@code init_postgres.sql} are idempotent ({@code IF NOT EXISTS}) so this
+   * is safe to run on every startup. Running it here means a fresh RDS database in AWS needs no
+   * manual {@code psql -f init_postgres.sql} bootstrap step or bastion tunnel before the builder
+   * can boot.
    */
   public void ensureSchemaInitialized() {
+    String sql = loadInitPostgresSql();
     db.withConnection(conn -> {
       try (java.sql.Statement st = conn.createStatement()) {
-        st.execute(
-            "CREATE SEQUENCE IF NOT EXISTS sandbox_port_seq "
-                + "START 10000 INCREMENT 1 MINVALUE 10000 MAXVALUE 11000 CYCLE");
-        st.execute(
-            "CREATE SEQUENCE IF NOT EXISTS sandbox_listener_priority_seq "
-                + "START 1000 INCREMENT 1 MINVALUE 1000 MAXVALUE 50000 NO CYCLE");
-        st.execute(
-            "CREATE TABLE IF NOT EXISTS sandbox_instances ("
-                + "id VARCHAR(64) PRIMARY KEY, "
-                + "city_name VARCHAR(255) NOT NULL, "
-                + "subdomain VARCHAR(63), "
-                + "civiform_version VARCHAR(64) NOT NULL DEFAULT 'latest', "
-                + "status VARCHAR(32) NOT NULL DEFAULT 'PROVISIONING', "
-                + "url VARCHAR(512) NOT NULL DEFAULT '', "
-                + "admin_email VARCHAR(255) NOT NULL DEFAULT '', "
-                + "pin VARCHAR(6) NOT NULL, "
-                + "container_id VARCHAR(128), "
-                + "host_port INTEGER NOT NULL, "
-                + "database_name VARCHAR(128) NOT NULL, "
-                + "target_group_arn VARCHAR(512), "
-                + "listener_rule_arn VARCHAR(512), "
-                + "listener_priority INTEGER, "
-                + "google_analytics_id VARCHAR(64), "
-                + "google_analytics_url VARCHAR(512), "
-                + "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), "
-                + "expires_at TIMESTAMPTZ NOT NULL, "
-                + "deleted_at TIMESTAMPTZ"
-                + ")");
-        st.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS sandbox_instances_subdomain_live_idx "
-                + "ON sandbox_instances (subdomain) "
-                + "WHERE deleted_at IS NULL AND subdomain IS NOT NULL");
+        st.execute(sql);
       }
       return null;
     });
+  }
+
+  static String loadInitPostgresSql() {
+    try (InputStream in = SandboxRepository.class.getResourceAsStream("/init_postgres.sql")) {
+      if (in != null) {
+        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+      }
+      return Files.readString(Path.of("../init_postgres.sql"), StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to load init_postgres.sql", e);
+    }
   }
 
   /**

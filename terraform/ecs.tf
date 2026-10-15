@@ -647,6 +647,8 @@ resource "aws_ecs_service" "builder" {
   task_definition = aws_ecs_task_definition.builder.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent = 100
 
   # Allow Terraform apply to finish before the first Docker image is pushed to ECR.
   wait_for_steady_state = false
