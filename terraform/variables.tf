@@ -62,3 +62,34 @@ variable "state_bucket_name" {
   default     = "civiform-sandbox-tfstate"
 }
 
+variable "builder_image_tag" {
+  description = "Image tag in the builder ECR repository to deploy"
+  type        = string
+  default     = "latest"
+}
+
+variable "builder_task_cpu" {
+  description = "CPU units for the cf-sandbox-builder ECS task (1024 = 1 vCPU)"
+  type        = number
+  default     = 1024
+}
+
+variable "builder_task_memory" {
+  description = "Memory (MB) for the cf-sandbox-builder ECS task"
+  type        = number
+  default     = 2048
+}
+
+variable "auth0_domain" {
+  description = "Auth0 tenant domain for portal OIDC login"
+  type        = string
+  default     = "civiform-sandbox-builder.us.auth0.com"
+}
+
+variable "auth0_client_id" {
+  description = "Auth0 application Client ID for portal OIDC login"
+  type        = string
+  default     = ""
+}
+
+

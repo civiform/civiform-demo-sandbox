@@ -2,6 +2,7 @@ services:
   builder:
     volumes:
       - ./server:/usr/src/server
+      - ./init_postgres.sql:/usr/src/init_postgres.sql:ro
       # Read-only: the service copies the root module to a temp dir per job and
       # never runs Terraform in place. Mounting it means SANDBOX_RUNTIME can be
       # flipped to "terraform" locally without rebuilding the image.

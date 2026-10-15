@@ -1,5 +1,5 @@
 # cf-sandbox-builder — Deployment HOWTO
-_For Exygy BD leads and conference presenters_
+_For Exygy BD leads, engineers, and conference presenters_
 
 ---
 
@@ -32,15 +32,15 @@ Wait ~60 seconds for the Play server to compile and start. Then open:
 
 > **http://localhost:9001**
 
-That's it — the portal is running.
+Log in with `admin@civiform.dev` and password `demo` (or your configured `DEMO_PORTAL_PASSWORD`).
 
 ### Creating a demo sandbox (local)
 
 1. Go to **http://localhost:9001**
 2. Click **"Create new demo"**
 3. Fill in the 3-step wizard — city name, subdomain, PIN
-4. Click **"Provision demo"**
-5. A CiviForm container starts locally. It'll show **PROVISIONING** then **ACTIVE** in ~2 minutes.
+4. Click **"Create"**
+5. A CiviForm container starts locally. It'll show **PROVISIONING** then **RUNNING** in ~2 minutes.
 6. Share the URL (`http://localhost:{port}`) and PIN with your prospect
 
 > ⚠️ **Local caveat**: the sandbox URL is `localhost:{port}` — only accessible on your machine.
@@ -61,79 +61,97 @@ That's it — the portal is running.
 
 ---
 
-## Option B — Deploy to AWS (Shareable Demo URL)
+## Option B — Deploy to AWS (`sandbox.civiform.dev`)
 
-Use this for real prospect demos. Each sandbox gets a public URL:
-`https://{city}.sandbox.civiform.dev`
+In AWS, both the **Builder Portal** (`https://sandbox.civiform.dev`) and all provisioned **Demo Sandboxes** (`https://{city}.sandbox.civiform.dev`) run on AWS ECS Fargate behind a single shared Application Load Balancer and shared RDS PostgreSQL instance.
 
 ### Prerequisites
 
-You need:
-1. **AWS credentials** — ask Rocky (`rocky@exygy.com`) for access to the Exygy sandbox AWS account
-2. **Terraform** — `brew install terraform` (Mac) or https://developer.hashicorp.com/terraform/install
-3. **AWS CLI** — `brew install awscli` + `aws configure` with your credentials
-4. The repo cloned locally (same as Option A step 1)
+1. **AWS credentials** — access to the Exygy sandbox AWS account (`aws configure` or `aws sso login`)
+2. **Terraform >= 1.10** — `brew install terraform` or https://developer.hashicorp.com/terraform/install
+3. **AWS CLI v2** & **Docker** installed locally
 
-### First-time infrastructure setup (do once)
+### Step 1: Bootstrap the Terraform State Bucket (One-Time per AWS Account)
 
-```bash
-cd terraform
-
-# Initialize Terraform
-terraform init
-
-# Preview what will be created (safe — no changes yet)
-terraform plan
-
-# Create the AWS infrastructure (~5 min)
-terraform apply
-```
-
-When `terraform apply` finishes, copy the outputs:
+The platform stack and every sandbox store their Terraform state in a shared, KMS-encrypted S3 bucket (`civiform-sandbox-tfstate`). Create it once:
 
 ```bash
-terraform output
+terraform -chdir=terraform/bootstrap init
+terraform -chdir=terraform/bootstrap apply
 ```
 
-You'll see values like:
-```
-alb_dns_name              = "civiform-sandbox-alb-xxxx.us-east-1.elb.amazonaws.com"
-alb_https_listener_arn    = "arn:aws:elasticloadbalancing:..."
-ecs_cluster_arn           = "arn:aws:ecs:..."
-rds_endpoint              = "civiform-sandbox.xxxx.us-east-1.rds.amazonaws.com"
-acm_validation_records    = { ... }  ← send these to Rocky for DNS
-```
+### Step 2: Provision the Platform & Builder Service Infrastructure
 
-**Send Rocky:**
-1. The `alb_dns_name` value → he creates `*.sandbox.civiform.dev → CNAME → <that value>`
-2. The `acm_validation_records` → he adds the CNAME for SSL cert validation
-
-After Rocky adds the DNS records, the wildcard cert goes active in ~5 min.
-
-### Configure the builder app
-
-Copy `.env.example` to `.env` and fill in the Terraform output values:
+Initialize the main `terraform/` stack against the state bucket and apply it (pass your Auth0 tenant domain and Client ID so Auth0 OIDC login is enabled on the portal):
 
 ```bash
-cp .env.example .env
-# Edit .env — fill in SANDBOX_VPC_ID, ALB_LISTENER_ARN, ECS_CLUSTER, ECS_SUBNETS,
-#             ECS_SECURITY_GROUP, ECS_EXECUTION_ROLE_ARN, ECS_TASK_ROLE_ARN, RDS_HOST
+terraform -chdir=terraform init \
+  -backend-config="bucket=civiform-sandbox-tfstate" \
+  -backend-config="key=sandbox/terraform.tfstate" \
+  -backend-config="region=us-east-1" \
+  -backend-config="use_lockfile=true"
+
+terraform -chdir=terraform apply \
+  -var="auth0_domain=civiform-sandbox-builder.us.auth0.com" \
+  -var="auth0_client_id=<YOUR_AUTH0_CLIENT_ID>"
 ```
 
-### Run the builder pointed at AWS
-
-You can run the builder portal locally while sandboxes deploy to AWS:
+When `terraform apply` finishes, inspect the outputs:
 
 ```bash
-# In .env, set:
-SANDBOX_RUNTIME=fargate
+terraform -chdir=terraform output
+```
 
-# Then start as normal:
+### Step 3: Configure Cloudflare DNS & Auth0 (One-Time)
+
+1. **Cloudflare DNS (`civiform.dev` zone)**:
+   - **ACM Certificate Validation**: Add the CNAME record shown in `terraform -chdir=terraform output acm_validation_records` (set Proxy status to **DNS Only / grey cloud**).
+   - **Builder Portal**: Add `CNAME` `sandbox.civiform.dev` → `<alb_dns_name>`.
+   - **Sandbox Wildcard**: Add `CNAME` `*.sandbox.civiform.dev` → `<alb_dns_name>`.
+   - Once the validation CNAME is live, AWS ACM automatically issues the certificate covering both `sandbox.civiform.dev` and `*.sandbox.civiform.dev` within ~5 minutes.
+
+2. **Auth0 Client Secret & Callback URLs**:
+   - Store the Auth0 Client Secret in AWS Secrets Manager:
+     ```bash
+     aws secretsmanager put-secret-value \
+       --region us-east-1 \
+       --secret-id civiform-sandbox/auth0-client-secret \
+       --secret-string "<YOUR_AUTH0_CLIENT_SECRET>"
+     ```
+   - In the Auth0 Dashboard (`civiform-sandbox-builder` tenant):
+     - **Allowed Callback URLs**: `https://sandbox.civiform.dev/callback`
+     - **Allowed Logout URLs**: `https://sandbox.civiform.dev/login`
+
+### Step 4: Build & Deploy the Builder Image to ECS
+
+Run the deployment script to build `prod.Dockerfile`, push to the ECR repository, and roll out the `civiform-sandbox-builder` ECS service:
+
+```bash
+./bin/deploy-prod
+```
+
+On first boot, `cf-sandbox-builder` automatically initializes its Postgres tables and sequences in RDS and starts serving at **https://sandbox.civiform.dev** — no RDS bastion or manual SQL migration is required.
+
+---
+
+## Option C — Hybrid Development (Run Portal Locally, Provision Sandboxes to AWS)
+
+If you are developing locally and want your local portal (`http://localhost:9001`) to provision sandboxes onto the AWS cluster, RDS is in a private subnet and requires an SSM tunnel:
+
+```bash
+# 1. Generate the local platform outputs file once
+terraform -chdir=terraform output -json > terraform/platform-outputs.json
+
+# 2. In terminal 1: start the SSM port-forward + Docker bridge relay (requires a running bastion)
+./bin/rds-tunnel
+
+# 3. In terminal 2: start the local builder pointed at AWS
+export SANDBOX_RUNTIME=terraform
+export RDS_ADMIN_HOST=host.docker.internal
+export RDS_ADMIN_PORT=15432
+export RDS_ADMIN_PASSWORD=$(./bin/rds-password)
 ./bin/run-dev
 ```
-
-Go to **http://localhost:9001** — create a sandbox — it provisions on AWS Fargate.
-The URL the prospect visits will be `https://{subdomain}.sandbox.civiform.dev`.
 
 ---
 
@@ -149,7 +167,8 @@ docker rm -f <id>       # remove them
 
 ### Builder portal won't start
 ```bash
-docker compose logs -f builder   # check for Java compile errors
+docker compose logs -f builder   # check for Java compile errors (local)
+aws logs tail /ecs/civiform-sandbox-builder --follow --region us-east-1  # (AWS)
 ```
 
 ### Reset everything and start fresh (local)
@@ -160,7 +179,7 @@ docker compose down -v   # wipes the database volume
 
 ### Sandbox stuck in PROVISIONING
 - **Local**: run `docker ps` — the CiviForm container should appear within 30s
-- **AWS**: open the AWS Console → ECS → cluster `civiform-sandbox-cluster` → Tasks tab
+- **AWS**: check builder logs (`aws logs tail /ecs/civiform-sandbox-builder --follow`) or open AWS Console → ECS → cluster `civiform-sandbox-cluster` → Tasks tab
 
 ---
 
@@ -168,22 +187,11 @@ docker compose down -v   # wipes the database volume
 
 | What | Where |
 |---|---|
+| Portal (AWS) | https://sandbox.civiform.dev |
 | Portal (local) | http://localhost:9001 |
-| Portal health check | http://localhost:9001/health |
-| Logs | `docker compose logs -f builder` |
-| Stop everything | `./bin/stop-dev` |
-| AWS Console | https://console.aws.amazon.com |
+| Portal health check | https://sandbox.civiform.dev/health |
+| Builder logs (AWS) | `aws logs tail /ecs/civiform-sandbox-builder --follow` |
+| Sandbox logs (AWS) | `aws logs tail /ecs/civiform-sandbox --follow` |
+| Deploy new builder release | `./bin/deploy-prod` |
 | Rocky (AWS / DNS access) | rocky@exygy.com |
 | Lesley (questions) | lkatzen@exygy.com |
-
----
-
-## What the demo shows (once a sandbox is running)
-
-Prospects land on the sandbox URL, enter the PIN, and see:
-
-- 🏷️ **Persistent demo banner** — "Burlington, VT — Demo Environment — 30 days remaining"
-- 🔄 **Role switcher** — toggle between [Resident Applicant] / [CiviForm Admin] / [Program Admin]
-- 📋 **Pre-loaded programs** — housing, utility relief, food assistance with predicate rules
-- 📊 **ROI benchmarks panel** — 75% application completion time reduction
-- 📥 **Export Program Schema (JSON)** — for city IT leads to carry config into production

@@ -111,9 +111,9 @@ public class TerraformSandboxService implements SandboxService {
     this.awsRegion = config.getString("sandbox.aws.region");
     this.civiformImageTag = config.getString("sandbox.terraform.civiformImageTag");
 
-    this.platformOutputs =
-        loadPlatformOutputs(config.getString("sandbox.terraform.platformOutputsFile"));
+    this.platformOutputs = loadPlatformOutputs(config);
 
+    this.repository.ensureSchemaInitialized();
     int recovered = this.repository.failInterruptedOperations();
     if (recovered > 0) {
       log.warn("Marked {} interrupted sandbox operation(s) as failed after restart", recovered);
@@ -459,23 +459,34 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   /**
-   * Loads the platform stack's outputs from a JSON file.
+   * Loads the platform stack's outputs from inline JSON ({@code
+   * sandbox.terraform.platformOutputsJson}) when present, falling back to the file path in {@code
+   * sandbox.terraform.platformOutputsFile}.
    *
-   * <p>A file produced by {@code terraform output -json}, rather than a dozen individual
-   * configuration keys. The values are already published as Terraform outputs, so copying them into
-   * configuration by hand would create a second source of truth that silently drifts the first time
-   * the platform stack is reapplied.
+   * <p>Accepts both Terraform's {@code {value, type, sensitive}} envelope (produced by {@code
+   * terraform output -json}) and a flat {@code {key: value}} object (convenient when injected by
+   * the platform Terraform stack into the builder ECS task definition).
    */
-  private static Map<String, JsonNode> loadPlatformOutputs(String path) {
+  private static Map<String, JsonNode> loadPlatformOutputs(Config config) {
+    String inlineJson =
+        config.hasPath("sandbox.terraform.platformOutputsJson")
+            ? config.getString("sandbox.terraform.platformOutputsJson").trim()
+            : "";
+
+    if (!inlineJson.isEmpty()) {
+      try {
+        return parsePlatformOutputsJson(inlineJson);
+      } catch (IOException e) {
+        throw new IllegalStateException(
+            "Could not parse inline platform outputs from sandbox.terraform.platformOutputsJson",
+            e);
+      }
+    }
+
+    String path = config.getString("sandbox.terraform.platformOutputsFile");
     try {
-      JsonNode root =
-          new ObjectMapper().readTree(Files.readString(Path.of(path), StandardCharsets.UTF_8));
-
-      Map<String, JsonNode> outputs = new java.util.LinkedHashMap<>();
-      // Unwrap Terraform's {value, type, sensitive} envelope.
-      root.fields().forEachRemaining(e -> outputs.put(e.getKey(), e.getValue().get("value")));
-      return outputs;
-
+      String raw = Files.readString(Path.of(path), StandardCharsets.UTF_8);
+      return parsePlatformOutputsJson(raw);
     } catch (IOException e) {
       throw new IllegalStateException(
           "Could not read platform outputs from "
@@ -484,6 +495,22 @@ public class TerraformSandboxService implements SandboxService {
               + path,
           e);
     }
+  }
+
+  private static Map<String, JsonNode> parsePlatformOutputsJson(String rawJson) throws IOException {
+    JsonNode root = new ObjectMapper().readTree(rawJson);
+    Map<String, JsonNode> outputs = new java.util.LinkedHashMap<>();
+    root.fields()
+        .forEachRemaining(
+            e -> {
+              JsonNode node = e.getValue();
+              // Unwrap Terraform's {value, type, sensitive} envelope when present;
+              // otherwise use the bare value directly.
+              JsonNode unwrapped =
+                  node != null && node.isObject() && node.has("value") ? node.get("value") : node;
+              outputs.put(e.getKey(), unwrapped);
+            });
+    return outputs;
   }
 
   // ---------------------------------------------------------------------------

@@ -1,11 +1,12 @@
 # ── ACM Wildcard Certificate ───────────────────────────────────────────────────
-# Single wildcard cert covers ALL sandbox subdomains: *.sandbox.civiform.dev
-# One cert, reused for every sandbox — no per-sandbox cert requests.
-# DNS validation CNAME must be added to the civiform.dev zone by Rocky / DNS owner.
+# Single certificate covers both the builder portal (sandbox.civiform.dev) and
+# all sandbox subdomains (*.sandbox.civiform.dev).
+# DNS validation CNAME must be added to the civiform.dev zone in Cloudflare.
 
 resource "aws_acm_certificate" "wildcard" {
-  domain_name       = "*.${var.domain}"
-  validation_method = "DNS"
+  domain_name               = "*.${var.domain}"
+  subject_alternative_names = [var.domain]
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
@@ -26,8 +27,9 @@ output "acm_validation_records" {
 }
 
 # ── Application Load Balancer ──────────────────────────────────────────────────
-# Single shared ALB. Per-sandbox routing via host-header listener rules.
-# EcsFargateSandboxService creates/deletes listener rules dynamically in Java.
+# Single shared ALB. Routes:
+#   - Host: sandbox.civiform.dev   → cf-sandbox-builder service (priority 100)
+#   - Host: *.sandbox.civiform.dev → per-sandbox target groups (priorities 1000–50000)
 
 resource "aws_lb" "sandbox" {
   name               = "civiform-sandbox-alb"
@@ -40,7 +42,7 @@ resource "aws_lb" "sandbox" {
   tags                       = { Name = "civiform-sandbox-alb" }
 }
 
-# HTTP → HTTPS redirect (applies to all subdomains)
+# HTTP → HTTPS redirect (applies to the portal and all sandbox subdomains)
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.sandbox.arn
   port              = 80
@@ -58,7 +60,7 @@ resource "aws_lb_listener" "http" {
 
 # HTTPS listener — default action returns 404 for unknown subdomains.
 # Per-sandbox listener rules (host-header → target group) are created by
-# EcsFargateSandboxService.registerListenerRule() at provision time.
+# TerraformSandboxService at provision time.
 resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.sandbox.arn
   port              = 443
@@ -77,10 +79,55 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+# ── Builder Portal Target Group & Listener Rule ────────────────────────────────
+# Routes https://sandbox.civiform.dev to the cf-sandbox-builder ECS service.
+# Priority 100 sits well below the 1000–50000 range allocated by
+# sandbox_listener_priority_seq for individual sandboxes.
+
+resource "aws_lb_target_group" "builder" {
+  name        = "civiform-sandbox-builder-tg"
+  port        = 9000
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.sandbox.id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 15
+    matcher             = "200"
+  }
+
+  tags = { Name = "civiform-sandbox-builder-tg" }
+}
+
+resource "aws_lb_listener_rule" "builder" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.builder.arn
+  }
+
+  condition {
+    host_header {
+      values = [var.domain]
+    }
+  }
+
+  tags = { Name = "civiform-sandbox-builder-rule" }
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "alb_dns_name" {
-  description = "ALB DNS name — create a wildcard Route53/Cloudflare CNAME: *.sandbox.civiform.dev → this value"
+  description = "ALB DNS name — create Cloudflare CNAMEs for sandbox.civiform.dev and *.sandbox.civiform.dev → this value"
   value       = aws_lb.sandbox.dns_name
 }
 

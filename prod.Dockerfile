@@ -18,6 +18,7 @@ ENV PROJECT_HOME=/usr/src
 ENV PROJECT_NAME=server
 ENV PROJECT_LOC="${PROJECT_HOME}/${PROJECT_NAME}"
 
+COPY init_postgres.sql "${PROJECT_HOME}/init_postgres.sql"
 COPY "${PROJECT_NAME}" "${PROJECT_LOC}"
 WORKDIR "${PROJECT_LOC}"
 
@@ -33,7 +34,7 @@ COPY --from=builder /cf-sandbox-builder-0.0.1 /cf-sandbox-builder-0.0.1
 
 RUN set -o pipefail && \
     apk update && \
-    apk add --no-cache bash curl unzip
+    apk add --no-cache bash curl git unzip
 
 # ── Terraform ─────────────────────────────────────────────────────────────────
 # Installed in the runner, not the builder stage: TerraformSandboxService shells

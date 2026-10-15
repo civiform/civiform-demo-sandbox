@@ -1,6 +1,11 @@
 package services;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -112,6 +117,36 @@ public class SandboxRepository {
       }
       return null;
     });
+  }
+
+  /**
+   * Ensures the builder metadata schema (sequences, table, and partial unique index) exists by
+   * executing {@code init_postgres.sql}.
+   *
+   * <p>All statements in {@code init_postgres.sql} are idempotent ({@code IF NOT EXISTS}) so this
+   * is safe to run on every startup. Running it here means a fresh RDS database in AWS needs no
+   * manual {@code psql -f init_postgres.sql} bootstrap step or bastion tunnel before the builder
+   * can boot.
+   */
+  public void ensureSchemaInitialized() {
+    String sql = loadInitPostgresSql();
+    db.withConnection(conn -> {
+      try (java.sql.Statement st = conn.createStatement()) {
+        st.execute(sql);
+      }
+      return null;
+    });
+  }
+
+  static String loadInitPostgresSql() {
+    try (InputStream in = SandboxRepository.class.getResourceAsStream("/init_postgres.sql")) {
+      if (in != null) {
+        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+      }
+      return Files.readString(Path.of("../init_postgres.sql"), StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to load init_postgres.sql", e);
+    }
   }
 
   /**

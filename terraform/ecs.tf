@@ -49,6 +49,31 @@ data "aws_kms_key" "tfstate" {
 
 data "aws_caller_identity" "current" {}
 
+# Account-level S3 Block Public Access.
+#
+# Each sandbox creates two buckets in `terraform/sandbox/filestorage.tf`:
+#   1. `civiform-sb-files-*`  — private (`block_public_policy = true` on the bucket)
+#   2. `civiform-sb-public-*` — serves program summary images (`block_public_policy = false`
+#      on the bucket, with a bucket policy granting public `s3:GetObject` to
+#      `/program-summary-image/program-*` only)
+#
+# AWS enables account-wide `block_public_policy = true` by default in new
+# accounts, which overrides per-bucket settings and causes `s3:PutBucketPolicy`
+# on `civiform-sb-public-*` to fail with 403 AccessDenied ("public policies are
+# prevented by the BlockPublicPolicy setting in S3 Block Public Access").
+#
+# Relaxing `block_public_policy` and `restrict_public_buckets` at the account
+# level delegates the check to each bucket's own `aws_s3_bucket_public_access_block`
+# (which remains `true` on `civiform-sb-files-*` and `civiform-sandbox-tfstate`).
+resource "aws_s3_account_public_access_block" "sandbox_account" {
+  account_id = data.aws_caller_identity.current.account_id
+
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = false
+  restrict_public_buckets = false
+}
+
 # Builder Service Role — what cf-sandbox-builder needs to run `terraform apply`
 # against terraform/sandbox, plus create and drop per-sandbox databases.
 #
@@ -174,22 +199,67 @@ module "sandbox_builder_role" {
         Resource = "*"
       },
       {
-        # Mutating security group calls, confined to the sandbox VPC so the
-        # builder cannot touch security groups anywhere else in the account.
+        # Mutating security group calls.
+        #
+        # NOTE: ec2:CreateSecurityGroup evaluates authorization against BOTH the
+        # vpc/* resource and the new security-group/* resource. Neither resource
+        # populates the `ec2:Vpc` condition key at creation time (the VPC ARN is
+        # the resource itself, and the security group does not exist yet).
+        #
+        # Scoping the vpc/* resource to `aws_vpc.sandbox.arn` already confines
+        # `CreateSecurityGroup` to the sandbox VPC — EC2 requires permission on
+        # BOTH resources for the call to succeed, so a call specifying any other
+        # VPC ID will fail on the vpc/* check.
+        #
+        # Existing security group mutations (Delete, Authorize/Revoke rules) DO
+        # populate `ec2:Vpc` on `security-group/*` and are conditioned on it.
+        Sid    = "Ec2CreateSecurityGroupInSandboxVpc"
+        Effect = "Allow"
+        Action = ["ec2:CreateSecurityGroup"]
+        Resource = [
+          aws_vpc.sandbox.arn,
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/*",
+        ]
+      },
+      {
         Sid    = "Ec2SecurityGroupsInSandboxVpc"
         Effect = "Allow"
         Action = [
-          "ec2:CreateSecurityGroup",
           "ec2:DeleteSecurityGroup",
           "ec2:AuthorizeSecurityGroupIngress",
           "ec2:AuthorizeSecurityGroupEgress",
           "ec2:RevokeSecurityGroupIngress",
           "ec2:RevokeSecurityGroupEgress",
+          "ec2:ModifySecurityGroupRules",
+          "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
+          "ec2:UpdateSecurityGroupRuleDescriptionsEgress",
           "ec2:CreateTags",
+          "ec2:DeleteTags",
         ]
-        Resource = "*"
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/*",
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group-rule/*",
+        ]
         Condition = {
-          StringEquals = { "ec2:Vpc" = aws_vpc.sandbox.arn }
+          StringEqualsIfExists = { "ec2:Vpc" = aws_vpc.sandbox.arn }
+        }
+      },
+      {
+        Sid    = "Ec2TagOnCreateSecurityGroup"
+        Effect = "Allow"
+        Action = ["ec2:CreateTags"]
+        Resource = [
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group/*",
+          "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:security-group-rule/*",
+        ]
+        Condition = {
+          StringEquals = {
+            "ec2:CreateAction" = [
+              "CreateSecurityGroup",
+              "AuthorizeSecurityGroupIngress",
+              "AuthorizeSecurityGroupEgress",
+            ]
+          }
         }
       },
       {
@@ -204,9 +274,12 @@ module "sandbox_builder_role" {
           "iam:CreateRole",
           "iam:DeleteRole",
           "iam:GetRole",
+          "iam:UpdateRole",
           "iam:TagRole",
+          "iam:UntagRole",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
           "iam:CreatePolicy",
           "iam:DeletePolicy",
           "iam:GetPolicy",
@@ -214,6 +287,8 @@ module "sandbox_builder_role" {
           "iam:ListPolicyVersions",
           "iam:CreatePolicyVersion",
           "iam:DeletePolicyVersion",
+          "iam:TagPolicy",
+          "iam:UntagPolicy",
           "iam:AttachRolePolicy",
           "iam:DetachRolePolicy",
         ]
@@ -250,9 +325,14 @@ module "sandbox_builder_role" {
         Action = [
           "secretsmanager:CreateSecret",
           "secretsmanager:DeleteSecret",
+          "secretsmanager:UpdateSecret",
           "secretsmanager:PutSecretValue",
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:PutResourcePolicy",
+          "secretsmanager:DeleteResourcePolicy",
+          "secretsmanager:ListSecretVersionIds",
           "secretsmanager:TagResource",
           "secretsmanager:UntagResource",
         ]
@@ -289,9 +369,15 @@ module "sandbox_builder_role" {
           "application-autoscaling:DeleteScalingPolicy",
           "application-autoscaling:DescribeScalingPolicies",
           "application-autoscaling:ListTagsForResource",
+          "application-autoscaling:TagResource",
+          "application-autoscaling:UntagResource",
           "cloudwatch:PutMetricAlarm",
           "cloudwatch:DeleteAlarms",
           "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "cloudwatch:TagResource",
+          "cloudwatch:UntagResource",
+          "iam:CreateServiceLinkedRole",
         ]
         Resource = "*"
       },
@@ -339,6 +425,251 @@ module "sandbox_builder_role" {
 #
 # Until then this role should live in an account dedicated to sandboxes.
 
+# ── Builder Application (cf-sandbox-builder) ──────────────────────────────────
+# Runs the generator portal itself on the shared cluster at https://sandbox.civiform.dev.
+
+resource "aws_ecr_repository" "builder" {
+  name                 = "civiform-sandbox-builder"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = { Name = "civiform-sandbox-builder" }
+}
+
+resource "aws_ecr_lifecycle_policy" "builder" {
+  repository = aws_ecr_repository.builder.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep the last 10 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_cloudwatch_log_group" "builder" {
+  name              = "/ecs/civiform-sandbox-builder"
+  retention_in_days = 30
+  tags              = { Name = "civiform-sandbox-builder-logs" }
+}
+
+# Play session signing secret (APPLICATION_SECRET)
+resource "random_password" "builder_app_secret" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "builder_app_secret" {
+  name                    = "civiform-sandbox/builder-app-secret"
+  description             = "Play APPLICATION_SECRET for cf-sandbox-builder"
+  kms_key_id              = aws_kms_key.sandbox_secrets.arn
+  recovery_window_in_days = 0
+  tags                    = { Name = "civiform-sandbox-builder-app-secret" }
+}
+
+resource "aws_secretsmanager_secret_version" "builder_app_secret" {
+  secret_id     = aws_secretsmanager_secret.builder_app_secret.id
+  secret_string = random_password.builder_app_secret.result
+}
+
+# Auth0 OIDC client secret (AUTH0_CLIENT_SECRET).
+# Created with an initial placeholder so the ECS task starts cleanly before the
+# real value is set via the AWS CLI or console; `ignore_changes` prevents a
+# subsequent `terraform apply` from overwriting the real secret.
+resource "aws_secretsmanager_secret" "auth0_client_secret" {
+  name                    = "civiform-sandbox/auth0-client-secret"
+  description             = "Auth0 OIDC Client Secret for cf-sandbox-builder"
+  kms_key_id              = aws_kms_key.sandbox_secrets.arn
+  recovery_window_in_days = 0
+  tags                    = { Name = "civiform-sandbox-auth0-client-secret" }
+}
+
+resource "aws_secretsmanager_secret_version" "auth0_client_secret" {
+  secret_id     = aws_secretsmanager_secret.auth0_client_secret.id
+  secret_string = "REPLACE_WITH_AUTH0_CLIENT_SECRET"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# Execution role for the builder task: pulls the builder image from ECR, writes
+# logs, and injects secrets from Secrets Manager at container startup.
+module "sandbox_builder_execution_role" {
+  source      = "./modules/iam_role"
+  name        = "CiviformSandboxBuilderExecutionRole"
+  description = "ECS task execution role for cf-sandbox-builder"
+
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  ]
+
+  policy_json = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadBuilderSecrets"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+        ]
+        Resource = [
+          aws_secretsmanager_secret.rds_master_password.arn,
+          aws_secretsmanager_secret.builder_app_secret.arn,
+          aws_secretsmanager_secret.auth0_client_secret.arn,
+        ]
+      },
+      {
+        Sid      = "DecryptBuilderSecrets"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = aws_kms_key.sandbox_secrets.arn
+      },
+    ]
+  })
+}
+
+locals {
+  # Inline platform outputs handed directly to the builder container via
+  # PLATFORM_OUTPUTS_JSON. Building this from the Terraform resources themselves
+  # means `terraform apply` wires every shared infrastructure ID into the
+  # builder automatically — no manual `terraform output -json > ...` step.
+  builder_platform_outputs_json = jsonencode({
+    base_domain                 = var.domain
+    rds_endpoint                = aws_db_instance.sandbox.address
+    vpc_id                      = aws_vpc.sandbox.id
+    private_subnet_ids          = aws_subnet.private[*].id
+    alb_security_group_id       = aws_security_group.alb.id
+    alb_https_listener_arn      = aws_lb_listener.https.arn
+    ecs_cluster_arn             = aws_ecs_cluster.sandbox.arn
+    ecs_cluster_name            = aws_ecs_cluster.sandbox.name
+    cloudwatch_log_group        = aws_cloudwatch_log_group.sandbox_tasks.name
+    sandbox_secrets_kms_key_arn = aws_kms_key.sandbox_secrets.arn
+    placeholder_secrets = [
+      for name in local.placeholder_secret_names : {
+        name       = name
+        value_arn  = aws_secretsmanager_secret_version.placeholder[name].secret_arn
+        secret_arn = aws_secretsmanager_secret.placeholder[name].arn
+      }
+    ]
+  })
+}
+
+resource "aws_ecs_task_definition" "builder" {
+  family                   = "civiform-sandbox-builder"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = tostring(var.builder_task_cpu)
+  memory                   = tostring(var.builder_task_memory)
+  execution_role_arn       = module.sandbox_builder_execution_role.arn
+  task_role_arn            = module.sandbox_builder_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "builder"
+      image     = "${aws_ecr_repository.builder.repository_url}:${var.builder_image_tag}"
+      essential = true
+
+      portMappings = [
+        {
+          containerPort = 9000
+          hostPort      = 9000
+          protocol      = "tcp"
+        }
+      ]
+
+      environment = [
+        { name = "SANDBOX_RUNTIME", value = "terraform" },
+        { name = "APP_BASE_URL", value = "https://${var.domain}" },
+        { name = "AWS_REGION", value = var.aws_region },
+        { name = "TERRAFORM_STATE_BUCKET", value = var.state_bucket_name },
+        { name = "CIVIFORM_IMAGE_TAG", value = split(":", var.civiform_image)[length(split(":", var.civiform_image)) - 1] },
+        { name = "DB_JDBC_URL", value = "jdbc:postgresql://${aws_db_instance.sandbox.address}:${aws_db_instance.sandbox.port}/${var.db_name}?ssl=true&sslmode=require" },
+        { name = "DB_USER", value = aws_db_instance.sandbox.username },
+        { name = "RDS_ADMIN_DATABASE", value = "postgres" },
+        { name = "RDS_ADMIN_USER", value = aws_db_instance.sandbox.username },
+        { name = "AUTH0_DOMAIN", value = var.auth0_domain },
+        { name = "AUTH0_CLIENT_ID", value = var.auth0_client_id },
+        { name = "PLATFORM_OUTPUTS_JSON", value = local.builder_platform_outputs_json },
+      ]
+
+      secrets = [
+        {
+          name      = "APPLICATION_SECRET"
+          valueFrom = aws_secretsmanager_secret.builder_app_secret.arn
+        },
+        {
+          name      = "DB_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.rds_master_password.arn}:password::"
+        },
+        {
+          name      = "RDS_ADMIN_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.rds_master_password.arn}:password::"
+        },
+        {
+          name      = "AUTH0_CLIENT_SECRET"
+          valueFrom = aws_secretsmanager_secret.auth0_client_secret.arn
+        },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.builder.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "builder"
+        }
+      }
+    }
+  ])
+
+  tags = { Name = "civiform-sandbox-builder" }
+}
+
+resource "aws_ecs_service" "builder" {
+  name            = "civiform-sandbox-builder"
+  cluster         = aws_ecs_cluster.sandbox.id
+  task_definition = aws_ecs_task_definition.builder.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent = 100
+
+  # Allow Terraform apply to finish before the first Docker image is pushed to ECR.
+  wait_for_steady_state = false
+
+  network_configuration {
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.builder.arn
+    container_name   = "builder"
+    container_port   = 9000
+  }
+
+  depends_on = [aws_lb_listener_rule.builder]
+
+  tags = { Name = "civiform-sandbox-builder" }
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "ecs_cluster_arn" {
@@ -359,3 +690,19 @@ output "sandbox_builder_role_arn" {
 output "cloudwatch_log_group" {
   value = aws_cloudwatch_log_group.sandbox_tasks.name
 }
+
+output "builder_ecr_repository_url" {
+  description = "ECR repository URL for the cf-sandbox-builder image"
+  value       = aws_ecr_repository.builder.repository_url
+}
+
+output "builder_ecs_service_name" {
+  description = "ECS service name for cf-sandbox-builder"
+  value       = aws_ecs_service.builder.name
+}
+
+output "auth0_client_secret_arn" {
+  description = "Secrets Manager ARN where the Auth0 Client Secret should be stored"
+  value       = aws_secretsmanager_secret.auth0_client_secret.arn
+}
+

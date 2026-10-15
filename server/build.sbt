@@ -63,5 +63,13 @@ lazy val root = (project in file("."))
       viewFiles.map { f =>
         f -> ("app/views/" + viewsDir.toPath.relativize(f.toPath).toString)
       }
-    }
+    },
+    // Bundle ../init_postgres.sql onto the classpath so SandboxRepository.ensureSchemaInitialized()
+    // executes the single source of truth rather than duplicating DDL in Java.
+    Compile / resourceGenerators += Def.task {
+      val sqlFile = baseDirectory.value / ".." / "init_postgres.sql"
+      val targetFile = (Compile / resourceManaged).value / "init_postgres.sql"
+      IO.copyFile(sqlFile, targetFile)
+      Seq(targetFile)
+    }.taskValue
   )

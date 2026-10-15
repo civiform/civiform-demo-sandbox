@@ -370,9 +370,11 @@ public class TerraformSandboxServiceTest {
   }
 
   @Test
-  public void construction_failsInterruptedOperationsOnStartup() {
+  public void construction_ensuresSchemaAndFailsInterruptedOperationsOnStartup() {
     newService();
 
+    // Schema is initialised idempotently before reconciling interrupted rows.
+    verify(repository).ensureSchemaInitialized();
     // Any PROVISIONING or DELETING rows left behind by a previous process are
     // transitioned to FAILED / DELETE_FAILED when the service starts up.
     verify(repository).failInterruptedOperations();
@@ -405,6 +407,25 @@ public class TerraformSandboxServiceTest {
   }
 
   // ── platform outputs ────────────────────────────────────────────────────────
+
+  @Test
+  public void construction_loadsFromInlinePlatformOutputsJsonWithoutFile() throws Exception {
+    Map<String, Object> values = new HashMap<>();
+    config(Path.of("/nonexistent/platform-outputs.json"))
+        .entrySet()
+        .forEach(e -> values.put(e.getKey(), e.getValue().unwrapped()));
+    values.put(
+        "sandbox.terraform.platformOutputsJson",
+        "{\"base_domain\": \"sandbox.civiform.dev\", \"rds_endpoint\": \"rds.inline.internal\"}");
+
+    TerraformSandboxService service =
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+
+    SandboxInstance created = service.createSandbox(request()).toCompletableFuture().get();
+    assertThat(created.getUrl()).isEqualTo("https://burlington-vt.sandbox.civiform.dev");
+    assertThat(service.rdsUrl("postgres"))
+        .isEqualTo("jdbc:postgresql://rds.inline.internal:5432/postgres?ssl=true&sslmode=require");
+  }
 
   @Test
   public void construction_failsFastWhenPlatformOutputsFileMissing() {

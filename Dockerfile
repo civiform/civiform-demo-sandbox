@@ -66,7 +66,8 @@ RUN sbt update
 COPY "${PROJECT_NAME}/package*.json" "${PROJECT_LOC}/"
 RUN npm ci
 
-# Copy full source code
+# Copy full source code and schema init script
+COPY init_postgres.sql "${PROJECT_HOME}/init_postgres.sql"
 COPY "${PROJECT_NAME}" "${PROJECT_LOC}"
 
 # Build frontend assets
