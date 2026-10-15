@@ -493,4 +493,130 @@ public class TerraformSandboxServiceTest {
     assertThat(service.rdsUrl("postgres")).contains("host.docker.internal:15432");
     assertThat(saved.getValue().getUrl()).contains("sandbox.civiform.dev");
   }
+
+  // ── readiness polling (/programs) ───────────────────────────────────────────
+
+  @Test
+  public void waitForProgramsReady_pollsProgramsEndpointUntil200() {
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(live("123456")));
+
+    List<String> probedUrls = new ArrayList<>();
+    AtomicInteger attempts = new AtomicInteger(0);
+    AtomicInteger sleeps = new AtomicInteger(0);
+
+    newService()
+        .waitForProgramsReady(
+            "sb-abcd1234",
+            "https://burlington-vt.sandbox.civiform.dev",
+            url -> {
+              probedUrls.add(url);
+              int n = attempts.incrementAndGet();
+              if (n == 1) {
+                return 502;
+              }
+              if (n == 2) {
+                throw new IOException("Connection reset");
+              }
+              if (n == 3) {
+                return 503;
+              }
+              return 200;
+            },
+            d -> sleeps.incrementAndGet());
+
+    assertThat(attempts.get()).isEqualTo(4);
+    assertThat(sleeps.get()).isEqualTo(3);
+    assertThat(probedUrls)
+        .containsOnly("https://burlington-vt.sandbox.civiform.dev/programs");
+  }
+
+  @Test
+  public void waitForProgramsReady_throwsWhenTimeoutExpiresBefore200() {
+    Map<String, Object> values = new HashMap<>();
+    config(platformOutputsFile)
+        .entrySet()
+        .forEach(e -> values.put(e.getKey(), e.getValue().unwrapped()));
+    values.put("sandbox.terraform.readinessTimeoutMinutes", 0);
+
+    TerraformSandboxService service =
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(live("123456")));
+
+    assertThatThrownBy(
+            () ->
+                service.waitForProgramsReady(
+                    "sb-abcd1234",
+                    "https://burlington-vt.sandbox.civiform.dev",
+                    url -> 503,
+                    d -> {}))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("https://burlington-vt.sandbox.civiform.dev/programs")
+        .hasMessageContaining("Timed out");
+  }
+
+  @Test
+  public void waitForProgramsReady_abortsEarlyWhenSandboxTransitionsToDeleting() {
+    SandboxInstance provisioning =
+        live("123456").toBuilder().status(SandboxStatus.PROVISIONING).build();
+    SandboxInstance deleting =
+        live("123456").toBuilder().status(SandboxStatus.DELETING).build();
+    when(repository.findById("sb-abcd1234"))
+        .thenReturn(Optional.of(provisioning))
+        .thenReturn(Optional.of(deleting));
+
+    AtomicInteger attempts = new AtomicInteger(0);
+
+    newService()
+        .waitForProgramsReady(
+            "sb-abcd1234",
+            "https://burlington-vt.sandbox.civiform.dev",
+            url -> {
+              attempts.incrementAndGet();
+              return 503;
+            },
+            d -> {});
+
+    // Polled once while PROVISIONING, then stopped on the next iteration once DELETING.
+    assertThat(attempts.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void probeUrl_followsGuestRedirectChainWithCookies() throws Exception {
+    com.sun.net.httpserver.HttpServer server =
+        com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+    try {
+      int port = server.getAddress().getPort();
+      server.createContext(
+          "/programs",
+          exchange -> {
+            List<String> cookies = exchange.getRequestHeaders().getOrDefault("Cookie", List.of());
+            boolean hasSession = cookies.stream().anyMatch(c -> c.contains("PLAY_SESSION=guest"));
+            if (!hasSession) {
+              exchange
+                  .getResponseHeaders()
+                  .add("Location", "http://127.0.0.1:" + port + "/callback?client_name=GuestClient");
+              exchange.sendResponseHeaders(303, -1);
+            } else {
+              exchange.sendResponseHeaders(200, 0);
+            }
+            exchange.close();
+          });
+      server.createContext(
+          "/callback",
+          exchange -> {
+            exchange.getResponseHeaders().add("Set-Cookie", "PLAY_SESSION=guest; Path=/");
+            exchange
+                .getResponseHeaders()
+                .add("Location", "http://127.0.0.1:" + port + "/programs");
+            exchange.sendResponseHeaders(303, -1);
+            exchange.close();
+          });
+      server.start();
+
+      int status = newService().probeUrl("http://127.0.0.1:" + port + "/programs");
+      assertThat(status).isEqualTo(200);
+    } finally {
+      server.stop(0);
+    }
+  }
 }

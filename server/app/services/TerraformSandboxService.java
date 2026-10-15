@@ -9,6 +9,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.typesafe.config.Config;
 import java.io.IOException;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +63,10 @@ public class TerraformSandboxService implements SandboxService {
 
   private static final ALogger log = Logger.of(TerraformSandboxService.class);
 
+  private static final Duration HTTP_PROBE_TIMEOUT = Duration.ofSeconds(10);
+  private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
+  private static final Duration DEFAULT_READINESS_POLL_INTERVAL = Duration.ofSeconds(10);
+
   /**
    * Passed as {@code db_password} when destroying.
    *
@@ -76,6 +86,8 @@ public class TerraformSandboxService implements SandboxService {
   private final String stateBucket;
   private final String awsRegion;
   private final String civiformImageTag;
+  private final Duration readinessTimeout;
+  private final Duration readinessPollInterval;
 
   private final Map<String, JsonNode> platformOutputs;
 
@@ -110,6 +122,14 @@ public class TerraformSandboxService implements SandboxService {
     this.stateBucket = config.getString("sandbox.terraform.stateBucket");
     this.awsRegion = config.getString("sandbox.aws.region");
     this.civiformImageTag = config.getString("sandbox.terraform.civiformImageTag");
+    this.readinessTimeout =
+        config.hasPath("sandbox.terraform.readinessTimeoutMinutes")
+            ? Duration.ofMinutes(config.getInt("sandbox.terraform.readinessTimeoutMinutes"))
+            : DEFAULT_READINESS_TIMEOUT;
+    this.readinessPollInterval =
+        config.hasPath("sandbox.terraform.readinessPollIntervalSeconds")
+            ? Duration.ofSeconds(config.getInt("sandbox.terraform.readinessPollIntervalSeconds"))
+            : DEFAULT_READINESS_POLL_INTERVAL;
 
     this.platformOutputs = loadPlatformOutputs(config);
 
@@ -207,18 +227,23 @@ public class TerraformSandboxService implements SandboxService {
 
       // 4. Record what was actually created, not what we predicted.
       Map<String, JsonNode> out = terraform.outputs(workDir);
+      String sandboxUrl = out.get("sandbox_url").asText();
       repository.updateTerraformOutputs(
           id,
-          out.get("sandbox_url").asText(),
+          sandboxUrl,
           out.get("target_group_arn").asText(),
           out.get("listener_rule_arn").asText(),
           out.get("task_definition_arn").asText());
 
-      // If a delete was requested while apply was running, leave DELETING in place —
-      // the queued destroy runs next.
+      // 5. Wait for CiviForm to finish booting and serve 200 OK on /programs before
+      //    marking the sandbox RUNNING.
+      waitForProgramsReady(id, sandboxUrl);
+
+      // If a delete was requested while apply or readiness polling was running,
+      // leave DELETING in place — the queued destroy runs next.
       if (!isDeleting(id)) {
         repository.updateStatus(id, SandboxStatus.RUNNING);
-        log.info("[{}] Status → RUNNING at {}", id, out.get("sandbox_url").asText());
+        log.info("[{}] Status → RUNNING at {}", id, sandboxUrl);
       }
 
     } catch (Exception e) {
@@ -656,6 +681,116 @@ public class TerraformSandboxService implements SandboxService {
   @FunctionalInterface
   private interface SqlWork {
     void run(Statement statement) throws SQLException;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Readiness polling
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Polls {@code <sandboxUrl>/programs} until it returns HTTP 200, the sandbox is marked for
+   * deletion, or {@link #readinessTimeout} elapses.
+   *
+   * <p>{@code terraform apply} finishes as soon as the ECS service and ALB listener rule exist,
+   * before Fargate has pulled the image, booted CiviForm, run database evolutions, and passed ALB
+   * target group health checks. Waiting for {@code /programs} to return 200 ensures the portal
+   * does not show the sandbox as Active while the ALB is still returning 502/503.
+   */
+  private void waitForProgramsReady(String id, String sandboxUrl) {
+    waitForProgramsReady(
+        id, sandboxUrl, this::probeUrl, d -> Thread.sleep(d.toMillis()));
+  }
+
+  @VisibleForTesting
+  void waitForProgramsReady(
+      String id, String sandboxUrl, HttpStatusProbe probe, Sleeper sleeper) {
+    String programsUrl =
+        sandboxUrl.endsWith("/") ? sandboxUrl + "programs" : sandboxUrl + "/programs";
+    Instant deadline = Instant.now().plus(readinessTimeout);
+    int attempt = 0;
+
+    log.info(
+        "[{}] Waiting up to {}m for {} to return 200",
+        id,
+        readinessTimeout.toMinutes(),
+        programsUrl);
+
+    while (!isDeleting(id)) {
+      attempt++;
+      try {
+        int status = probe.getStatus(programsUrl);
+        if (status == 200) {
+          log.info("[{}] {} returned 200 on attempt {}", id, programsUrl, attempt);
+          return;
+        }
+        log.debug(
+            "[{}] Readiness attempt {} for {} returned HTTP {}",
+            id,
+            attempt,
+            programsUrl,
+            status);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(
+            "Interrupted waiting for " + programsUrl + " to become ready", e);
+      } catch (Exception e) {
+        log.debug(
+            "[{}] Readiness attempt {} for {} failed: {}",
+            id,
+            attempt,
+            programsUrl,
+            e.getMessage());
+      }
+
+      if (!Instant.now().isBefore(deadline)) {
+        throw new RuntimeException(
+            String.format(
+                "Timed out after %d minutes (%d attempts) waiting for %s to return 200",
+                readinessTimeout.toMinutes(), attempt, programsUrl));
+      }
+
+      try {
+        sleeper.sleep(readinessPollInterval);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(
+            "Interrupted waiting for " + programsUrl + " to become ready", e);
+      }
+    }
+
+    log.info("[{}] Aborting readiness poll because sandbox is deleting", id);
+  }
+
+  /**
+   * Sends a GET request to {@code url}, following redirects with a per-request cookie jar so
+   * CiviForm's guest session redirect chain ({@code /programs} → {@code /callback?client_name=GuestClient}
+   * → {@code /programs}) resolves to its final HTTP status code.
+   */
+  @VisibleForTesting
+  int probeUrl(String url) throws IOException, InterruptedException {
+    CookieManager cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+    HttpClient client =
+        HttpClient.newBuilder()
+            .connectTimeout(HTTP_PROBE_TIMEOUT)
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .cookieHandler(cookieManager)
+            .build();
+    HttpRequest request =
+        HttpRequest.newBuilder(URI.create(url)).timeout(HTTP_PROBE_TIMEOUT).GET().build();
+    HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+    return response.statusCode();
+  }
+
+  @VisibleForTesting
+  @FunctionalInterface
+  interface HttpStatusProbe {
+    int getStatus(String url) throws Exception;
+  }
+
+  @VisibleForTesting
+  @FunctionalInterface
+  interface Sleeper {
+    void sleep(Duration duration) throws InterruptedException;
   }
 
   /** Alphanumeric only: the value ends up in a JDBC URL, a SQL literal and a JSON file. */
