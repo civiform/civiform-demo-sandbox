@@ -497,10 +497,11 @@ public class TerraformSandboxServiceTest {
   // ── readiness polling (/programs) ───────────────────────────────────────────
 
   @Test
-  public void waitForProgramsReady_pollsProgramsEndpointUntil200() {
+  public void waitForProgramsReady_pollsProgramsEndpointWithAccessCookieUntil200() {
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(live("123456")));
 
     List<String> probedUrls = new ArrayList<>();
+    List<String> probedCookies = new ArrayList<>();
     AtomicInteger attempts = new AtomicInteger(0);
     AtomicInteger sleeps = new AtomicInteger(0);
 
@@ -508,8 +509,10 @@ public class TerraformSandboxServiceTest {
         .waitForProgramsReady(
             "sb-abcd1234",
             "https://burlington-vt.sandbox.civiform.dev",
-            url -> {
+            "secret-token-999",
+            (url, cookieName, cookieValue) -> {
               probedUrls.add(url);
+              probedCookies.add(cookieName + "=" + cookieValue);
               int n = attempts.incrementAndGet();
               if (n == 1) {
                 return 502;
@@ -528,6 +531,8 @@ public class TerraformSandboxServiceTest {
     assertThat(sleeps.get()).isEqualTo(3);
     assertThat(probedUrls)
         .containsOnly("https://burlington-vt.sandbox.civiform.dev/programs");
+    assertThat(probedCookies)
+        .containsOnly("sb_access_sb_abcd1234=secret-token-999");
   }
 
   @Test
@@ -547,7 +552,8 @@ public class TerraformSandboxServiceTest {
                 service.waitForProgramsReady(
                     "sb-abcd1234",
                     "https://burlington-vt.sandbox.civiform.dev",
-                    url -> 503,
+                    "secret-token-999",
+                    (url, cookieName, cookieValue) -> 503,
                     d -> {}))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("https://burlington-vt.sandbox.civiform.dev/programs")
@@ -570,7 +576,8 @@ public class TerraformSandboxServiceTest {
         .waitForProgramsReady(
             "sb-abcd1234",
             "https://burlington-vt.sandbox.civiform.dev",
-            url -> {
+            "secret-token-999",
+            (url, cookieName, cookieValue) -> {
               attempts.incrementAndGet();
               return 503;
             },
@@ -581,7 +588,7 @@ public class TerraformSandboxServiceTest {
   }
 
   @Test
-  public void probeUrl_followsGuestRedirectChainWithCookies() throws Exception {
+  public void probeUrl_sendsAccessCookieAndFollowsGuestRedirectChain() throws Exception {
     com.sun.net.httpserver.HttpServer server =
         com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
     try {
@@ -590,6 +597,15 @@ public class TerraformSandboxServiceTest {
           "/programs",
           exchange -> {
             List<String> cookies = exchange.getRequestHeaders().getOrDefault("Cookie", List.of());
+            boolean hasAccessCookie =
+                cookies.stream()
+                    .anyMatch(c -> c.contains("sb_access_sb_abcd1234=token-xyz"));
+            if (!hasAccessCookie) {
+              // Simulate the ALB PIN-gate rule rejecting/redirecting requests without the cookie
+              exchange.sendResponseHeaders(403, -1);
+              exchange.close();
+              return;
+            }
             boolean hasSession = cookies.stream().anyMatch(c -> c.contains("PLAY_SESSION=guest"));
             if (!hasSession) {
               exchange
@@ -604,6 +620,15 @@ public class TerraformSandboxServiceTest {
       server.createContext(
           "/callback",
           exchange -> {
+            List<String> cookies = exchange.getRequestHeaders().getOrDefault("Cookie", List.of());
+            boolean hasAccessCookie =
+                cookies.stream()
+                    .anyMatch(c -> c.contains("sb_access_sb_abcd1234=token-xyz"));
+            if (!hasAccessCookie) {
+              exchange.sendResponseHeaders(403, -1);
+              exchange.close();
+              return;
+            }
             exchange.getResponseHeaders().add("Set-Cookie", "PLAY_SESSION=guest; Path=/");
             exchange
                 .getResponseHeaders()
@@ -613,7 +638,12 @@ public class TerraformSandboxServiceTest {
           });
       server.start();
 
-      int status = newService().probeUrl("http://127.0.0.1:" + port + "/programs");
+      int status =
+          newService()
+              .probeUrl(
+                  "http://127.0.0.1:" + port + "/programs",
+                  "sb_access_sb_abcd1234",
+                  "token-xyz");
       assertThat(status).isEqualTo(200);
     } finally {
       server.stop(0);

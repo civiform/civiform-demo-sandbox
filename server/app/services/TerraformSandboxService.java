@@ -11,6 +11,7 @@ import com.typesafe.config.Config;
 import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -237,7 +238,7 @@ public class TerraformSandboxService implements SandboxService {
 
       // 5. Wait for CiviForm to finish booting and serve 200 OK on /programs before
       //    marking the sandbox RUNNING.
-      waitForProgramsReady(id, sandboxUrl);
+      waitForProgramsReady(id, sandboxUrl, instance.getAccessToken());
 
       // If a delete was requested while apply or readiness polling was running,
       // leave DELETING in place — the queued destroy runs next.
@@ -695,17 +696,25 @@ public class TerraformSandboxService implements SandboxService {
    * before Fargate has pulled the image, booted CiviForm, run database evolutions, and passed ALB
    * target group health checks. Waiting for {@code /programs} to return 200 ensures the portal
    * does not show the sandbox as Active while the ALB is still returning 502/503.
+   *
+   * <p>Includes the {@code sb_access_<id>=<accessToken>} cookie so the ALB forwards the request to
+   * the CiviForm target group instead of redirecting to the PIN gate on the builder portal.
    */
-  private void waitForProgramsReady(String id, String sandboxUrl) {
+  private void waitForProgramsReady(String id, String sandboxUrl, String accessToken) {
     waitForProgramsReady(
-        id, sandboxUrl, this::probeUrl, d -> Thread.sleep(d.toMillis()));
+        id, sandboxUrl, accessToken, this::probeUrl, d -> Thread.sleep(d.toMillis()));
   }
 
   @VisibleForTesting
   void waitForProgramsReady(
-      String id, String sandboxUrl, HttpStatusProbe probe, Sleeper sleeper) {
+      String id,
+      String sandboxUrl,
+      String accessToken,
+      HttpStatusProbe probe,
+      Sleeper sleeper) {
     String programsUrl =
         sandboxUrl.endsWith("/") ? sandboxUrl + "programs" : sandboxUrl + "/programs";
+    String cookieName = accessCookieName(id);
     Instant deadline = Instant.now().plus(readinessTimeout);
     int attempt = 0;
 
@@ -718,7 +727,7 @@ public class TerraformSandboxService implements SandboxService {
     while (!isDeleting(id)) {
       attempt++;
       try {
-        int status = probe.getStatus(programsUrl);
+        int status = probe.getStatus(programsUrl, cookieName, accessToken);
         if (status == 200) {
           log.info("[{}] {} returned 200 on attempt {}", id, programsUrl, attempt);
           return;
@@ -762,13 +771,22 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   /**
-   * Sends a GET request to {@code url}, following redirects with a per-request cookie jar so
-   * CiviForm's guest session redirect chain ({@code /programs} → {@code /callback?client_name=GuestClient}
-   * → {@code /programs}) resolves to its final HTTP status code.
+   * Sends a GET request to {@code url} with the sandbox PIN-gate bypass cookie pre-populated in a
+   * per-request cookie jar, following redirects so CiviForm's guest session redirect chain
+   * ({@code /programs} → {@code /callback?client_name=GuestClient} → {@code /programs}) resolves
+   * to its final HTTP status code without being redirected to the PIN gate by the ALB.
    */
   @VisibleForTesting
-  int probeUrl(String url) throws IOException, InterruptedException {
+  int probeUrl(String url, String cookieName, String cookieValue)
+      throws IOException, InterruptedException {
+    URI uri = URI.create(url);
     CookieManager cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+    if (cookieName != null && cookieValue != null) {
+      HttpCookie accessCookie = new HttpCookie(cookieName, cookieValue);
+      accessCookie.setPath("/");
+      accessCookie.setVersion(0);
+      cookieManager.getCookieStore().add(uri, accessCookie);
+    }
     HttpClient client =
         HttpClient.newBuilder()
             .connectTimeout(HTTP_PROBE_TIMEOUT)
@@ -776,15 +794,25 @@ public class TerraformSandboxService implements SandboxService {
             .cookieHandler(cookieManager)
             .build();
     HttpRequest request =
-        HttpRequest.newBuilder(URI.create(url)).timeout(HTTP_PROBE_TIMEOUT).GET().build();
+        HttpRequest.newBuilder(uri).timeout(HTTP_PROBE_TIMEOUT).GET().build();
     HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
     return response.statusCode();
+  }
+
+  /**
+   * Name of the ALB PIN-gate access cookie for a sandbox. Matches {@code
+   * aws_lb_listener_rule.sandbox_allow} in {@code terraform/sandbox/main.tf} and {@code
+   * SandboxController.accessCookieName}.
+   */
+  @VisibleForTesting
+  static String accessCookieName(String sandboxId) {
+    return "sb_access_" + sandboxId.replace("-", "_");
   }
 
   @VisibleForTesting
   @FunctionalInterface
   interface HttpStatusProbe {
-    int getStatus(String url) throws Exception;
+    int getStatus(String url, String cookieName, String cookieValue) throws Exception;
   }
 
   @VisibleForTesting
