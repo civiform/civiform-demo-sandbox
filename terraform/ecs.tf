@@ -647,8 +647,12 @@ resource "aws_ecs_service" "builder" {
   task_definition = aws_ecs_task_definition.builder.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+
+  # Ensure the previous deployment is terminated before starting a new one.
+  # This prevents the new builder instance from marking a creation or deletion
+  # as failed while the previous builder instance is working on it.
   deployment_minimum_healthy_percent = 0
-  deployment_maximum_percent = 100
+  deployment_maximum_percent         = 100
 
   # Allow Terraform apply to finish before the first Docker image is pushed to ECR.
   wait_for_steady_state = false
