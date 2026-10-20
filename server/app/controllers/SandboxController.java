@@ -87,6 +87,20 @@ public class SandboxController extends Controller {
   @RequireCSRFCheck
   public CompletionStage<Result> create(Http.Request request) {
     CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
+
+    // Server-side validation — defense in depth. The client-side wizard validates
+    // these fields too, but a direct POST (curl / API) would bypass that.
+    String validationError = validateCreateRequest(sandboxRequest);
+    if (validationError != null) {
+      if (isJsonRequest(request)) {
+        return CompletableFuture.completedFuture(
+            badRequest(Json.toJson(java.util.Map.of("error", validationError))));
+      }
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.SandboxController.index())
+              .flashing("error", validationError));
+    }
+
     return sandboxService.createSandbox(sandboxRequest)
         .thenApply(instance -> {
           if (isJsonRequest(request)) {
@@ -108,9 +122,9 @@ public class SandboxController extends Controller {
       String gaId  = json.has("googleAnalyticsId")  ? json.get("googleAnalyticsId").asText()  : null;
       String gaUrl = json.has("googleAnalyticsUrl") ? json.get("googleAnalyticsUrl").asText() : null;
       return CreateSandboxRequest.builder()
-          .cityName(json.has("cityName")       ? json.get("cityName").asText()       : "Demo City")
-          .subdomain(json.has("subdomain")     ? json.get("subdomain").asText()      : "demo")
-          .pin(json.has("pin")                 ? json.get("pin").asText()            : "000000")
+          .cityName(json.has("cityName")       ? json.get("cityName").asText()       : "")
+          .subdomain(json.has("subdomain")     ? json.get("subdomain").asText()      : "")
+          .pin(json.has("pin")                 ? json.get("pin").asText()            : "")
           .adminEmail(json.has("adminEmail")   ? json.get("adminEmail").asText()     : "")
           .expirationDays(json.has("expirationDays") ? json.get("expirationDays").asInt(30) : 30)
           .googleAnalyticsId(gaId  != null  && !gaId.isBlank()  ? gaId  : null)
@@ -128,9 +142,9 @@ public class SandboxController extends Controller {
     } catch (NumberFormatException ignored) { /* keep default 30 */ }
 
     return CreateSandboxRequest.builder()
-        .cityName(orDefault(form.get("cityName"),   "Demo City"))
-        .subdomain(orDefault(form.get("subdomain"), "demo"))
-        .pin(orDefault(form.get("pin"),             "000000"))
+        .cityName(orDefault(form.get("cityName"),   ""))
+        .subdomain(orDefault(form.get("subdomain"), ""))
+        .pin(orDefault(form.get("pin"),             ""))
         .adminEmail(orDefault(form.get("adminEmail"), ""))
         .expirationDays(expirationDays)
         .googleAnalyticsId(gaId  != null && !gaId.isBlank()  ? gaId  : null)
@@ -333,6 +347,27 @@ public class SandboxController extends Controller {
 
   private boolean isJsonRequest(Http.Request request) {
     return request.accepts("application/json") && !request.accepts("text/html");
+  }
+
+  /**
+   * Validates the required fields of a {@link CreateSandboxRequest}.
+   *
+   * @return {@code null} if valid, or a user-facing error message if validation fails.
+   */
+  private String validateCreateRequest(CreateSandboxRequest req) {
+    if (req.getCityName() == null || req.getCityName().isBlank()) {
+      return "City name is required.";
+    }
+    if (req.getSubdomain() == null || req.getSubdomain().isBlank()) {
+      return "Subdomain is required.";
+    }
+    if (!req.getSubdomain().matches("^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$")) {
+      return "Subdomain must contain only lowercase letters, numbers, and hyphens.";
+    }
+    if (req.getPin() == null || !req.getPin().matches("^[0-9]{6}$")) {
+      return "Access PIN must be exactly 6 digits.";
+    }
+    return null;
   }
 
   private String orDefault(String value, String defaultValue) {
