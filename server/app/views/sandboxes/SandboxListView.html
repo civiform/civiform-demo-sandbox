@@ -630,7 +630,6 @@
                 type="submit"
                 class="usa-button px-8"
                 aria-label="Provision demo"
-                onclick="syncHiddenInputs()"
               >
                 Provision demo
               </button>
@@ -1014,6 +1013,22 @@
         for (var i = 1; i <= TOTAL_STEPS; i++) {
           setStepInputsDisabled(i, false)
         }
+      }
+
+      // Validate Step 2 fields on form submit. The form is novalidate (HTML5
+      // validation is off) and the old wizardNext(2) call that ran
+      // validateStep2() was removed when Step 3 was dropped. Without this
+      // guard, blank Step 2 fields would reach the server, which falls back
+      // to defaults (PIN "000000", subdomain "demo") — a security risk.
+      var sandboxForm = document.getElementById('sandbox-form')
+      if (sandboxForm) {
+        sandboxForm.addEventListener('submit', function (e) {
+          if (!validateStep2()) {
+            e.preventDefault()
+            return
+          }
+          syncHiddenInputs()
+        })
       }
 
       if (cityNameEl) {
