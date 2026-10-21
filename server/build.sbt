@@ -64,6 +64,10 @@ lazy val root = (project in file("."))
         f -> ("app/views/" + viewsDir.toPath.relativize(f.toPath).toString)
       }
     },
+    // Exclude integration tests from the default `sbt test` run.
+    // Integration tests require a running Postgres (Docker Compose db service).
+    // Run them explicitly: sbt 'testOnly *IntegrationTest*'
+    Test / testOptions += Tests.Filter(name => !name.contains("IntegrationTest")),
     // Bundle ../init_postgres.sql onto the classpath so SandboxRepository.ensureSchemaInitialized()
     // executes the single source of truth rather than duplicating DDL in Java.
     Compile / resourceGenerators += Def.task {
