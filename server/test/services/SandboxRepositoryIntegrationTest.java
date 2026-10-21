@@ -1,8 +1,11 @@
 package services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.common.collect.ImmutableList;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -11,12 +14,14 @@ import java.util.UUID;
 import models.SandboxInstance;
 import models.SandboxStatus;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import play.Application;
 import play.db.Database;
 import play.inject.guice.GuiceApplicationBuilder;
-import play.test.WithApplication;
+import play.test.Helpers;
 
 /**
  * Integration tests for {@link SandboxRepository} against the real Docker Compose Postgres.
@@ -28,26 +33,46 @@ import play.test.WithApplication;
  *
  * <p><b>Prerequisites:</b> The Docker Compose {@code db} service must be running
  * ({@code bin/run-dev}). Tests run inside the {@code builder} container via
- * {@code docker exec ... sbt test}.
+ * {@code docker exec ... sbt 'testOnly *IntegrationTest*'}.
+ *
+ * <p><b>CI behavior:</b> These tests are excluded from the default {@code sbt test} run via
+ * a filter in {@code build.sbt}. If they are run without Postgres, they are gracefully skipped
+ * via {@link org.junit.Assume#assumeTrue} (not failed).
  *
  * <p>Each test generates a unique sandbox ID so tests don't collide. {@link #cleanup()} removes
  * test rows after each test.
  */
-public class SandboxRepositoryIntegrationTest extends WithApplication {
+public class SandboxRepositoryIntegrationTest {
 
+  private static Application app;
   private SandboxRepository repo;
   private String testId;
 
-  @Override
-  protected Application provideApplication() {
-    // Use the default application.conf, which points at the Docker Compose Postgres
-    // (DB_JDBC_URL=jdbc:postgresql://db:5432/sandbox_builder in the builder container).
-    // No Guice overrides — we want the real Database pool.
-    return new GuiceApplicationBuilder().build();
+  @BeforeClass
+  public static void startApp() {
+    // Check Postgres reachability BEFORE booting the Play app.
+    // This prevents a 30-second connection timeout + NPE cascade in CI.
+    assumeTrue(
+        "Skipping: Postgres not reachable at db:5432 or localhost:5432",
+        isPostgresReachable());
+
+    app = new GuiceApplicationBuilder().build();
+    Helpers.start(app);
+  }
+
+  @AfterClass
+  public static void stopApp() {
+    if (app != null) {
+      Helpers.stop(app);
+      app = null;
+    }
   }
 
   @Before
   public void setUp() {
+    // Double-check: if @BeforeClass skipped via assumeTrue, individual tests should also skip.
+    assumeTrue("Skipping: no Postgres", app != null);
+
     Database db = app.injector().instanceOf(Database.class);
     repo = new SandboxRepository(db);
     // Ensure schema exists (idempotent — safe to call every time)
@@ -58,6 +83,10 @@ public class SandboxRepositoryIntegrationTest extends WithApplication {
 
   @After
   public void cleanup() {
+    // Guard against NPE when the app failed to start (e.g. no Postgres).
+    if (app == null || testId == null) {
+      return;
+    }
     // Hard-delete the test row so it doesn't leak into the dev database
     Database db = app.injector().instanceOf(Database.class);
     db.withConnection(conn -> {
@@ -70,6 +99,23 @@ public class SandboxRepositoryIntegrationTest extends WithApplication {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Checks whether Postgres is reachable on the expected host/port.
+   * Tries "db" (Docker Compose service name) first, then localhost (for local dev outside Docker).
+   */
+  private static boolean isPostgresReachable() {
+    return isReachable("db", 5432) || isReachable("localhost", 5432);
+  }
+
+  private static boolean isReachable(String host, int port) {
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress(host, port), 1000);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
+  }
 
   /** Builds a minimal valid SandboxInstance with all required (NOT NULL) columns populated. */
   private SandboxInstance makeTestInstance() {
