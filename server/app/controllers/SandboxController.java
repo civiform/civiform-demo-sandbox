@@ -311,6 +311,25 @@ public class SandboxController extends Controller {
     });
   }
 
+  /**
+   * POST /sandboxes/:id/reprovision — re-runs Terraform against the existing sandbox state
+   * without affecting database contents.
+   */
+  @RequireCSRFCheck
+  public CompletionStage<Result> reprovision(Http.Request request, String id) {
+    return sandboxService.reprovisionSandbox(id).thenApply(maybeReprovisioned -> {
+      if (maybeReprovisioned.isEmpty()) {
+        return notFound("Sandbox not found or cannot be re-provisioned: " + id);
+      }
+      SandboxInstance instance = maybeReprovisioned.get();
+      if (isJsonRequest(request)) {
+        return ok(Json.toJson(instance));
+      }
+      return redirect(controllers.routes.SandboxController.index())
+          .flashing("success", "Re-provisioning initiated for " + instance.getCityName() + ".");
+    });
+  }
+
 
   private boolean isJsonRequest(Http.Request request) {
     return request.accepts("application/json") && !request.accepts("text/html");

@@ -278,6 +278,24 @@ public class SandboxRepositoryTest {
   }
 
   @Test
+  public void updateAccessTokenAndPriority_bindsParameters() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+
+    repository.updateAccessTokenAndPriority("sb-1", "new-token", 1004);
+
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(conn).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .contains("SET access_token = ?, listener_priority = ?");
+
+    verify(ps).setString(1, "new-token");
+    verify(ps).setObject(2, 1004, java.sql.Types.INTEGER);
+    verify(ps).setString(3, "sb-1");
+    verify(ps).executeUpdate();
+  }
+
+  @Test
   public void findById_existingId_returnsInstance() throws Exception {
     PreparedStatement ps = mock(PreparedStatement.class);
     ResultSet rs = mock(ResultSet.class);

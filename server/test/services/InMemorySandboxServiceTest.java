@@ -81,5 +81,26 @@ public class InMemorySandboxServiceTest {
     Boolean deleted = service.deleteSandbox("does-not-exist").toCompletableFuture().get();
     assertThat(deleted).isFalse();
   }
+
+  @Test
+  public void reprovisionSandbox_transitionsRunningSandboxToProvisioning()
+      throws ExecutionException, InterruptedException {
+    var result = service.reprovisionSandbox("sb-demo0001").toCompletableFuture().get();
+    assertThat(result).isPresent();
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+  }
+
+  @Test
+  public void reprovisionSandbox_returnsEmptyForMissingOrProvisioningSandbox()
+      throws ExecutionException, InterruptedException {
+    assertThat(service.reprovisionSandbox("does-not-exist").toCompletableFuture().get()).isEmpty();
+
+    SandboxInstance created =
+        service
+            .createSandbox(makeRequest("Already Provisioning", "prov-city", "111111"))
+            .toCompletableFuture()
+            .get();
+    assertThat(service.reprovisionSandbox(created.getId()).toCompletableFuture().get()).isEmpty();
+  }
 }
 

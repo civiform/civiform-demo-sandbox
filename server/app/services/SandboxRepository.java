@@ -234,6 +234,26 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Backfills {@code access_token} and {@code listener_priority} for an existing sandbox prior to
+   * re-provisioning (e.g. upgrading a sandbox created before PIN gating was introduced).
+   */
+  public void updateAccessTokenAndPriority(
+      String id, String accessToken, Integer listenerPriority) {
+    db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET access_token = ?, listener_priority = ? "
+              + "WHERE id = ?")) {
+        ps.setString(1, accessToken);
+        ps.setObject(2, listenerPriority, java.sql.Types.INTEGER);
+        ps.setString(3, id);
+        ps.executeUpdate();
+      }
+      return null;
+    });
+  }
+
   public Optional<SandboxInstance> findById(String id) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(

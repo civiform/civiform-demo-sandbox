@@ -263,6 +263,21 @@
                   </button>
                 </li>
                 <li class="usa-button-group__item">
+                  <!-- Re-provision → modal -->
+                  <button
+                    type="button"
+                    th:if="${sb.sandbox.status.name() != 'DELETED' and sb.sandbox.status.name() != 'DELETING'}"
+                    th:data-id="${sb.sandbox.id}"
+                    th:data-city-name="${sb.cityName}"
+                    th:onclick="openReprovisionModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
+                    class="usa-button usa-button--outline"
+                    th:disabled="${sb.provisioning}"
+                    th:classappend="${sb.provisioning} ? 'opacity-50 cursor-not-allowed' : ''"
+                  >
+                    Re-provision
+                  </button>
+                </li>
+                <li class="usa-button-group__item">
                   <!-- AWS → opens AWS console (placeholder until Sprint 2 wires real URL) -->
                   <a
                     th:href="|https://console.aws.amazon.com/ecs/v2/clusters?search=${sb.sandbox.id}|"
@@ -977,6 +992,46 @@
     </div>
   </div>
 
+  <!-- ── Re-provision Modal ───────────────────────────────────────────── -->
+  <div
+    id="reprovision-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reprovision-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+      <button
+        onclick="closeModal('reprovision-modal')"
+        aria-label="Close"
+        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
+        ×
+      </button>
+      <h2 id="reprovision-modal-title" class="text-xl font-bold text-gray-900 mb-3">
+        Re-provision demo?
+      </h2>
+      <p class="text-sm text-gray-700 mb-6">
+        This will re-run Terraform to update the demo for
+        <strong id="reprovision-city-name"></strong> to the latest infrastructure configuration.
+        Existing programs and database data will not be affected.
+      </p>
+      <form id="reprovision-form" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+        <div class="flex items-center gap-4">
+          <button type="submit" class="usa-button">Re-provision demo</button>
+          <button
+            type="button"
+            onclick="closeModal('reprovision-modal')"
+            class="usa-button usa-button--unstyled text-blue-600 hover:underline text-sm font-medium cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
     function openDetailsModal(id, cityName, url, pin, gaId) {
@@ -1014,6 +1069,13 @@
         '/sandboxes/' + id + '/extend'
       document.getElementById('extend-days').value = 30
       openModal('extend-modal')
+    }
+
+    function openReprovisionModal(id, cityName) {
+      document.getElementById('reprovision-city-name').textContent = cityName
+      document.getElementById('reprovision-form').action =
+        '/sandboxes/' + id + '/reprovision'
+      openModal('reprovision-modal')
     }
 
     function openModal(id) {

@@ -25,6 +25,14 @@ public interface SandboxService {
   CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days);
 
   /**
+   * Re-runs provisioning against an existing sandbox without dropping or recreating its database.
+   * Used to upgrade existing sandboxes to the latest infrastructure configuration (e.g. PIN gating)
+   * or redeploy tasks. Returns the updated instance (with status PROVISIONING), or empty if the
+   * sandbox does not exist or cannot be re-provisioned in its current state.
+   */
+  CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id);
+
+  /**
    * Validates a PIN for a sandbox. Returns the sandbox if PIN matches, empty otherwise.
    * Must use constant-time comparison to prevent timing attacks.
    */
