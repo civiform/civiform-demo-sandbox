@@ -107,6 +107,25 @@ resource "aws_s3_bucket_ownership_controls" "public_files" {
 }
 
 data "aws_iam_policy_document" "public_files" {
+  # civiform_app's IAM policy only grants the task role access to the private
+  # file_storage_bucket_arn; access to the public bucket is granted here via
+  # the bucket policy, matching upstream cloud-deploy-infra's filestorage.tf.
+  statement {
+    sid     = "TaskRoleAccess"
+    effect  = "Allow"
+    actions = ["s3:*"]
+
+    resources = [
+      aws_s3_bucket.public_files.arn,
+      "${aws_s3_bucket.public_files.arn}/*",
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = [module.civiform_app.task_execution_role_arn]
+    }
+  }
+
   statement {
     sid     = "PublicReadProgramImages"
     effect  = "Allow"
