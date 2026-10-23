@@ -40,3 +40,19 @@
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800;
 }
 
+/* ── Sortable table headers ──────────────────────────────────────────
+   USWDS highlights ALL sortable <th> headers blue by default.
+   Override so only the actively sorted column gets the blue background;
+   unsorted headers stay neutral.
+   See: https://designsystem.digital.gov/components/table/
+   ──────────────────────────────────────────────────────────────────── */
+.usa-table th[data-sortable] {
+  background-color: #f0f0f0;
+  color: #1b1b1b;
+}
+
+.usa-table th[data-sortable][aria-sort="ascending"],
+.usa-table th[data-sortable][aria-sort="descending"] {
+  background-color: #005ea2;
+  color: #ffffff;
+}
