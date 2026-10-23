@@ -298,6 +298,20 @@ public class SandboxRepository {
     });
   }
 
+  /**
+   * Permanently removes a sandbox row from the database. Only operates on sandboxes that are
+   * already soft-deleted ({@code DELETED} or {@code DELETE_FAILED}) as a safety guard.
+   */
+  public boolean hardDelete(String id) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "DELETE FROM sandbox_instances WHERE id = ? AND status IN ('DELETED', 'DELETE_FAILED', 'DELETING')")) {
+        ps.setString(1, id);
+        return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
   private SandboxInstance mapRow(ResultSet rs) throws java.sql.SQLException {
     return SandboxInstance.builder()
         .id(rs.getString("id"))

@@ -24,6 +24,7 @@ POST    /sandboxes                  controllers.SandboxController.create(request
 GET     /sandboxes/:id              controllers.SandboxController.show(request: Request, id: String)
 GET     /sandboxes/:id/status       controllers.SandboxController.statusFragment(request: Request, id: String)
 POST    /sandboxes/:id/delete       controllers.SandboxController.delete(request: Request, id: String)
+POST    /sandboxes/:id/purge        controllers.SandboxController.purge(request: Request, id: String)
 POST    /sandboxes/:id/extend       controllers.SandboxController.extend(request: Request, id: String)
 
 # PIN Gate (prospect access)

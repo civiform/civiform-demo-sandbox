@@ -20,6 +20,7 @@ import play.mvc.Result;
 import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
+import services.SandboxRepository;
 import services.SandboxService;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
@@ -31,6 +32,7 @@ import views.sandboxes.SandboxListViewModel;
 public class SandboxController extends Controller {
 
   private final SandboxService sandboxService;
+  private final SandboxRepository repository;
   private final SandboxListView listView;
   private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
@@ -41,12 +43,14 @@ public class SandboxController extends Controller {
   @Inject
   public SandboxController(
       SandboxService sandboxService,
+      SandboxRepository repository,
       SandboxListView listView,
       SandboxDetailsView detailsView,
       PinGateView pinGateView,
       FormFactory formFactory,
       Config config) {
     this.sandboxService = checkNotNull(sandboxService);
+    this.repository = checkNotNull(repository);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
@@ -287,6 +291,16 @@ public class SandboxController extends Controller {
             });
   }
 
+  /** POST /sandboxes/:id/purge — permanently removes a soft-deleted sandbox row from the DB. */
+  @RequireCSRFCheck
+  public Result purge(Http.Request request, String id) {
+    boolean removed = repository.hardDelete(id);
+    if (isJsonRequest(request)) {
+      return ok(Json.newObject().put("purged", removed));
+    }
+    return redirect(controllers.routes.SandboxController.index())
+        .flashing("deleted", removed ? "Permanently removed sandbox." : "Nothing to purge.");
+  }
 
   /**
    * POST /sandboxes/:id/extend — extends sandbox expiry by {@code days} days.
