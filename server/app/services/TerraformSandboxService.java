@@ -196,20 +196,95 @@ public class TerraformSandboxService implements SandboxService {
     return CompletableFuture.completedFuture(instance);
   }
 
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id) {
+    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+    if (maybeSandbox.isEmpty()) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+    SandboxInstance existing = maybeSandbox.get();
+
+    // Do not start a competing apply if the sandbox is already being provisioned,
+    // torn down, or soft-deleted.
+    if (existing.getStatus() == SandboxStatus.PROVISIONING
+        || existing.getStatus() == SandboxStatus.DELETING
+        || existing.getStatus() == SandboxStatus.DELETED) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    // Backfill access_token or listener_priority for legacy sandboxes created before
+    // PIN gating or sequence-based priorities existed.
+    String accessToken = existing.getAccessToken();
+    boolean needsMetadataUpdate = false;
+    if (accessToken == null || accessToken.isBlank()) {
+      accessToken = UUID.randomUUID().toString();
+      needsMetadataUpdate = true;
+    }
+    Integer listenerPriority = existing.getListenerPriority();
+    if (listenerPriority == null) {
+      listenerPriority = repository.nextListenerPriority();
+      needsMetadataUpdate = true;
+    }
+    if (needsMetadataUpdate) {
+      repository.updateAccessTokenAndPriority(id, accessToken, listenerPriority);
+    }
+
+    repository.updateStatus(id, SandboxStatus.PROVISIONING);
+
+    SandboxInstance updated =
+        existing.toBuilder()
+            .accessToken(accessToken)
+            .listenerPriority(listenerPriority)
+            .status(SandboxStatus.PROVISIONING)
+            .build();
+
+    String dbUser = updated.getDatabaseName();
+    String dbPassword = generateSecret(32);
+
+    enqueueForSandbox(id, () -> reprovision(updated, dbUser, dbPassword));
+
+    return CompletableFuture.completedFuture(Optional.of(updated));
+  }
+
   /** The long-running half of creation. Runs on {@link #provisioningPool}. */
   private void provision(SandboxInstance instance, String dbUser, String dbPassword) {
+    applyInfrastructure(
+        instance,
+        dbUser,
+        dbPassword,
+        () -> {
+          provisionDatabase(instance.getDatabaseName(), dbUser, dbPassword);
+          log.info("[{}] Database created", instance.getId());
+        });
+  }
+
+  /**
+   * The long-running half of re-provisioning. Updates the database role password in place (without
+   * touching existing tables or data) so it matches the rotated Secrets Manager secret, then
+   * re-runs {@code terraform apply} against the sandbox's existing state.
+   */
+  private void reprovision(SandboxInstance instance, String dbUser, String dbPassword) {
+    applyInfrastructure(
+        instance,
+        dbUser,
+        dbPassword,
+        () -> {
+          reconcileDatabase(instance.getDatabaseName(), dbUser, dbPassword);
+          log.info("[{}] Database credentials reconciled", instance.getId());
+        });
+  }
+
+  private void applyInfrastructure(
+      SandboxInstance instance, String dbUser, String dbPassword, Runnable databaseStep) {
     String id = instance.getId();
     Path workDir = null;
 
     try {
       log.info("[{}] Provisioning started (priority={})", id, instance.getListenerPriority());
 
-      // 1. The database must exist before the container starts. CiviForm connects on
-      //    boot, and the ECS deployment circuit breaker turns a failed connection into
-      //    a failed deployment after 10 attempts rather than retrying indefinitely —
-      //    so a late database is not slow, it is fatal.
-      provisionDatabase(instance.getDatabaseName(), dbUser, dbPassword);
-      log.info("[{}] Database created", id);
+      // 1. Ensure the database and role exist with the expected password before the
+      //    container starts or restarts.
+      databaseStep.run();
 
       // 2. Fresh working directory. Terraform keeps provider plugins and backend
       //    configuration in .terraform/ inside the working directory, so concurrent
@@ -623,6 +698,58 @@ public class TerraformSandboxService implements SandboxService {
       st.execute("CREATE EXTENSION IF NOT EXISTS btree_gin;");
     } catch (SQLException e) {
       throw new RuntimeException("Could not install extensions in " + databaseName, e);
+    }
+  }
+
+  /**
+   * Ensures the per-sandbox database and role exist and updates the role's password to {@code
+   * dbPassword} without modifying existing tables or data.
+   *
+   * <p>The builder does not persist the sandbox's database password — it lives only in Secrets
+   * Manager and Terraform state. On re-provision, generating a fresh password and updating the role
+   * via {@code ALTER USER} keeps PostgreSQL and Secrets Manager in sync while preserving all
+   * existing database contents. If a previous initial provision failed before the database was
+   * created, this falls back to creating the role and database cleanly.
+   */
+  private void reconcileDatabase(String databaseName, String dbUser, String dbPassword) {
+    boolean[] dbExists = {false};
+    withRdsAdmin(
+        st -> {
+          boolean roleExists;
+          try (java.sql.ResultSet rs =
+              st.executeQuery(
+                  String.format("SELECT 1 FROM pg_roles WHERE rolname = '%s'", dbUser))) {
+            roleExists = rs.next();
+          }
+          if (roleExists) {
+            st.execute(String.format("ALTER USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
+          } else {
+            st.execute(String.format("CREATE USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
+          }
+          st.execute(String.format("GRANT %s TO CURRENT_USER", dbUser));
+
+          try (java.sql.ResultSet rs =
+              st.executeQuery(
+                  String.format("SELECT 1 FROM pg_database WHERE datname = '%s'", databaseName))) {
+            dbExists[0] = rs.next();
+          }
+          if (!dbExists[0]) {
+            st.execute(String.format("CREATE DATABASE %s OWNER %s", databaseName, dbUser));
+            st.execute(
+                String.format(
+                    "REVOKE CONNECT, TEMPORARY ON DATABASE %s FROM PUBLIC", databaseName));
+          }
+        });
+
+    if (!dbExists[0]) {
+      String url = rdsUrl(databaseName);
+      try (Connection conn = DriverManager.getConnection(url, dbUser, dbPassword);
+          Statement st = conn.createStatement()) {
+        st.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
+        st.execute("CREATE EXTENSION IF NOT EXISTS btree_gin;");
+      } catch (SQLException e) {
+        throw new RuntimeException("Could not install extensions in " + databaseName, e);
+      }
     }
   }
 

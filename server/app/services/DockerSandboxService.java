@@ -322,6 +322,90 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id) {
+    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+    if (maybeSandbox.isEmpty()) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+    SandboxInstance existing = maybeSandbox.get();
+    if (existing.getStatus() == SandboxStatus.PROVISIONING
+        || existing.getStatus() == SandboxStatus.DELETING
+        || existing.getStatus() == SandboxStatus.DELETED) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+
+    String accessToken = existing.getAccessToken();
+    if (accessToken == null || accessToken.isBlank()) {
+      accessToken = UUID.randomUUID().toString();
+      repository.updateAccessTokenAndPriority(id, accessToken, existing.getListenerPriority());
+    }
+
+    repository.updateStatus(id, SandboxStatus.PROVISIONING);
+
+    SandboxInstance updated =
+        existing.toBuilder()
+            .accessToken(accessToken)
+            .status(SandboxStatus.PROVISIONING)
+            .build();
+
+    String databaseName = updated.getDatabaseName();
+    String dbUser = databaseName;
+    String dbPassword = generateSecret(20);
+    String appSecret = generateSecret(32);
+    int hostPort = updated.getHostPort();
+
+    CompletableFuture.runAsync(
+        () -> {
+          try {
+            log.info("[{}] Re-provisioning started (port={}, database={})", id, hostPort, databaseName);
+
+            if (updated.getContainerId() != null) {
+              try {
+                dockerClient.stopContainerCmd(updated.getContainerId()).withTimeout(10).exec();
+                dockerClient.removeContainerCmd(updated.getContainerId()).withForce(true).exec();
+              } catch (Exception e) {
+                log.warn("[{}] Could not stop old container during re-provision: {}", id, e.getMessage());
+              }
+            }
+
+            db.withConnection(
+                conn -> {
+                  try (Statement st = conn.createStatement()) {
+                    st.execute(
+                        String.format("ALTER USER %s WITH PASSWORD '%s'", dbUser, dbPassword));
+                  }
+                  return null;
+                });
+
+            String dbUrl = String.format("jdbc:postgresql://%s:5432/%s", dbHost, databaseName);
+            String containerId =
+                launchContainer(
+                    id,
+                    updated.getCiviformVersion(),
+                    hostPort,
+                    dbUrl,
+                    dbUser,
+                    dbPassword,
+                    appSecret,
+                    updated.getCityName());
+            repository.updateContainerId(id, containerId);
+
+            waitForHealthy(id, hostPort);
+            Thread.sleep(POST_HEALTH_BUFFER_MS);
+
+            repository.updateStatus(id, SandboxStatus.RUNNING);
+            log.info("[{}] Re-provision complete → RUNNING", id);
+          } catch (Exception e) {
+            log.error("[{}] Re-provisioning failed: {}", id, e.getMessage(), e);
+            repository.updateStatus(id, SandboxStatus.FAILED);
+          }
+        },
+        provisioningPool);
+
+    return CompletableFuture.completedFuture(Optional.of(updated));
+  }
+
 
 
 
