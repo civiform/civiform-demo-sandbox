@@ -7,12 +7,6 @@
       <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
     </div>
     <div class="flex items-center gap-3">
-      <a href="https://console.aws.amazon.com/ecs/v2/clusters"
-         target="_blank"
-         rel="noopener"
-         class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1">
-        View in AWS ↗
-      </a>
       <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
         <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
           <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
@@ -109,7 +103,6 @@
     <table
       th:if="${!model.sandboxes.isEmpty()}"
       class="usa-table usa-table--borderless w-full text-sm"
-      data-sortable
     >
       <thead>
         <tr>
@@ -1073,7 +1066,7 @@
 
     // ── Column sort ──────────────────────────────────────────────────
     ;(function () {
-      var table = document.querySelector('table[data-sortable]')
+      var table = document.querySelector('table.usa-table')
       if (!table) return
       var headers = table.querySelectorAll('th[data-sortable]')
       headers.forEach(function (th, colIdx) {
