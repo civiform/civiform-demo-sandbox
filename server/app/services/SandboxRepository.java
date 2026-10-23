@@ -134,6 +134,12 @@ public class SandboxRepository {
     db.withConnection(conn -> {
       try (java.sql.Statement st = conn.createStatement()) {
         st.execute(sql);
+
+        // Purge soft-deleted rows. Their AWS resources were already torn down
+        // by terraform destroy when the delete button was clicked; the rows
+        // only remained for the tombstone display.
+        st.executeUpdate(
+            "DELETE FROM sandbox_instances WHERE deleted_at IS NOT NULL");
       }
       return null;
     });
