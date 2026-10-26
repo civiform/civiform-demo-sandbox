@@ -371,26 +371,7 @@ public class SandboxController extends Controller {
     return request.accepts("application/json") && !request.accepts("text/html");
   }
 
-  /**
-   * Validates the required fields of a {@link CreateSandboxRequest}.
-   *
-   * @return {@code null} if valid, or a user-facing error message if validation fails.
-   */
-  private String validateCreateRequest(CreateSandboxRequest req) {
-    if (req.getCityName() == null || req.getCityName().isBlank()) {
-      return "City name is required.";
-    }
-    if (req.getSubdomain() == null || req.getSubdomain().isBlank()) {
-      return "Subdomain is required.";
-    }
-    if (!req.getSubdomain().matches("^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$")) {
-      return "Subdomain must contain only lowercase letters, numbers, and hyphens.";
-    }
-    if (req.getPin() == null || !req.getPin().matches("^[0-9]{6}$")) {
-      return "Access PIN must be exactly 6 digits.";
-    }
-    return null;
-  }
+
 
   private String orDefault(String value, String defaultValue) {
     return (value != null && !value.isBlank()) ? value : defaultValue;
