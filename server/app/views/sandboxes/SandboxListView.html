@@ -825,98 +825,134 @@
     </div>
   </div>
 
-  <!-- ── Extend Modal ────────────────────────────────────────────────────── -->
+  <!-- ── Extend Modal (USWDS Modal component) ───────────────────────── -->
   <div
     id="extend-modal"
+    class="usa-modal-wrapper is-hidden"
     role="dialog"
     aria-modal="true"
     aria-labelledby="extend-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
   >
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button
-        onclick="closeModal('extend-modal')"
-        aria-label="Close"
-        class="usa-button usa-button--unstyled absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+    <div class="usa-modal-overlay" onclick="closeModal('extend-modal')">
+      <div
+        onclick="event.stopPropagation()"
       >
-        ×
-      </button>
-      <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
-        Extend Demo: <span id="extend-city-name"></span>
-      </h2>
-      <p class="text-sm text-gray-600 mb-2">
-        Specify the number of days you want to extend this sandbox demo by.
-      </p>
-      <p class="text-xs text-gray-500 mb-5">
-        Note: Extending a sandbox will make it unavailable for ~15 minutes.
-      </p>
-      <form id="extend-form" method="POST">
-        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-        <div class="mb-5">
-          <label
-            for="extend-days"
-            class="block text-sm font-medium text-gray-700 mb-1"
-            >Extend by (days):</label
-          >
-          <input
-            id="extend-days"
-            name="days"
-            type="number"
-            value="30"
-            min="1"
-            max="90"
-            class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-            aria-label="Number of days to extend"
-          />
-        </div>
-        <div class="flex items-center gap-4">
-          <button type="submit" class="usa-button">Extend Demo</button>
+        <div class="usa-modal__content">
+          <div class="usa-modal__main">
+            <h2 class="usa-modal__heading" id="extend-modal-title">
+              Extend Demo: <span id="extend-city-name"></span>
+            </h2>
+            <div class="usa-prose">
+              <p>
+                Specify the number of days you want to extend this sandbox demo by.
+              </p>
+              <p class="text-xs text-gray-500">
+                Note: Extending a sandbox will make it unavailable for ~15 minutes.
+              </p>
+            </div>
+            <form id="extend-form" method="POST">
+              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+              <label class="usa-label" for="extend-days">Extend by (days)</label>
+              <input
+                id="extend-days"
+                name="days"
+                type="number"
+                value="30"
+                min="1"
+                max="90"
+                class="usa-input"
+                aria-label="Number of days to extend"
+              />
+              <ul class="usa-button-group margin-top-3">
+                <li class="usa-button-group__item">
+                  <button type="submit" class="usa-button">Extend Demo</button>
+                </li>
+                <li class="usa-button-group__item">
+                  <button
+                    type="button"
+                    onclick="closeModal('extend-modal')"
+                    class="usa-button usa-button--unstyled"
+                  >
+                    Cancel
+                  </button>
+                </li>
+              </ul>
+            </form>
+          </div>
           <button
             type="button"
+            class="usa-button usa-modal__close"
+            aria-label="Close this window"
             onclick="closeModal('extend-modal')"
-            class="usa-button usa-button--unstyled text-blue-600 hover:underline text-sm font-medium cursor-pointer"
           >
-            Cancel
+            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+              <use href="/assets/dist/img/sprite.svg#close"></use>
+            </svg>
           </button>
         </div>
-      </form>
+      </div>
     </div>
   </div>
 
-  <!-- ── Delete Modal ─────────────────────────────────────────────────── -->
+  <!-- ── Delete Modal (USWDS Modal component) ────────────────────────── -->
   <div
     id="delete-modal"
+    class="usa-modal-wrapper is-hidden"
     role="dialog"
     aria-modal="true"
     aria-labelledby="delete-modal-title"
-    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
   >
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-      <button
-        onclick="closeModal('delete-modal')"
-        aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+    <div class="usa-modal-overlay" onclick="closeModal('delete-modal')">
+      <div
+        onclick="event.stopPropagation()"
       >
-        ×
-      </button>
-      <h2 id="delete-modal-title" class="text-xl font-bold text-gray-900 mb-3">
-        Delete demo?
-      </h2>
-      <p class="text-sm text-gray-700 mb-6">
-        This will permanently delete the demo for
-        <strong id="delete-city-name"></strong> from AWS. This cannot be
-        undone.
-      </p>
-      <form id="delete-form" method="POST">
-        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-        <button
-          type="submit"
-          class="usa-button w-full"
-          style="background-color: #c0392b; width: 100%"
-        >
-          Delete demo
-        </button>
-      </form>
+        <div class="usa-modal__content">
+          <div class="usa-modal__main">
+            <h2 class="usa-modal__heading" id="delete-modal-title">
+              Delete demo?
+            </h2>
+            <div class="usa-prose">
+              <p>
+                This will permanently delete the demo for
+                <strong id="delete-city-name"></strong> from AWS. This cannot be
+                undone.
+              </p>
+            </div>
+            <form id="delete-form" method="POST">
+              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+              <ul class="usa-button-group">
+                <li class="usa-button-group__item">
+                  <button
+                    type="submit"
+                    class="usa-button usa-button--secondary"
+                  >
+                    Delete demo
+                  </button>
+                </li>
+                <li class="usa-button-group__item">
+                  <button
+                    type="button"
+                    onclick="closeModal('delete-modal')"
+                    class="usa-button usa-button--unstyled"
+                  >
+                    Cancel
+                  </button>
+                </li>
+              </ul>
+            </form>
+          </div>
+          <button
+            type="button"
+            class="usa-button usa-modal__close"
+            aria-label="Close this window"
+            onclick="closeModal('delete-modal')"
+          >
+            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+              <use href="/assets/dist/img/sprite.svg#close"></use>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -960,8 +996,29 @@
     </div>
   </div>
 
+  <!-- ── Copy success alert (USWDS Alert component, success variant) ──── -->
+  <div
+    id="copy-alert"
+    class="usa-alert usa-alert--success usa-alert--slim"
+    role="alert"
+    hidden
+    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+  >
+    <div class="usa-alert__body">
+      <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
+    </div>
+  </div>
+
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
+    function showCopyAlert(message) {
+      var alert = document.getElementById('copy-alert')
+      var text = document.getElementById('copy-alert-text')
+      text.textContent = message || 'Copied to clipboard'
+      alert.hidden = false
+      setTimeout(function () { alert.hidden = true }, 2000)
+    }
+
     function openDetailsModal(id, cityName, url, pin, gaId) {
       document.getElementById('info-city-name').textContent = cityName
       document.getElementById('info-url').value = url
@@ -1018,15 +1075,14 @@
 
     function openModal(id) {
       const modal = document.getElementById(id)
-      modal.classList.remove('hidden')
-      modal.style.display = 'flex'
-      // trap focus — close on backdrop click
-      modal.addEventListener('click', function onBackdrop(e) {
-        if (e.target === modal) {
-          closeModal(id)
-          modal.removeEventListener('click', onBackdrop)
-        }
-      })
+      // USWDS modals use is-hidden; legacy modals use hidden + display
+      if (modal.classList.contains('usa-modal-wrapper')) {
+        modal.classList.remove('is-hidden')
+        modal.classList.add('is-visible')
+      } else {
+        modal.classList.remove('hidden')
+        modal.style.display = 'flex'
+      }
       // close on Escape
       document.addEventListener('keydown', function onEsc(e) {
         if (e.key === 'Escape') {
@@ -1042,8 +1098,13 @@
 
     function closeModal(id) {
       const modal = document.getElementById(id)
-      modal.classList.add('hidden')
-      modal.style.display = 'none'
+      if (modal.classList.contains('usa-modal-wrapper')) {
+        modal.classList.remove('is-visible')
+        modal.classList.add('is-hidden')
+      } else {
+        modal.classList.add('hidden')
+        modal.style.display = 'none'
+      }
     }
 
     function togglePinVisibility() {
@@ -1054,9 +1115,7 @@
     function copyField(inputId, btn) {
       const val = document.getElementById(inputId).value
       navigator.clipboard.writeText(val).then(() => {
-        const orig = btn.textContent
-        btn.textContent = '✓ Copied'
-        setTimeout(() => (btn.textContent = orig), 1800)
+        showCopyAlert('Copied to clipboard')
       })
     }
 
@@ -1065,9 +1124,7 @@
       const pin = document.getElementById('info-pin').value
       const text = 'Demo URL: ' + url + '\nPassword: ' + pin
       navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById('copy-all-btn')
-        btn.textContent = '✓ Copied!'
-        setTimeout(() => (btn.textContent = 'Copy All'), 1800)
+        showCopyAlert('URL and password copied to clipboard')
       })
     }
 
