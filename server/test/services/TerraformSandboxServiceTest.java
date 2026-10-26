@@ -383,9 +383,15 @@ public class TerraformSandboxServiceTest {
   // ── extendSandbox ───────────────────────────────────────────────────────────
 
   @Test
-  public void extendSandbox_updatesExpiryWithoutReinserting() throws Exception {
+  public void extendSandbox_updatesExpiryAndReprovisionsWithoutReinserting() throws Exception {
     Instant original = Instant.now().plus(5, ChronoUnit.DAYS);
-    SandboxInstance existing = live("123456").toBuilder().expiresAt(original).build();
+    SandboxInstance existing =
+        live("123456").toBuilder()
+            .expiresAt(original)
+            .accessToken("existing-token")
+            .listenerPriority(1002)
+            .databaseName("sb_abcd1234")
+            .build();
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(existing));
 
     Optional<SandboxInstance> result =
@@ -393,17 +399,78 @@ public class TerraformSandboxServiceTest {
 
     assertThat(result).isPresent();
     assertThat(result.get().getExpiresAt()).isEqualTo(original.plus(7, ChronoUnit.DAYS));
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
 
     verify(repository).updateExpiry(eq("sb-abcd1234"), eq(original.plus(7, ChronoUnit.DAYS)));
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.PROVISIONING);
     // save() is a plain INSERT; calling it here would raise a duplicate key violation.
     verify(repository, never()).save(any());
   }
 
   @Test
-  public void extendSandbox_unknownIdReturnsEmpty() throws Exception {
-    when(repository.findById("sb-nope")).thenReturn(Optional.empty());
+  public void extendSandbox_alreadyExpiredSandbox_anchorsFromNow() throws Exception {
+    Instant pastExpiry = Instant.now().minus(15, ChronoUnit.DAYS);
+    SandboxInstance existing =
+        live("123456").toBuilder()
+            .expiresAt(pastExpiry)
+            .accessToken("existing-token")
+            .listenerPriority(1002)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(existing));
 
+    Instant beforeCall = Instant.now();
+    Optional<SandboxInstance> result =
+        newService().extendSandbox("sb-abcd1234", 7).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getExpiresAt()).isAfterOrEqualTo(beforeCall.plus(7, ChronoUnit.DAYS));
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+  }
+
+  @Test
+  public void extendSandbox_unknownOrInFlightOrDeletedIdReturnsEmpty() throws Exception {
+    when(repository.findById("sb-nope")).thenReturn(Optional.empty());
     assertThat(newService().extendSandbox("sb-nope", 7).toCompletableFuture().get()).isEmpty();
+
+    for (SandboxStatus disallowed :
+        new SandboxStatus[] {
+          SandboxStatus.PROVISIONING, SandboxStatus.DELETING, SandboxStatus.DELETED
+        }) {
+      SandboxInstance instance = live("123456").toBuilder().status(disallowed).build();
+      when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(instance));
+
+      assertThat(newService().extendSandbox("sb-abcd1234", 7).toCompletableFuture().get())
+          .isEmpty();
+    }
+    verify(repository, never()).updateExpiry(anyString(), any());
+    verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.PROVISIONING));
+  }
+
+  @Test
+  public void writeTfVars_includesExpirationDateInYyyyMmDdFormat() throws Exception {
+    Path varFile = Files.createTempFile("sandbox-tfvars", ".json");
+    try {
+      SandboxInstance instance =
+          live("123456").toBuilder()
+              .cityName("Burlington, VT")
+              .subdomain("burlington-vt")
+              .adminEmail("bd-lead@exygy.com")
+              .accessToken("token-123")
+              .listenerPriority(1000)
+              .civiformVersion("v2.22.0")
+              .databaseName("sb_abcd1234")
+              .expiresAt(Instant.parse("2026-11-25T15:30:00Z"))
+              .build();
+
+      newService().writeTfVars(varFile, instance, "sb_abcd1234", "db-secret");
+
+      com.fasterxml.jackson.databind.JsonNode json =
+          new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(varFile));
+      assertThat(json.get("expiration_date").asText()).isEqualTo("2026-11-25");
+    } finally {
+      Files.deleteIfExists(varFile);
+    }
   }
 
   // ── reprovisionSandbox ──────────────────────────────────────────────────────

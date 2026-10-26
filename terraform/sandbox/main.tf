@@ -188,6 +188,8 @@ module "civiform_app" {
     # three are exactly what must never be enabled on a real deployment.
     STAGING_DISABLE_DEMO_MODE_LOGINS   = "false"
     SHOW_NOT_PRODUCTION_BANNER_ENABLED = "true"
+    BANNER_TYPE                        = "demo"
+    DEMO_BANNER_EXPIRATION_DATE        = var.expiration_date
 
     # Load-bearing, and not obviously so. FakeAdminClient — the thing that
     # actually provides the [CiviForm Admin] / [Program Admin] personas — only

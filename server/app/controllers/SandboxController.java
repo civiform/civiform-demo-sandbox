@@ -340,10 +340,10 @@ public class SandboxController extends Controller {
     }
     return sandboxService.extendSandbox(id, days).thenApply(maybeExtended -> {
       if (maybeExtended.isEmpty()) {
-        return notFound("Sandbox not found: " + id);
+        return notFound("Sandbox not found or cannot be extended: " + id);
       }
       return redirect(controllers.routes.SandboxController.index())
-          .flashing("success", "Demo extended successfully.");
+          .flashing("success", "Demo extended and re-provisioning initiated.");
     });
   }
 

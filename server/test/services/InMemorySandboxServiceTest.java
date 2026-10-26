@@ -102,5 +102,17 @@ public class InMemorySandboxServiceTest {
             .get();
     assertThat(service.reprovisionSandbox(created.getId()).toCompletableFuture().get()).isEmpty();
   }
+
+  @Test
+  public void extendSandbox_extendsExpiryAndTransitionsToProvisioning()
+      throws ExecutionException, InterruptedException {
+    var before = service.getSandbox("sb-demo0001").toCompletableFuture().get().orElseThrow();
+    var result = service.extendSandbox("sb-demo0001", 15).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getExpiresAt())
+        .isEqualTo(before.getExpiresAt().plus(java.time.Duration.ofDays(15)));
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+  }
 }
 

@@ -27,6 +27,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +69,8 @@ public class TerraformSandboxService implements SandboxService {
   private static final Duration HTTP_PROBE_TIMEOUT = Duration.ofSeconds(10);
   private static final Duration DEFAULT_READINESS_TIMEOUT = Duration.ofMinutes(10);
   private static final Duration DEFAULT_READINESS_POLL_INTERVAL = Duration.ofSeconds(10);
+  private static final DateTimeFormatter EXPIRATION_DATE_FMT =
+      DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
 
   /**
    * Passed as {@code db_password} when destroying.
@@ -198,19 +202,29 @@ public class TerraformSandboxService implements SandboxService {
 
   @Override
   public CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id) {
-    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
-    if (maybeSandbox.isEmpty()) {
-      return CompletableFuture.completedFuture(Optional.empty());
-    }
-    SandboxInstance existing = maybeSandbox.get();
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return Optional.empty();
+          }
+          SandboxInstance existing = maybeSandbox.get();
 
-    // Do not start a competing apply if the sandbox is already being provisioned,
-    // torn down, or soft-deleted.
-    if (existing.getStatus() == SandboxStatus.PROVISIONING
-        || existing.getStatus() == SandboxStatus.DELETING
-        || existing.getStatus() == SandboxStatus.DELETED) {
-      return CompletableFuture.completedFuture(Optional.empty());
-    }
+          // Do not start a competing apply if the sandbox is already being provisioned,
+          // torn down, or soft-deleted.
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+
+          return Optional.of(startReprovision(existing));
+        },
+        provisioningPool);
+  }
+
+  private SandboxInstance startReprovision(SandboxInstance existing) {
+    String id = existing.getId();
 
     // Backfill access_token or listener_priority for legacy sandboxes created before
     // PIN gating or sequence-based priorities existed.
@@ -243,7 +257,7 @@ public class TerraformSandboxService implements SandboxService {
 
     enqueueForSandbox(id, () -> reprovision(updated, dbUser, dbPassword));
 
-    return CompletableFuture.completedFuture(Optional.of(updated));
+    return updated;
   }
 
   /** The long-running half of creation. Runs on {@link #provisioningPool}. */
@@ -440,12 +454,20 @@ public class TerraformSandboxService implements SandboxService {
             return Optional.empty();
           }
           SandboxInstance existing = maybeSandbox.get();
-          Instant extended = existing.getExpiresAt().plus(Duration.ofDays(days));
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+          Instant now = Instant.now();
+          Instant base = existing.getExpiresAt().isBefore(now) ? now : existing.getExpiresAt();
+          Instant extended = base.plus(Duration.ofDays(days));
 
           repository.updateExpiry(id, extended);
           log.info("[{}] Expiry extended by {} days → {}", id, days, extended);
 
-          return Optional.of(existing.toBuilder().expiresAt(extended).build());
+          return Optional.of(
+              startReprovision(existing.toBuilder().expiresAt(extended).build()));
         },
         provisioningPool);
   }
@@ -481,8 +503,14 @@ public class TerraformSandboxService implements SandboxService {
   // Terraform inputs
   // ---------------------------------------------------------------------------
 
+  @VisibleForTesting
+  static String formatExpirationDate(Instant expiresAt) {
+    return expiresAt != null ? EXPIRATION_DATE_FMT.format(expiresAt) : "";
+  }
+
   /** Builds the per-sandbox variables file by merging platform outputs with sandbox values. */
-  private void writeTfVars(
+  @VisibleForTesting
+  void writeTfVars(
       Path varFile, SandboxInstance instance, String dbUser, String dbPassword) {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode vars = mapper.createObjectNode();
@@ -491,6 +519,7 @@ public class TerraformSandboxService implements SandboxService {
     vars.put("city_name", instance.getCityName());
     vars.put("subdomain", instance.getSubdomain());
     vars.put("admin_email", instance.getAdminEmail());
+    vars.put("expiration_date", formatExpirationDate(instance.getExpiresAt()));
     vars.put("listener_priority", instance.getListenerPriority());
     vars.put("access_token", instance.getAccessToken());
     vars.put("civiform_image_tag", instance.getCiviformVersion());

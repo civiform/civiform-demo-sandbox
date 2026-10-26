@@ -587,6 +587,45 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
+  public void extend_existingSandbox_redirectsToDashboardWithFlash() {
+    SandboxInstance extended = makeSandbox("sb-ext1", SandboxStatus.PROVISIONING);
+    when(sandboxService.extendSandbox("sb-ext1", 30))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(extended)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-ext1/extend")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).isPresent();
+    assertThat(result.redirectLocation().get()).isEqualTo(routes.SandboxController.index().url());
+    assertThat(result.flash().get("success"))
+        .contains("Demo extended and re-provisioning initiated.");
+  }
+
+  @Test
+  public void extend_missingOrIneligibleSandbox_returns404() {
+    when(sandboxService.extendSandbox("sb-missing", 30))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-missing/extend")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(NOT_FOUND);
+    assertThat(Helpers.contentAsString(result))
+        .contains("Sandbox not found or cannot be extended: sb-missing");
+  }
+
+  @Test
   public void reprovision_withoutAuth_redirectsToLogin() {
     Http.RequestBuilder request =
         Helpers.fakeRequest().method("POST").uri("/sandboxes/sb-reprov1/reprovision");
