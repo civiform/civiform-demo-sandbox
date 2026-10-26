@@ -3,11 +3,14 @@ package controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static play.mvc.Http.Status.BAD_REQUEST;
 import static play.mvc.Http.Status.NOT_FOUND;
 import static play.mvc.Http.Status.OK;
 import static play.mvc.Http.Status.SEE_OTHER;
+import static play.mvc.Http.Status.TOO_MANY_REQUESTS;
 import static play.test.Helpers.contentAsString;
 
 import com.google.common.collect.ImmutableList;
@@ -215,6 +218,72 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(contentAsString(result)).contains("Incorrect PIN");
     // No cookie on wrong PIN
     assertThat(result.cookie("sb_access_sb_pin2")).isEmpty();
+  }
+
+  @Test
+  public void validateAccess_tooManyWrongPins_returns429WithoutCheckingPin() {
+    SandboxInstance sandbox = makeSandbox("sb-pin4", SandboxStatus.RUNNING);
+    when(sandboxService.validatePin(any(), any()))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+    when(sandboxService.getSandbox("sb-pin4"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    // Default limit is 10 guesses per window.
+    for (int i = 0; i < 10; i++) {
+      Result wrong =
+          Helpers.route(
+              app,
+              Helpers.fakeRequest()
+                  .method("POST")
+                  .uri("/sandboxes/sb-pin4/access")
+                  .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "00000" + i)));
+      assertThat(wrong.status()).isEqualTo(BAD_REQUEST);
+    }
+
+    Result limited =
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("POST")
+                .uri("/sandboxes/sb-pin4/access")
+                .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917")));
+
+    assertThat(limited.status()).isEqualTo(TOO_MANY_REQUESTS);
+    assertThat(limited.header("Retry-After")).isPresent();
+    assertThat(contentAsString(limited)).contains("Too many incorrect attempts");
+    assertThat(limited.cookie("sb_access_sb_pin4")).isEmpty();
+    // The 11th guess was refused before the PIN was looked at.
+    verify(sandboxService, times(10)).validatePin(any(), any());
+  }
+
+  @Test
+  public void validateAccess_correctPinResetsAttemptCount() {
+    SandboxInstance sandbox = makeSandbox("sb-pin5", SandboxStatus.RUNNING);
+    when(sandboxService.validatePin("sb-pin5", "111111"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+    when(sandboxService.validatePin("sb-pin5", "482917"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+    when(sandboxService.getSandbox("sb-pin5"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
+
+    for (int round = 0; round < 3; round++) {
+      for (int i = 0; i < 9; i++) {
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("POST")
+                .uri("/sandboxes/sb-pin5/access")
+                .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "111111")));
+      }
+      Result correct =
+          Helpers.route(
+              app,
+              Helpers.fakeRequest()
+                  .method("POST")
+                  .uri("/sandboxes/sb-pin5/access")
+                  .bodyForm(com.google.common.collect.ImmutableMap.of("pin", "482917")));
+      assertThat(correct.status()).isEqualTo(SEE_OTHER);
+    }
   }
 
   @Test
