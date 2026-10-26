@@ -14,7 +14,7 @@ import views.shared.ScriptElementSettings;
 import views.shared.TemplateGlobals;
 
 /**
- * Base view for rendering Thymeleaf templates in the Civiform architecture.
+ * Base view for rendering Thymeleaf templates in the CiviForm architecture.
  *
  * @param <TModel> Type of model extending BaseViewModel
  */
@@ -32,7 +32,7 @@ public abstract class BaseView<TModel extends BaseViewModel> {
   }
 
   protected String pageTitle(TModel model, Messages messages) {
-    return "Civiform Sandbox Builder";
+    return "CiviForm Sandbox Builder";
   }
 
   protected String pageHeading(TModel model, Messages messages) {
