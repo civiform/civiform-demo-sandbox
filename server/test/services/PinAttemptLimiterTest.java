@@ -105,4 +105,14 @@ public class PinAttemptLimiterTest {
 
     assertThat(limiter.tryAttempt("sb-1")).isEmpty();
   }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void rejectsAMaxAttemptsBelowOne() {
+    new PinAttemptLimiter(0, WINDOW, new MutableClock());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void rejectsANonPositiveWindow() {
+    new PinAttemptLimiter(3, Duration.ZERO, new MutableClock());
+  }
 }

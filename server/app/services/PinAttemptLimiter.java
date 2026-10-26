@@ -1,5 +1,7 @@
 package services;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.typesafe.config.Config;
@@ -44,6 +46,10 @@ public class PinAttemptLimiter {
   }
 
   PinAttemptLimiter(int maxAttempts, Duration window, Clock clock) {
+    // A limit below 1 would make every PIN submission fail, so refuse to start instead.
+    checkArgument(maxAttempts >= 1, "sandbox.pinGate.maxAttempts must be at least 1");
+    checkArgument(
+        !window.isNegative() && !window.isZero(), "sandbox.pinGate.window must be positive");
     this.maxAttempts = maxAttempts;
     this.window = window;
     this.clock = clock;
