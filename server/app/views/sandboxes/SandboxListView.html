@@ -26,6 +26,16 @@
     <span th:text="${flash['success']}"></span>
   </div>
 
+  <!-- Flash: error (validation failures, rejected creates) -->
+  <div
+    th:if="${flash != null && #maps.containsKey(flash, 'error')}"
+    role="alert"
+    class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 flex items-center gap-2"
+  >
+    <span>✗</span>
+    <span th:text="${flash['error']}"></span>
+  </div>
+
   <!-- Flash: deleted (auto-dismisses after 4s, matches prototype) -->
   <div
     th:if="${flash != null && #maps.containsKey(flash, 'deleted')}"

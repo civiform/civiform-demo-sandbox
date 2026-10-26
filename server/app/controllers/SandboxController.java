@@ -88,17 +88,16 @@ public class SandboxController extends Controller {
   public CompletionStage<Result> create(Http.Request request) {
     CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
 
-    // Server-side validation — defense in depth. The client-side wizard validates
-    // these fields too, but a direct POST (curl / API) would bypass that.
-    String validationError = validateCreateRequest(sandboxRequest);
-    if (validationError != null) {
+    // Server-side validation: reject blank/invalid required fields
+    Optional<String> validationError = validateCreateRequest(sandboxRequest);
+    if (validationError.isPresent()) {
       if (isJsonRequest(request)) {
         return CompletableFuture.completedFuture(
-            badRequest(Json.toJson(java.util.Map.of("error", validationError))));
+            badRequest(Json.newObject().put("error", validationError.get())));
       }
       return CompletableFuture.completedFuture(
           redirect(controllers.routes.SandboxController.index())
-              .flashing("error", validationError));
+              .flashing("error", validationError.get()));
     }
 
     return sandboxService.createSandbox(sandboxRequest)
@@ -110,6 +109,29 @@ public class SandboxController extends Controller {
           return redirect(controllers.routes.SandboxController.index())
               .flashing("success", "Demo provisioning initiated. You'll be notified when the demo instance is ready.");
         });
+  }
+
+  /**
+   * Validates a {@link CreateSandboxRequest} and returns the first error found, if any.
+   *
+   * <p>Checks: city name non-blank, subdomain non-blank + valid chars, PIN exactly 6 digits.
+   * This is defense-in-depth — the browser wizard validates too, but direct POST callers
+   * (curl, API clients) bypass client-side JS.
+   */
+  private Optional<String> validateCreateRequest(CreateSandboxRequest req) {
+    if (req.getCityName() == null || req.getCityName().isBlank()) {
+      return Optional.of("City name is required.");
+    }
+    if (req.getSubdomain() == null || req.getSubdomain().isBlank()) {
+      return Optional.of("Subdomain is required.");
+    }
+    if (!req.getSubdomain().matches("[a-z0-9]+(-[a-z0-9]+)*")) {
+      return Optional.of("Subdomain must be lowercase letters, digits, and hyphens only.");
+    }
+    if (req.getPin() == null || !req.getPin().matches("[0-9]{6}")) {
+      return Optional.of("PIN must be exactly 6 digits.");
+    }
+    return Optional.empty();
   }
 
   /**
