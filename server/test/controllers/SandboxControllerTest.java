@@ -228,8 +228,8 @@ public class SandboxControllerTest extends WithApplication {
     when(sandboxService.getSandbox("sb-pin4"))
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
-    // Default limit is 10 guesses per window.
-    for (int i = 0; i < 10; i++) {
+    // Default limit is 5 guesses per window.
+    for (int i = 0; i < 5; i++) {
       Result wrong =
           Helpers.route(
               app,
@@ -252,8 +252,8 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(limited.header("Retry-After")).isPresent();
     assertThat(contentAsString(limited)).contains("Too many incorrect attempts");
     assertThat(limited.cookie("sb_access_sb_pin4")).isEmpty();
-    // The 11th guess was refused before the PIN was looked at.
-    verify(sandboxService, times(10)).validatePin(any(), any());
+    // The 6th guess was refused before the PIN was looked at.
+    verify(sandboxService, times(5)).validatePin(any(), any());
   }
 
   @Test
@@ -267,7 +267,7 @@ public class SandboxControllerTest extends WithApplication {
         .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
 
     for (int round = 0; round < 3; round++) {
-      for (int i = 0; i < 9; i++) {
+      for (int i = 0; i < 4; i++) {
         Helpers.route(
             app,
             Helpers.fakeRequest()
