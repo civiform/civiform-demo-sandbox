@@ -20,6 +20,7 @@ import play.mvc.Result;
 import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
+import services.PinAttemptLimiter;
 import services.SandboxService;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
@@ -35,6 +36,7 @@ public class SandboxController extends Controller {
   private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
+  private final PinAttemptLimiter pinAttemptLimiter;
   /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
   private final String sandboxBaseDomain;
 
@@ -45,12 +47,14 @@ public class SandboxController extends Controller {
       SandboxDetailsView detailsView,
       PinGateView pinGateView,
       FormFactory formFactory,
+      PinAttemptLimiter pinAttemptLimiter,
       Config config) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
+    this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
     this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
   }
 
@@ -265,14 +269,23 @@ public class SandboxController extends Controller {
    * hitting the PIN gate again.
    *
    * <p>Wrong PIN → re-renders PIN gate with error. No cookie is set.
+   *
+   * <p>Guesses are limited per sandbox by {@link PinAttemptLimiter}. Once a sandbox is out of
+   * guesses the PIN is not checked at all and the response is a 429 with {@code Retry-After}.
    */
   @RequireCSRFCheck
   public CompletionStage<Result> validateAccess(Http.Request request, String id) {
     DynamicForm form = formFactory.form().bindFromRequest(request);
     String pin = orDefault(form.get("pin"), "");
 
+    Optional<Duration> retryAfter = pinAttemptLimiter.tryAttempt(id);
+    if (retryAfter.isPresent()) {
+      return sandboxService.getSandbox(id).thenApply(ms -> tooManyAttempts(request, id, ms, retryAfter.get()));
+    }
+
     return sandboxService.validatePin(id, pin).thenCompose(maybeSandbox -> {
       if (maybeSandbox.isPresent()) {
+        pinAttemptLimiter.clear(id);
         SandboxInstance sandbox = maybeSandbox.get();
         // Correct PIN — set HTTP-only access cookie with per-sandbox secret token
         Http.Cookie accessCookie = Http.Cookie.builder(accessCookieName(id), sandbox.getAccessToken())
@@ -289,6 +302,10 @@ public class SandboxController extends Controller {
       }
       // Wrong PIN — re-render gate with error, no cookie set
       return sandboxService.getSandbox(id).thenApply(ms -> {
+        if (ms.isEmpty()) {
+          // Not a real sandbox: don't let guessing random ids grow the limiter's map.
+          pinAttemptLimiter.clear(id);
+        }
         PinGateViewModel model = PinGateViewModel.builder()
             .sandboxId(id)
             .cityName(ms.map(SandboxInstance::getCityName).orElse(""))
@@ -300,6 +317,26 @@ public class SandboxController extends Controller {
   }
 
 
+
+  private Result tooManyAttempts(
+      Http.Request request, String id, Optional<SandboxInstance> sandbox, Duration retryAfter) {
+    if (sandbox.isEmpty()) {
+      pinAttemptLimiter.clear(id);
+    }
+    long seconds = Math.max(1, retryAfter.toSeconds());
+    long minutes = Math.max(1, (seconds + 59) / 60);
+    PinGateViewModel model = PinGateViewModel.builder()
+        .sandboxId(id)
+        .cityName(sandbox.map(SandboxInstance::getCityName).orElse(""))
+        .error(
+            "Too many incorrect attempts. Try again in "
+                + minutes
+                + (minutes == 1 ? " minute." : " minutes."))
+        .build();
+    return status(TOO_MANY_REQUESTS, pinGateView.render(request, model))
+        .as("text/html")
+        .withHeader(RETRY_AFTER, Long.toString(seconds));
+  }
 
   /** POST /sandboxes/:id/delete — destroys a sandbox and redirects to list. */
   @RequireCSRFCheck
