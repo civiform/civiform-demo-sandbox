@@ -34,6 +34,16 @@
     <span th:text="${flash['success']}"></span>
   </div>
 
+  <!-- Flash: error (validation failures, rejected creates) -->
+  <div
+    th:if="${flash != null && #maps.containsKey(flash, 'error')}"
+    role="alert"
+    class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 flex items-center gap-2"
+  >
+    <span>✗</span>
+    <span th:text="${flash['error']}"></span>
+  </div>
+
   <!-- Flash: deleted (auto-dismisses after 4s, matches prototype) -->
   <div
     th:if="${flash != null && #maps.containsKey(flash, 'deleted')}"
@@ -380,17 +390,6 @@
           >
             AWS setup
           </button>
-          <button
-            type="button"
-            role="tab"
-            id="wizard-tab-3"
-            aria-selected="false"
-            aria-controls="create-step-panel-3"
-            class="wizard-tab"
-            onclick="wizardGoTo(3)"
-          >
-            Program setup
-          </button>
         </div>
 
         <!-- Inline validation error -->
@@ -418,7 +417,7 @@
                 class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
                 >1</span
               >
-              <span class="text-sm text-gray-500">of 3</span>
+              <span class="text-sm text-gray-500">of 2</span>
               <span class="text-lg font-bold text-gray-900"
                 >CiviForm setup</span
               >
@@ -537,7 +536,7 @@
                 class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
                 >2</span
               >
-              <span class="text-sm text-gray-500">of 3</span>
+              <span class="text-sm text-gray-500">of 2</span>
               <span class="text-lg font-bold text-gray-900">AWS setup</span>
             </div>
             <p class="text-sm text-gray-600 mb-5">
@@ -655,113 +654,9 @@
                 &#x2190; Back
               </button>
               <button
-                type="button"
-                class="usa-button px-8"
-                onclick="wizardNext(2)"
-                aria-label="Continue to Step 3: Program setup"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-
-          <!-- Step 3: Program setup -->
-          <div
-            id="create-step-panel-3"
-            class="wizard-panel hidden"
-            role="tabpanel"
-            aria-labelledby="wizard-tab-3"
-          >
-            <!-- Step heading -->
-            <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
-                >3</span
-              >
-              <span class="text-sm text-gray-500">of 3</span>
-              <span class="text-lg font-bold text-gray-900">Program setup</span>
-            </div>
-
-            <!-- Pre-loaded programs info block -->
-            <div
-              class="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3"
-            >
-              <span
-                class="text-blue-500 text-lg flex-shrink-0 mt-0.5"
-                aria-hidden="true"
-                >&#x2139;</span
-              >
-              <p class="text-sm text-blue-800 leading-relaxed">
-                Demos are pre-loaded with a generic set of programs designed to
-                demonstrate the range of CiviForm features for different user
-                roles.
-              </p>
-            </div>
-
-            <!-- Import from PDF (stub, disabled) -->
-            <div class="mb-6">
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                class="usa-button usa-button--outline w-full opacity-60 cursor-not-allowed"
-              >
-                Import from PDF
-              </button>
-              <p class="text-xs text-gray-500 mt-2">
-                Upload PDF forms to automatically extract and generate
-                additional custom programs in the demo. Imported programs are
-                editable after the demo is provisioned.
-              </p>
-            </div>
-
-            <input
-              type="hidden"
-              id="hidden-cityName"
-              name="cityName"
-              value=""
-            />
-            <input
-              type="hidden"
-              id="hidden-adminEmail"
-              name="adminEmail"
-              value=""
-            />
-            <input
-              type="hidden"
-              id="hidden-subdomain"
-              name="subdomain"
-              value=""
-            />
-            <input type="hidden" id="hidden-pin" name="pin" value="" />
-            <input
-              type="hidden"
-              id="hidden-expirationDays"
-              name="expirationDays"
-              value="30"
-            />
-            <input
-              type="hidden"
-              id="hidden-googleAnalyticsId"
-              name="googleAnalyticsId"
-              value=""
-            />
-
-            <!-- Step 3 footer -->
-            <div class="flex items-center justify-between gap-4">
-              <button
-                type="button"
-                class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                onclick="wizardBack(3)"
-                aria-label="Back to Step 2: AWS setup"
-              >
-                &#x2190; Back
-              </button>
-              <button
                 type="submit"
                 class="usa-button px-8"
                 aria-label="Provision demo"
-                onclick="syncHiddenInputs()"
               >
                 Provision demo
               </button>
@@ -1213,7 +1108,7 @@
     ;(function () {
       'use strict'
 
-      var TOTAL_STEPS = 3
+      var TOTAL_STEPS = 2
       var subdomainDirty = false
 
       // Convert a city name string to a URL-safe slug
@@ -1228,20 +1123,28 @@
       var cityNameEl = document.getElementById('cityName')
       var subdomainEl = document.getElementById('subdomain')
 
-      // Mirror live inputs into hidden inputs for the Step 3 POST
+      // Re-enable all form inputs before submit so the browser includes
+      // Step 1 fields (which are disabled when the user advances to Step 2).
       window.syncHiddenInputs = function () {
-        function val(id) {
-          var el = document.getElementById(id)
-          return el ? (el.value || '').trim() : ''
+        for (var i = 1; i <= TOTAL_STEPS; i++) {
+          setStepInputsDisabled(i, false)
         }
-        document.getElementById('hidden-cityName').value = val('cityName')
-        document.getElementById('hidden-adminEmail').value = val('adminEmail')
-        document.getElementById('hidden-subdomain').value = val('subdomain')
-        document.getElementById('hidden-pin').value = val('pin')
-        document.getElementById('hidden-expirationDays').value =
-          val('expirationDays') || '30'
-        document.getElementById('hidden-googleAnalyticsId').value =
-          val('googleAnalyticsId')
+      }
+
+      // Validate Step 2 fields on form submit. The form is novalidate (HTML5
+      // validation is off) and the old wizardNext(2) call that ran
+      // validateStep2() was removed when Step 3 was dropped. Without this
+      // guard, blank Step 2 fields would reach the server, which falls back
+      // to defaults (PIN "000000", subdomain "demo") — a security risk.
+      var sandboxForm = document.getElementById('sandbox-form')
+      if (sandboxForm) {
+        sandboxForm.addEventListener('submit', function (e) {
+          if (!validateStep2()) {
+            e.preventDefault()
+            return
+          }
+          syncHiddenInputs()
+        })
       }
 
       if (cityNameEl) {
@@ -1249,23 +1152,14 @@
           if (!subdomainDirty && subdomainEl) {
             subdomainEl.value = toSlug(cityNameEl.value)
           }
-          syncHiddenInputs()
         })
       }
 
       if (subdomainEl) {
         subdomainEl.addEventListener('input', function () {
           subdomainDirty = subdomainEl.value.length > 0
-          syncHiddenInputs()
         })
       }
-
-      ;['adminEmail', 'pin', 'expirationDays', 'googleAnalyticsId'].forEach(
-        function (id) {
-          var el = document.getElementById(id)
-          if (el) el.addEventListener('input', syncHiddenInputs)
-        },
-      )
 
       // Update tab states and show the correct panel
       function showStep(targetStep) {

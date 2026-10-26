@@ -130,6 +130,111 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.flash().get("success").get()).contains("Demo provisioning initiated");
   }
 
+  @Test
+  public void create_blankCityName_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "",
+                    "subdomain", "burlington-vt",
+                    "pin", "123456",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("City name");
+  }
+
+  @Test
+  public void create_blankSubdomain_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Portland, OR",
+                    "subdomain", "",
+                    "pin", "123456",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("Subdomain");
+  }
+
+  @Test
+  public void create_invalidSubdomainChars_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Portland, OR",
+                    "subdomain", "Portland OR!!!",
+                    "pin", "123456",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).containsIgnoringCase("subdomain");
+  }
+
+  @Test
+  public void create_invalidPin_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Portland, OR",
+                    "subdomain", "portland-or",
+                    "pin", "12",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("PIN");
+  }
+
+  @Test
+  public void create_blankPin_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Portland, OR",
+                    "subdomain", "portland-or",
+                    "pin", "",
+                    "adminEmail", "admin@test.com"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("PIN");
+  }
+
   // ── POST /sandboxes/:id/access — PIN validation ───────────────────────────
 
   @Test

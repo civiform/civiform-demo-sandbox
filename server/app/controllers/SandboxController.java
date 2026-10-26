@@ -87,6 +87,19 @@ public class SandboxController extends Controller {
   @RequireCSRFCheck
   public CompletionStage<Result> create(Http.Request request) {
     CreateSandboxRequest sandboxRequest = parseCreateRequest(request);
+
+    // Server-side validation: reject blank/invalid required fields
+    Optional<String> validationError = validateCreateRequest(sandboxRequest);
+    if (validationError.isPresent()) {
+      if (isJsonRequest(request)) {
+        return CompletableFuture.completedFuture(
+            badRequest(Json.newObject().put("error", validationError.get())));
+      }
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.SandboxController.index())
+              .flashing("error", validationError.get()));
+    }
+
     return sandboxService.createSandbox(sandboxRequest)
         .thenApply(instance -> {
           if (isJsonRequest(request)) {
@@ -99,6 +112,29 @@ public class SandboxController extends Controller {
   }
 
   /**
+   * Validates a {@link CreateSandboxRequest} and returns the first error found, if any.
+   *
+   * <p>Checks: city name non-blank, subdomain non-blank + valid chars, PIN exactly 6 digits.
+   * This is defense-in-depth — the browser wizard validates too, but direct POST callers
+   * (curl, API clients) bypass client-side JS.
+   */
+  private Optional<String> validateCreateRequest(CreateSandboxRequest req) {
+    if (req.getCityName() == null || req.getCityName().isBlank()) {
+      return Optional.of("City name is required.");
+    }
+    if (req.getSubdomain() == null || req.getSubdomain().isBlank()) {
+      return Optional.of("Subdomain is required.");
+    }
+    if (!req.getSubdomain().matches("[a-z0-9]+(-[a-z0-9]+)*")) {
+      return Optional.of("Subdomain must be lowercase letters, digits, and hyphens only.");
+    }
+    if (req.getPin() == null || !req.getPin().matches("[0-9]{6}")) {
+      return Optional.of("PIN must be exactly 6 digits.");
+    }
+    return Optional.empty();
+  }
+
+  /**
    * Parses a {@link CreateSandboxRequest} from either a JSON body or an HTML form POST.
    * Centralises all field extraction and default-value logic in one place.
    */
@@ -108,9 +144,9 @@ public class SandboxController extends Controller {
       String gaId  = json.has("googleAnalyticsId")  ? json.get("googleAnalyticsId").asText()  : null;
       String gaUrl = json.has("googleAnalyticsUrl") ? json.get("googleAnalyticsUrl").asText() : null;
       return CreateSandboxRequest.builder()
-          .cityName(json.has("cityName")       ? json.get("cityName").asText()       : "Demo City")
-          .subdomain(json.has("subdomain")     ? json.get("subdomain").asText()      : "demo")
-          .pin(json.has("pin")                 ? json.get("pin").asText()            : "000000")
+          .cityName(json.has("cityName")       ? json.get("cityName").asText()       : "")
+          .subdomain(json.has("subdomain")     ? json.get("subdomain").asText()      : "")
+          .pin(json.has("pin")                 ? json.get("pin").asText()            : "")
           .adminEmail(json.has("adminEmail")   ? json.get("adminEmail").asText()     : "")
           .expirationDays(json.has("expirationDays") ? json.get("expirationDays").asInt(30) : 30)
           .googleAnalyticsId(gaId  != null  && !gaId.isBlank()  ? gaId  : null)
@@ -128,9 +164,9 @@ public class SandboxController extends Controller {
     } catch (NumberFormatException ignored) { /* keep default 30 */ }
 
     return CreateSandboxRequest.builder()
-        .cityName(orDefault(form.get("cityName"),   "Demo City"))
-        .subdomain(orDefault(form.get("subdomain"), "demo"))
-        .pin(orDefault(form.get("pin"),             "000000"))
+        .cityName(orDefault(form.get("cityName"),   ""))
+        .subdomain(orDefault(form.get("subdomain"), ""))
+        .pin(orDefault(form.get("pin"),             ""))
         .adminEmail(orDefault(form.get("adminEmail"), ""))
         .expirationDays(expirationDays)
         .googleAnalyticsId(gaId  != null && !gaId.isBlank()  ? gaId  : null)
@@ -334,6 +370,8 @@ public class SandboxController extends Controller {
   private boolean isJsonRequest(Http.Request request) {
     return request.accepts("application/json") && !request.accepts("text/html");
   }
+
+
 
   private String orDefault(String value, String defaultValue) {
     return (value != null && !value.isBlank()) ? value : defaultValue;
