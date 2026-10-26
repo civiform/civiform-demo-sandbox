@@ -406,6 +406,74 @@ public class TerraformSandboxServiceTest {
     assertThat(newService().extendSandbox("sb-nope", 7).toCompletableFuture().get()).isEmpty();
   }
 
+  // ── reprovisionSandbox ──────────────────────────────────────────────────────
+
+  @Test
+  public void reprovisionSandbox_marksProvisioningSynchronouslyBeforeReturning() throws Exception {
+    SandboxInstance running =
+        live("123456").toBuilder()
+            .accessToken("existing-token")
+            .listenerPriority(1002)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(running));
+
+    Optional<SandboxInstance> result =
+        newService().reprovisionSandbox("sb-abcd1234").toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+    assertThat(result.get().getAccessToken()).isEqualTo("existing-token");
+    assertThat(result.get().getListenerPriority()).isEqualTo(1002);
+
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.PROVISIONING);
+    verify(repository, never()).updateAccessTokenAndPriority(anyString(), anyString(), any());
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  public void reprovisionSandbox_backfillsMissingAccessTokenAndPriority() throws Exception {
+    SandboxInstance legacy =
+        live("123456").toBuilder()
+            .accessToken("")
+            .listenerPriority(null)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(legacy));
+    when(repository.nextListenerPriority()).thenReturn(1004);
+
+    Optional<SandboxInstance> result =
+        newService().reprovisionSandbox("sb-abcd1234").toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+    assertThat(result.get().getAccessToken()).isNotBlank();
+    assertThat(result.get().getListenerPriority()).isEqualTo(1004);
+
+    verify(repository)
+        .updateAccessTokenAndPriority(
+            eq("sb-abcd1234"), eq(result.get().getAccessToken()), eq(1004));
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.PROVISIONING);
+  }
+
+  @Test
+  public void reprovisionSandbox_unknownOrInFlightOrDeletedIdReturnsEmpty() throws Exception {
+    when(repository.findById("sb-nope")).thenReturn(Optional.empty());
+    assertThat(newService().reprovisionSandbox("sb-nope").toCompletableFuture().get()).isEmpty();
+
+    for (SandboxStatus disallowed :
+        new SandboxStatus[] {
+          SandboxStatus.PROVISIONING, SandboxStatus.DELETING, SandboxStatus.DELETED
+        }) {
+      SandboxInstance instance = live("123456").toBuilder().status(disallowed).build();
+      when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(instance));
+
+      assertThat(newService().reprovisionSandbox("sb-abcd1234").toCompletableFuture().get())
+          .isEmpty();
+    }
+    verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.PROVISIONING));
+  }
+
   // ── platform outputs ────────────────────────────────────────────────────────
 
   @Test

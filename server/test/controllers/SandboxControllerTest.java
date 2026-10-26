@@ -481,6 +481,55 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.redirectLocation()).contains("/login");
   }
 
+  @Test
+  public void reprovision_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest().method("POST").uri("/sandboxes/sb-reprov1/reprovision");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
+  public void reprovision_existingSandbox_redirectsToDashboardWithFlash() {
+    SandboxInstance reprovisioned = makeSandbox("sb-reprov1", SandboxStatus.PROVISIONING);
+    when(sandboxService.reprovisionSandbox("sb-reprov1"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(reprovisioned)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-reprov1/reprovision")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).isPresent();
+    assertThat(result.redirectLocation().get()).isEqualTo(routes.SandboxController.index().url());
+    assertThat(result.flash().get("success")).isPresent();
+    assertThat(result.flash().get("success").get())
+        .contains("Re-provisioning initiated for Burlington, VT");
+  }
+
+  @Test
+  public void reprovision_missingSandbox_returns404() {
+    when(sandboxService.reprovisionSandbox("sb-missing"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-missing/reprovision")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(NOT_FOUND);
+  }
+
   // ── GET /sandboxes/:id/access — PIN gate page ─────────────────────────────
 
   @Test

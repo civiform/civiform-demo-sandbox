@@ -184,6 +184,14 @@
         </button>
         <button
           type="button"
+          th:if="${model.sandbox.status.name() != 'DELETED' and model.sandbox.status.name() != 'DELETING' and model.sandbox.status.name() != 'PROVISIONING'}"
+          onclick="openReprovisionModal()"
+          class="usa-button usa-button--outline"
+        >
+          Re-provision Demo
+        </button>
+        <button
+          type="button"
           th:if="${model.sandbox.status.name() != 'DELETED' and model.sandbox.status.name() != 'DELETING'}"
           onclick="openDestroyModal()"
           class="usa-button usa-button--secondary"
@@ -191,6 +199,51 @@
           Destroy Sandbox
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ── Re-provision Modal ──────────────────────────────────────────────── -->
+  <div
+    id="reprovision-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="reprovision-modal-title"
+    class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 px-4"
+  >
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+      <button
+        onclick="closeReprovisionModal()"
+        aria-label="Close"
+        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none"
+      >
+        ×
+      </button>
+      <h2 id="reprovision-modal-title" class="text-xl font-bold text-gray-900 mb-3">
+        Re-provision demo?
+      </h2>
+      <p class="text-sm text-gray-700 mb-6">
+        This will re-run Terraform to update the demo for
+        <strong th:text="${model.sandbox.cityName}">Burlington, VT</strong>
+        to the latest infrastructure configuration. Existing programs and database data will not be affected.
+      </p>
+      <form th:action="|/sandboxes/${model.sandbox.id}/reprovision|" method="POST">
+        <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+        <div class="flex items-center gap-4">
+          <button
+            type="submit"
+            class="usa-button"
+          >
+            Re-provision Demo
+          </button>
+          <button
+            type="button"
+            onclick="closeReprovisionModal()"
+            class="text-blue-600 hover:underline text-sm font-medium bg-transparent border-0 cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -315,6 +368,27 @@
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
+    function openReprovisionModal() {
+      const modal = document.getElementById('reprovision-modal')
+      modal.classList.remove('hidden')
+      modal.addEventListener('click', function onBackdrop(e) {
+        if (e.target === modal) {
+          closeReprovisionModal()
+          modal.removeEventListener('click', onBackdrop)
+        }
+      })
+      document.addEventListener('keydown', function onEsc(e) {
+        if (e.key === 'Escape') {
+          closeReprovisionModal()
+          document.removeEventListener('keydown', onEsc)
+        }
+      })
+    }
+
+    function closeReprovisionModal() {
+      document.getElementById('reprovision-modal').classList.add('hidden')
+    }
+
     function openDestroyModal() {
       const modal = document.getElementById('destroy-modal')
       modal.classList.remove('hidden')
