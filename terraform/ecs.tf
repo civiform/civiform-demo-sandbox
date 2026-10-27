@@ -579,6 +579,12 @@ resource "aws_ecs_task_definition" "builder" {
   execution_role_arn       = module.sandbox_builder_execution_role.arn
   task_role_arn            = module.sandbox_builder_role.arn
 
+  # Specify default Arch and OS to avoid ambiguity.
+  runtime_platform {
+    cpu_architecture        = "X86_64"
+    operating_system_family = "LINUX"
+  }
+
   container_definitions = jsonencode([
     {
       name      = "builder"
