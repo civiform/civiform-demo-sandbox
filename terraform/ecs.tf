@@ -653,6 +653,8 @@ resource "aws_ecs_service" "builder" {
   # as failed while the previous builder instance is working on it.
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+  scheduling_strategy                = "REPLICA"
+  availability_zone_rebalancing      = "DISABLED"
 
   # Allow Terraform apply to finish before the first Docker image is pushed to ECR.
   wait_for_steady_state = false
