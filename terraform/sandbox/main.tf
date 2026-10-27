@@ -187,6 +187,7 @@ module "civiform_app" {
     # Demo affordances. All three are required by the product brief and all
     # three are exactly what must never be enabled on a real deployment.
     STAGING_DISABLE_DEMO_MODE_LOGINS   = "false"
+    # TODO: Remove this deprecated flag, as it was replaced with BANNER_TYPE.
     SHOW_NOT_PRODUCTION_BANNER_ENABLED = "true"
     BANNER_TYPE                        = "demo"
     DEMO_BANNER_EXPIRATION_DATE        = var.expiration_date

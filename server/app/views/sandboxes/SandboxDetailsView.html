@@ -303,8 +303,11 @@
       <h2 id="extend-modal-title" class="text-xl font-bold text-gray-900 mb-2">
         Extend Demo: <span th:text="${model.sandbox.cityName}"></span>
       </h2>
-      <p class="text-sm text-gray-600 mb-5">
+      <p class="text-sm text-gray-600 mb-2">
         Specify the number of days you want to extend this sandbox demo by.
+      </p>
+      <p class="text-xs text-gray-500 mb-5">
+        Note: Extending a sandbox will make it unavailable for ~15 minutes.
       </p>
       <form th:action="|/sandboxes/${model.sandbox.id}/extend|" method="POST">
         <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
