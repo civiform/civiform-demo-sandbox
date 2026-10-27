@@ -311,7 +311,7 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `DockerSandboxServiceTest` | 25 | Docker socket provisioning |
 | `AuthControllerTest` | 22 | Auth0 OIDC + password fallback |
 | `SandboxRepositoryTest` | 21 | DB CRUD, stale state reconciliation |
-| `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via Testcontainers |
+| `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via `docker compose` (`bin/run-dev`); excluded from default `sbt test` |
 | `PinAttemptLimiterTest` | 8 | Rate limiting logic |
 | `InMemorySandboxServiceTest` | 6 | In-memory stub |
 | `AuthFilterTest` | 5 | Route protection |
