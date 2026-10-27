@@ -273,27 +273,71 @@ When Auth0 is not configured, the portal falls back to a simple email/password l
 
 ## Deploying the Builder Application
 
-### Build & Push to ECR
+### Option A: GitHub Actions (Recommended)
+
+The fastest and most reliable way to deploy. Builds on Ubuntu — no local Docker required.
+
+**Trigger via GitHub UI:**
+1. Go to [Actions → "Deploy to Production"](https://github.com/civiform/civiform-demo-sandbox/actions/workflows/deploy.yml)
+2. Click **Run workflow** → select `main` branch → click **Run workflow**
+3. Monitor the run (~12 minutes: build ~2 min, push ~30s, ECS stability ~10 min)
+
+**Trigger via CLI:**
+```bash
+gh workflow run deploy.yml --repo civiform/civiform-demo-sandbox --ref main -f image_tag=latest
+gh run list --workflow=deploy.yml --repo civiform/civiform-demo-sandbox --limit 1
+```
+
+**What the workflow does:**
+1. Builds `linux/amd64` image from `prod.Dockerfile` on GitHub-hosted Ubuntu runner
+2. Authenticates to ECR via `aws-actions/amazon-ecr-login`
+3. Pushes to `956519721490.dkr.ecr.us-east-1.amazonaws.com/civiform-sandbox-builder:latest`
+4. Triggers ECS rolling deployment via `aws ecs update-service --force-new-deployment`
+5. Waits for service stability (up to 10 min)
+
+#### AWS Credentials for GitHub Actions
+
+The workflow uses three GitHub Actions secrets:
+
+| Secret | Description |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | STS temporary access key |
+| `AWS_SECRET_ACCESS_KEY` | STS temporary secret key |
+| `AWS_SESSION_TOKEN` | STS session token |
+
+> [!IMPORTANT]
+> **STS session tokens expire** (typically 1–12 hours). When deploys fail with
+> `ExpiredTokenException`, update all three secrets with fresh creds from your SSO login:
+>
+> ```bash
+> # Get fresh creds from AWS SSO, then:
+> gh secret set AWS_ACCESS_KEY_ID --repo civiform/civiform-demo-sandbox --body "ASIA..."
+> gh secret set AWS_SECRET_ACCESS_KEY --repo civiform/civiform-demo-sandbox --body "..."
+> gh secret set AWS_SESSION_TOKEN --repo civiform/civiform-demo-sandbox --body "..."
+> ```
+
+### Option B: Local Docker (`./bin/deploy-prod`)
+
+If you have Docker running locally (e.g. via Colima), you can deploy from your machine:
 
 ```bash
 # From repo root:
 ./bin/deploy-prod latest
 ```
 
-This script:
-1. Builds a `linux/amd64` Docker image from `prod.Dockerfile`
-2. Authenticates to ECR via `aws ecr get-login-password`
-3. Pushes to `<account>.dkr.ecr.us-east-1.amazonaws.com/civiform-sandbox-builder:latest`
-4. Triggers ECS rolling deployment via `aws ecs update-service --force-new-deployment`
+This script does the same 4 steps as the CI workflow but runs the Docker build locally.
 
 > [!WARNING]
 > **Apple Silicon (M1/M2/M3) Macs**: The production image must be `linux/amd64` for ECS Fargate.
 > Cross-platform builds on arm64 Macs can produce corrupt layers that cause
 > `CannotPullContainerError` on Fargate. See [Troubleshooting](#cannotpullcontainererror-on-ecs-fargate)
-> below. **Strongly recommended**: Install Docker Buildx (`brew install docker-buildx`) for
-> reliable cross-platform builds.
+> below.
 
-### Prerequisites for Deploying from Apple Silicon
+> [!CAUTION]
+> **Corp Macs with Santa**: Santa may block `qemu-img` and `docker-buildx`, preventing
+> Colima from starting. If you hit Santa blocks, use Option A (GitHub Actions) instead.
+
+**Prerequisites for local deploy on Apple Silicon:**
 
 Docker Buildx handles cross-platform builds correctly. The legacy Docker builder (`docker build`)
 has known issues with `--platform linux/amd64` on arm64 hosts:
