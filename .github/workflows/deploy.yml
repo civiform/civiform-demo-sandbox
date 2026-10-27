@@ -1,0 +1,105 @@
+# Builds the production Docker image on GitHub Actions (linux/amd64),
+# pushes it to AWS ECR, and triggers a rolling ECS deployment.
+#
+# Trigger options:
+#   - Manual:  Actions → "Deploy to Production" → Run workflow
+#   - On push: Merges to main auto-deploy (disabled by default — uncomment below)
+#
+# Required secrets (set via gh secret set or GitHub UI):
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN (STS temporary creds)
+#
+# NOTE: STS session tokens expire (typically 1–12 hours). When they expire,
+# update all three secrets with fresh creds from your SSO login.
+
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag'
+        required: false
+        default: 'latest'
+  # Uncomment to auto-deploy on merge to main:
+  # push:
+  #   branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: civiform-sandbox-builder
+  ECS_CLUSTER: civiform-sandbox-cluster
+  ECS_SERVICE: civiform-sandbox-builder
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build production image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }} \
+            -f prod.Dockerfile .
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --region ${{ env.AWS_REGION }} \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --force-new-deployment
+
+      - name: Wait for deployment stability
+        run: |
+          echo "Waiting for ECS service to stabilize (up to 10 minutes)..."
+          aws ecs wait services-stable \
+            --region ${{ env.AWS_REGION }} \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} || {
+            echo "::warning::Service did not stabilize within timeout. Check ECS console."
+            exit 0
+          }
+          echo "✅ Deployment stable!"
+
+      - name: Print deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cluster | \`${{ env.ECS_CLUSTER }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | \`${{ env.ECS_SERVICE }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Triggered by | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
