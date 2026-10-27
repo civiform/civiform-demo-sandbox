@@ -104,14 +104,19 @@ public class InMemorySandboxService implements SandboxService {
   @Override
   public CompletionStage<Optional<SandboxInstance>> extendSandbox(String id, int days) {
     SandboxInstance existing = sandboxes.get(id);
-    if (existing == null) {
+    if (existing == null
+        || existing.getStatus() == SandboxStatus.PROVISIONING
+        || existing.getStatus() == SandboxStatus.DELETING
+        || existing.getStatus() == SandboxStatus.DELETED) {
       return CompletableFuture.completedFuture(Optional.empty());
     }
+    Instant now = Instant.now();
+    Instant base = existing.getExpiresAt().isBefore(now) ? now : existing.getExpiresAt();
     SandboxInstance extended = existing.toBuilder()
-        .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
+        .expiresAt(base.plus(Duration.ofDays(days)))
         .build();
     sandboxes.put(id, extended);
-    return CompletableFuture.completedFuture(Optional.of(extended));
+    return reprovisionSandbox(id);
   }
 
   @Override

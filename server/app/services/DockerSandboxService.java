@@ -20,6 +20,8 @@ import java.security.SecureRandom;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -52,6 +54,8 @@ public class DockerSandboxService implements SandboxService {
   private static final int HEALTH_CHECK_MAX_ATTEMPTS = 40; // 40 × 5s = 200s max
   private static final int HEALTH_CHECK_INTERVAL_MS = 5_000;
   private static final int POST_HEALTH_BUFFER_MS = 15_000; // wait for DB migrations
+  private static final DateTimeFormatter EXPIRATION_DATE_FMT =
+      DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
 
   private final SandboxRepository repository;
   private final Database db;
@@ -197,7 +201,15 @@ public class DockerSandboxService implements SandboxService {
             // 3. Launch the CiviForm Docker container
             String containerId =
                 launchContainer(
-                    id, instance.getCiviformVersion(), hostPort, dbUrl, dbUser, dbPassword, appSecret, instance.getCityName());
+                    id,
+                    instance.getCiviformVersion(),
+                    hostPort,
+                    dbUrl,
+                    dbUser,
+                    dbPassword,
+                    appSecret,
+                    instance.getCityName(),
+                    formatExpirationDate(instance.getExpiresAt()));
             repository.updateContainerId(id, containerId);
             log.info("[{}] Container launched: {}", id, containerId);
 
@@ -304,9 +316,16 @@ public class DockerSandboxService implements SandboxService {
             return Optional.empty();
           }
           SandboxInstance existing = maybeSandbox.get();
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+          Instant now = Instant.now();
+          Instant base = existing.getExpiresAt().isBefore(now) ? now : existing.getExpiresAt();
           SandboxInstance extended =
               existing.toBuilder()
-                  .expiresAt(existing.getExpiresAt().plus(Duration.ofDays(days)))
+                  .expiresAt(base.plus(Duration.ofDays(days)))
                   .build();
           // updateExpiry, not save: save is a plain INSERT, so passing an
           // already-persisted instance raises a duplicate key violation on the
@@ -317,24 +336,33 @@ public class DockerSandboxService implements SandboxService {
               id,
               days,
               extended.getExpiresAt());
-          return Optional.of(extended);
+          return Optional.of(startReprovision(extended));
         },
         provisioningPool);
   }
 
   @Override
   public CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id) {
-    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
-    if (maybeSandbox.isEmpty()) {
-      return CompletableFuture.completedFuture(Optional.empty());
-    }
-    SandboxInstance existing = maybeSandbox.get();
-    if (existing.getStatus() == SandboxStatus.PROVISIONING
-        || existing.getStatus() == SandboxStatus.DELETING
-        || existing.getStatus() == SandboxStatus.DELETED) {
-      return CompletableFuture.completedFuture(Optional.empty());
-    }
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return Optional.empty();
+          }
+          SandboxInstance existing = maybeSandbox.get();
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
 
+          return Optional.of(startReprovision(existing));
+        },
+        provisioningPool);
+  }
+
+  private SandboxInstance startReprovision(SandboxInstance existing) {
+    String id = existing.getId();
     String accessToken = existing.getAccessToken();
     if (accessToken == null || accessToken.isBlank()) {
       accessToken = UUID.randomUUID().toString();
@@ -388,7 +416,8 @@ public class DockerSandboxService implements SandboxService {
                     dbUser,
                     dbPassword,
                     appSecret,
-                    updated.getCityName());
+                    updated.getCityName(),
+                    formatExpirationDate(updated.getExpiresAt()));
             repository.updateContainerId(id, containerId);
 
             waitForHealthy(id, hostPort);
@@ -403,7 +432,7 @@ public class DockerSandboxService implements SandboxService {
         },
         provisioningPool);
 
-    return CompletableFuture.completedFuture(Optional.of(updated));
+    return updated;
   }
 
 
@@ -477,6 +506,10 @@ public class DockerSandboxService implements SandboxService {
         });
   }
 
+  static String formatExpirationDate(Instant expiresAt) {
+    return expiresAt != null ? EXPIRATION_DATE_FMT.format(expiresAt) : "";
+  }
+
   /** Launches a CiviForm container and returns its container ID. */
   private String launchContainer(
       String sandboxId,
@@ -486,7 +519,8 @@ public class DockerSandboxService implements SandboxService {
       String dbUser,
       String dbPassword,
       String appSecret,
-      String cityName) {
+      String cityName,
+      String expirationDate) {
 
     ExposedPort internalPort = ExposedPort.tcp(9000);
     Ports portBindings = new Ports();
@@ -534,6 +568,8 @@ public class DockerSandboxService implements SandboxService {
                 "APPLICANT_OIDC_CLIENT_ID=generic-fake-oidc-client",
                 "WHITELABEL_CIVIC_ENTITY_SHORT_NAME=" + cityName,
                 "WHITELABEL_CIVIC_ENTITY_LONG_NAME=" + cityName,
+                "BANNER_TYPE=demo",
+                "DEMO_BANNER_EXPIRATION_DATE=" + expirationDate,
                 "PORT=9000")
             .exec();
 

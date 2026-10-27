@@ -474,6 +474,67 @@ public class DockerSandboxServiceTest {
     assertThat(result.getUrl()).contains("10042");
   }
 
+  @Test
+  public void formatExpirationDate_formatsInstantAsYyyyMmDd() {
+    Instant instant = Instant.parse("2026-11-25T18:45:00Z");
+    assertThat(DockerSandboxService.formatExpirationDate(instant)).isEqualTo("2026-11-25");
+  }
+
+  @Test
+  public void extendSandbox_updatesExpiryAndReprovisionsWithBannerEnvVars()
+      throws ExecutionException, InterruptedException {
+    Instant originalExpiry = Instant.now().plus(Duration.ofDays(5));
+    SandboxInstance existing =
+        makeSandboxWithContainer("sb-ext1", "container-old").toBuilder()
+            .expiresAt(originalExpiry)
+            .accessToken("existing-token")
+            .build();
+    when(repository.findById("sb-ext1")).thenReturn(Optional.of(existing));
+    stubDockerStop("container-old");
+    CreateContainerCmd createCmd = stubSuccessfulContainerLaunch("container-new");
+
+    Optional<SandboxInstance> result =
+        service.extendSandbox("sb-ext1", 10).toCompletableFuture().get();
+
+    Instant expectedExpiry = originalExpiry.plus(Duration.ofDays(10));
+    assertThat(result).isPresent();
+    assertThat(result.get().getExpiresAt()).isEqualTo(expectedExpiry);
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+    verify(repository).updateExpiry("sb-ext1", expectedExpiry);
+    verify(repository).updateStatus("sb-ext1", SandboxStatus.PROVISIONING);
+
+    org.mockito.ArgumentCaptor<String[]> envCaptor =
+        org.mockito.ArgumentCaptor.forClass(String[].class);
+    verify(createCmd, org.mockito.Mockito.timeout(2000)).withEnv(envCaptor.capture());
+    assertThat(envCaptor.getValue())
+        .contains(
+            "BANNER_TYPE=demo",
+            "DEMO_BANNER_EXPIRATION_DATE="
+                + DockerSandboxService.formatExpirationDate(expectedExpiry));
+  }
+
+  @Test
+  public void extendSandbox_alreadyExpiredSandbox_anchorsFromNow()
+      throws ExecutionException, InterruptedException {
+    Instant pastExpiry = Instant.now().minus(Duration.ofDays(15));
+    SandboxInstance existing =
+        makeSandboxWithContainer("sb-ext-past", "container-old").toBuilder()
+            .expiresAt(pastExpiry)
+            .accessToken("existing-token")
+            .build();
+    when(repository.findById("sb-ext-past")).thenReturn(Optional.of(existing));
+    stubDockerStop("container-old");
+    stubSuccessfulContainerLaunch("container-new");
+
+    Instant beforeCall = Instant.now();
+    Optional<SandboxInstance> result =
+        service.extendSandbox("sb-ext-past", 7).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getExpiresAt())
+        .isAfterOrEqualTo(beforeCall.plus(Duration.ofDays(7)));
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────
 
   private void stubSuccessfulImagePull() {
@@ -487,7 +548,7 @@ public class DockerSandboxServiceTest {
   }
 
   /** Stubs a minimal successful docker container launch. */
-  private void stubSuccessfulContainerLaunch(String containerId) {
+  private CreateContainerCmd stubSuccessfulContainerLaunch(String containerId) {
     CreateContainerCmd createCmd = mock(CreateContainerCmd.class);
     when(createCmd.withName(anyString())).thenReturn(createCmd);
     when(createCmd.withExposedPorts(any(ExposedPort.class))).thenReturn(createCmd);
@@ -504,6 +565,7 @@ public class DockerSandboxServiceTest {
 
     // Stub db.withConnection for database provisioning (no-op)
     when(db.withConnection(any(ConnectionCallable.class))).thenReturn(null);
+    return createCmd;
   }
 
   private void stubDockerStop(String containerId) {
