@@ -2,5 +2,5 @@
 
 source bin/lib.sh
 
-echo "Building production container..."
-docker build -t cf-sandbox-builder:latest -f prod.Dockerfile .
+echo "Building production container (linux/amd64)..."
+docker build --platform linux/amd64 -t cf-sandbox-builder:latest -f prod.Dockerfile .

@@ -579,6 +579,12 @@ resource "aws_ecs_task_definition" "builder" {
   execution_role_arn       = module.sandbox_builder_execution_role.arn
   task_role_arn            = module.sandbox_builder_role.arn
 
+  # Specify default Arch and OS to avoid ambiguity.
+  runtime_platform {
+    cpu_architecture        = "X86_64"
+    operating_system_family = "LINUX"
+  }
+
   container_definitions = jsonencode([
     {
       name      = "builder"
@@ -653,6 +659,8 @@ resource "aws_ecs_service" "builder" {
   # as failed while the previous builder instance is working on it.
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
+  scheduling_strategy                = "REPLICA"
+  availability_zone_rebalancing      = "DISABLED"
 
   # Allow Terraform apply to finish before the first Docker image is pushed to ECR.
   wait_for_steady_state = false
