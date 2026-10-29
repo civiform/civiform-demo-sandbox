@@ -275,7 +275,10 @@ When Auth0 is not configured, the portal falls back to a simple email/password l
 
 ### Option A: GitHub Actions (Recommended)
 
-The fastest and most reliable way to deploy. Builds on Ubuntu — no local Docker required.
+The fastest way to deploy. Builds on Ubuntu — no local Docker required. Note: requires fresh STS credentials in repo secrets (see below).
+
+> [!TIP]
+> **Follow-up improvement**: Migrate to a [GitHub OIDC identity provider](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services) with an IAM role, which eliminates the need to rotate STS creds manually.
 
 **Trigger via GitHub UI:**
 1. Go to [Actions → "Deploy to Production"](https://github.com/civiform/civiform-demo-sandbox/actions/workflows/deploy.yml)
@@ -511,7 +514,7 @@ POST /sandboxes/:id/delete
 POST /sandboxes/:id/reprovision
     │
     ▼
-1. Guard: Only allowed when status is RUNNING or FAILED
+1. Guard: Blocked when status is PROVISIONING, DELETING, or DELETED (allowed on RUNNING, FAILED, STOPPED, DELETE_FAILED, etc.)
 2. Mark status = PROVISIONING
 3. Re-run Terraform apply with updated env vars
 4. Poll for readiness → mark RUNNING
@@ -667,7 +670,7 @@ export RDS_ADMIN_PORT=15432
 ### Running Tests
 
 ```bash
-./bin/sbt test              # 36+ unit tests (no Docker/AWS needed)
+./bin/sbt test              # 164+ unit tests (no Docker/AWS needed)
 ./bin/run-browser-tests     # Playwright E2E tests
 ```
 
@@ -715,6 +718,9 @@ docker pull --platform linux/amd64 eclipse-temurin:21-jre-alpine
 ```
 
 **Fix (nuclear option — if above doesn't work)**:
+> [!WARNING]
+> `docker system prune -af` removes **all** unused Docker images on the machine, not just ours. If you have other projects' images cached locally, they will be deleted too.
+
 ```bash
 # Remove all cached images and rebuild from scratch
 docker system prune -af
@@ -764,7 +770,7 @@ psql -h <rds-endpoint> -U sandbox_master -d postgres \
 
 ### Stale PROVISIONING/DELETING on startup
 
-The builder automatically calls `SandboxRepository.reconcileStaleStatuses()` at startup, which transitions:
+The builder automatically calls `SandboxRepository.failInterruptedOperations()` at startup, which transitions:
 - `PROVISIONING` → `FAILED`
 - `DELETING` → `DELETE_FAILED`
 
@@ -789,10 +795,13 @@ Each sandbox CiviForm instance opens its own connection pool. With many sandboxe
 
 ### Add a new user to the portal
 
-1. Go to **Auth0 Dashboard → User Management → Users**
-2. Create or invite the user
-3. Assign the **"Sandbox builder users"** role
-4. User can now log in at `https://sandbox.civiform.dev`
+1. The new user visits `https://sandbox.civiform.dev` and clicks **Continue with Google**
+2. Auth0 authenticates them via the Google OAuth connection, but the Post-Login Action denies access because they don't have the **"Sandbox builder users"** role yet
+3. An existing admin goes to **Auth0 Dashboard → User Management → Users**, finds the user (they'll appear after their first login attempt), and assigns the **"Sandbox builder users"** role
+4. The user can now log in successfully at `https://sandbox.civiform.dev`
+
+> [!NOTE]
+> The Google OAuth client used by Auth0 lives in the **`civiform-sandbox-auth` Google Cloud project**. If the OAuth client secret needs to be rotated, update it in both the GCP console and the Auth0 Social Connection settings.
 
 ### Extend a sandbox expiry
 
