@@ -1,5 +1,5 @@
 /**
- * Browser tests for the "Create new demo" 3-step modal wizard.
+ * Browser tests for the "Create new demo" 2-step modal wizard.
  *
  * Tests both the wizard UI and the feature-flag-equivalent behavior
  * (wizard is only triggered from the dashboard — no direct /sandboxes/new URL).
@@ -58,12 +58,12 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     await expect(page.locator('[name="expirationDays"]')).toHaveValue('30')
   })
 
-  test('Step 1: Next button is disabled when city name is empty', async ({page}) => {
+  test('Step 1 validation: Next shows error when city name is empty', async ({page}) => {
     await openCreateModal(page)
-    // City name field should be empty by default
     await page.fill('[name="cityName"]', '')
-    const nextBtn = page.getByRole('button', {name: /next/i})
-    await expect(nextBtn).toBeDisabled()
+    await page.click('button:has-text("Next")')
+    // Validation error should appear
+    await expect(page.locator('#create-wizard-error')).toBeVisible()
   })
 
   // ── Step 2: AWS setup ─────────────────────────────────────────────────────
@@ -127,89 +127,40 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     await expect(page.locator('[name="pin"]')).toHaveValue('482917')
   })
 
-  test('Step 2: Next button disabled when PIN is not 6 digits', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="pin"]')
-
-    await page.fill('[name="subdomain"]', 'burlington-vt')
-    await page.fill('[name="pin"]', '123') // only 3 digits
-    const nextBtn = page.getByRole('button', {name: /next/i})
-    await expect(nextBtn).toBeDisabled()
-  })
-
-  // ── Step 3: Program setup ─────────────────────────────────────────────────
-
-  test('Step 3 screenshot matches baseline', async ({page}) => {
+  test('Step 2 has "Provision demo" submit button', async ({page}) => {
     await openCreateModal(page)
     await page.fill('[name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
-    await page.fill('[name="subdomain"]', 'burlington-vt')
-    await page.fill('[name="pin"]', '482917')
-    await page.fill('[name="adminEmail"]', 'rep@exygy.com')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('button:has-text("Provision demo")')
 
-    await test.step('Screenshot Step 3', async () => {
-      await validateScreenshot(page.getByRole('dialog'), 'wizard-step-3')
-    })
+    await expect(page.getByRole('button', {name: /provision demo/i})).toBeVisible()
   })
 
-  test('Step 3 passes accessibility audit', async ({page}) => {
+  test('Step 2 has Back button to return to Step 1', async ({page}) => {
     await openCreateModal(page)
     await page.fill('[name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
-    await page.fill('[name="subdomain"]', 'burlington-vt')
-    await page.fill('[name="pin"]', '482917')
-    await page.fill('[name="adminEmail"]', 'rep@exygy.com')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('button:has-text("Provision demo")')
-    await validateAccessibility(page)
-  })
 
-  test('Step 3 has "Import from PDF" button', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="subdomain"]')
-    await page.fill('[name="subdomain"]', 'burlington-vt')
-    await page.fill('[name="pin"]', '482917')
-    await page.fill('[name="adminEmail"]', 'rep@exygy.com')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('button:has-text("Provision demo")')
-
-    await expect(page.getByRole('button', {name: /import from pdf/i})).toBeVisible()
-  })
-
-  test('Step 3 does NOT have a Notes textarea', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="subdomain"]')
-    await page.fill('[name="subdomain"]', 'burlington-vt')
-    await page.fill('[name="pin"]', '482917')
-    await page.fill('[name="adminEmail"]', 'rep@exygy.com')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('button:has-text("Provision demo")')
-
-    await expect(page.locator('[name="notes"]')).not.toBeVisible()
+    await page.click('button:has-text("Back")')
+    // Step 1 fields should be visible again
+    await expect(page.locator('[name="cityName"]')).toBeVisible()
   })
 
   // ── Full wizard flow → redirect ───────────────────────────────────────────
 
   test('Completing the wizard redirects to /sandboxes with success flash', async ({page}) => {
     await openCreateModal(page)
+
+    // Step 1: CiviForm setup
     await page.fill('[name="cityName"]', 'Test City')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
+
+    // Step 2: AWS setup + submit
     await page.fill('[name="subdomain"]', 'test-city')
     await page.fill('[name="pin"]', '111222')
     await page.fill('[name="adminEmail"]', 'test@exygy.com')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('button:has-text("Provision demo")')
     await page.click('button:has-text("Provision demo")')
 
     // Should redirect to /sandboxes (list) — not /sandboxes/:id
