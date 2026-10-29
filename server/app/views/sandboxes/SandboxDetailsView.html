@@ -89,7 +89,7 @@
         <button
           onclick="
             navigator.clipboard.writeText(this.dataset.pin)
-            this.textContent = '✓ Copied!'
+            showCopyAlert('PIN copied to clipboard')
           "
           th:data-pin="${model.sandbox.pin}"
           class="usa-button usa-button--unstyled mt-3 text-xs text-blue-600 hover:underline cursor-pointer"
@@ -348,8 +348,28 @@
     </div>
   </div>
 
+  <!-- ── Copy success alert (USWDS Alert component, success variant) ──── -->
+  <div
+    id="copy-alert"
+    class="usa-alert usa-alert--success usa-alert--slim"
+    role="alert"
+    hidden
+    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+  >
+    <div class="usa-alert__body">
+      <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
+    </div>
+  </div>
+
   <!-- ── Share URL + Copy ─────────────────────────────────────────────── -->
   <script>
+    function showCopyAlert(message) {
+      var alert = document.getElementById('copy-alert');
+      var text = document.getElementById('copy-alert-text');
+      text.textContent = message || 'Copied to clipboard';
+      alert.hidden = false;
+      setTimeout(function () { alert.hidden = true; }, 2000);
+    }
     // Resolve the prospect access link to a full URL so reps can copy & share it.
     ;(function () {
       var el = document.getElementById('prospect-access-url');
@@ -362,9 +382,7 @@
     function copyShareUrl(btn) {
       var el = document.getElementById('prospect-access-url');
       navigator.clipboard.writeText(el.textContent).then(function () {
-        var orig = btn.textContent;
-        btn.textContent = '✓ Copied!';
-        setTimeout(function () { btn.textContent = orig; }, 1800);
+        showCopyAlert('URL copied to clipboard');
       });
     }
   </script>

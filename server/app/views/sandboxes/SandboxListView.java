@@ -14,7 +14,7 @@ public final class SandboxListView extends BaseView<SandboxListViewModel> {
 
   @Override
   protected String pageTitle(SandboxListViewModel model, Messages messages) {
-    return "All Sandboxes - Civiform Sandbox Builder";
+    return "All Sandboxes - CiviForm Sandbox Builder";
   }
 
   @Override
