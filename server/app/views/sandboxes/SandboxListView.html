@@ -340,52 +340,45 @@
     role="dialog"
     aria-modal="true"
     aria-labelledby="create-modal-title"
-    class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8"
+    class="fixed inset-0 z-50 hidden items-center justify-center px-4 py-8 usa-modal-overlay"
     style="display: none; background: rgba(0, 0, 0, 0.4)"
   >
     <div
-      class="bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
+      class="usa-modal__content bg-white rounded-xl shadow-xl w-full max-w-lg relative flex flex-col"
       style="max-height: 85vh; overflow-y: auto; margin: auto"
     >
       <!-- Close X -->
       <button
         onclick="closeModal('create-modal')"
         aria-label="Close"
-        class="absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
-        style="font-size: 24px"
+        class="usa-modal__close absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
       >
-        ×
+        <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+          <use href="/assets/dist/img/sprite.svg#close"></use>
+        </svg>
       </button>
 
-      <div class="px-6 pt-6 pb-6">
-        <!-- Tab Navigation -->
-        <div
-          class="flex border-b-2 border-gray-200 mb-5"
-          role="tablist"
-          aria-label="Wizard steps"
-        >
-          <button
-            type="button"
-            role="tab"
-            id="wizard-tab-1"
-            aria-selected="true"
-            aria-controls="create-step-panel-1"
-            class="wizard-tab wizard-tab--active"
-            onclick="wizardGoTo(1)"
-          >
-            CiviForm setup
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="wizard-tab-2"
-            aria-selected="false"
-            aria-controls="create-step-panel-2"
-            class="wizard-tab"
-            onclick="wizardGoTo(2)"
-          >
-            AWS setup
-          </button>
+      <div class="usa-modal__main px-6 pt-6 pb-6">
+        <!-- Step Indicator -->
+        <div class="usa-step-indicator usa-step-indicator--counters-sm mb-5" aria-label="progress">
+          <ol class="usa-step-indicator__segments">
+            <li id="step-indicator-1" class="usa-step-indicator__segment usa-step-indicator__segment--current cursor-pointer" onclick="wizardGoTo(1)">
+              <span class="usa-step-indicator__segment-label">CiviForm setup</span>
+            </li>
+            <li id="step-indicator-2" class="usa-step-indicator__segment cursor-pointer" onclick="wizardGoTo(2)">
+              <span class="usa-step-indicator__segment-label">AWS setup <span class="usa-sr-only">not completed</span></span>
+            </li>
+          </ol>
+          <div class="usa-step-indicator__header">
+            <h4 class="usa-step-indicator__heading usa-modal__heading" id="create-modal-title">
+              <span class="usa-step-indicator__heading-counter">
+                <span class="usa-sr-only">Step</span>
+                <span id="step-indicator-current-step" class="usa-step-indicator__current-step">1</span>
+                <span class="usa-step-indicator__total-steps">of 2</span>
+              </span>
+              <span id="step-indicator-heading-text" class="usa-step-indicator__heading-text">CiviForm setup</span>
+            </h4>
+          </div>
         </div>
 
         <!-- Inline validation error -->
@@ -405,19 +398,9 @@
             id="create-step-panel-1"
             class="wizard-panel"
             role="tabpanel"
-            aria-labelledby="wizard-tab-1"
+            aria-labelledby="step-indicator-1"
           >
-            <!-- Step heading -->
-            <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
-                >1</span
-              >
-              <span class="text-sm text-gray-500">of 2</span>
-              <span class="text-lg font-bold text-gray-900"
-                >CiviForm setup</span
-              >
-            </div>
+
             <p class="text-sm text-gray-600 mb-5">
               Configure general demo and banner information. This is visible to
               all demo users.
@@ -524,17 +507,9 @@
             id="create-step-panel-2"
             class="wizard-panel hidden"
             role="tabpanel"
-            aria-labelledby="wizard-tab-2"
+            aria-labelledby="step-indicator-2"
           >
-            <!-- Step heading -->
-            <div class="flex items-center gap-2 mb-2">
-              <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-700 text-white text-sm font-bold"
-                >2</span
-              >
-              <span class="text-sm text-gray-500">of 2</span>
-              <span class="text-lg font-bold text-gray-900">AWS setup</span>
-            </div>
+
             <p class="text-sm text-gray-600 mb-5">
               Configure setup details for the AWS deployment.
             </p>
@@ -1171,23 +1146,30 @@
               panel.classList.add('hidden')
             }
           }
-          // Update tab active state
-          var tab = document.getElementById('wizard-tab-' + i)
-          if (tab) {
-            if (i === targetStep) {
-              tab.classList.add('wizard-tab--active')
-              tab.setAttribute('aria-selected', 'true')
+          // Update step indicator
+          var segment = document.getElementById('step-indicator-' + i)
+          if (segment) {
+            var label = segment.querySelector('.usa-step-indicator__segment-label')
+            var text = i === 1 ? 'CiviForm setup' : 'AWS setup'
+            if (i < targetStep) {
+              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--complete cursor-pointer'
+              label.innerHTML = text + ' <span class="usa-sr-only">completed</span>'
+            } else if (i === targetStep) {
+              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--current cursor-pointer'
+              label.innerHTML = text
             } else {
-              tab.classList.remove('wizard-tab--active')
-              tab.setAttribute('aria-selected', 'false')
+              segment.className = 'usa-step-indicator__segment cursor-pointer'
+              label.innerHTML = text + ' <span class="usa-sr-only">not completed</span>'
             }
           }
         }
-        // Update step number in panel heading
-        var panel = document.getElementById('create-step-panel-' + targetStep)
-        if (panel) {
-          var circle = panel.querySelector('.rounded-full')
-          if (circle) circle.textContent = String(targetStep)
+        
+        var currentStepEl = document.getElementById('step-indicator-current-step')
+        if (currentStepEl) currentStepEl.textContent = targetStep
+        
+        var headingTextEl = document.getElementById('step-indicator-heading-text')
+        if (headingTextEl) {
+          headingTextEl.textContent = targetStep === 1 ? 'CiviForm setup' : 'AWS setup'
         }
       }
 
