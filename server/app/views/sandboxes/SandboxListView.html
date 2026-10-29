@@ -362,10 +362,10 @@
         <!-- Step Indicator -->
         <div class="usa-step-indicator usa-step-indicator--counters-sm mb-5" aria-label="progress">
           <ol class="usa-step-indicator__segments">
-            <li id="step-indicator-1" class="usa-step-indicator__segment usa-step-indicator__segment--current cursor-pointer" onclick="wizardGoTo(1)">
+            <li id="step-indicator-1" class="usa-step-indicator__segment usa-step-indicator__segment--current">
               <span class="usa-step-indicator__segment-label">CiviForm setup</span>
             </li>
-            <li id="step-indicator-2" class="usa-step-indicator__segment cursor-pointer" onclick="wizardGoTo(2)">
+            <li id="step-indicator-2" class="usa-step-indicator__segment">
               <span class="usa-step-indicator__segment-label">AWS setup <span class="usa-sr-only">not completed</span></span>
             </li>
           </ol>
@@ -397,8 +397,6 @@
           <div
             id="create-step-panel-1"
             class="wizard-panel"
-            role="tabpanel"
-            aria-labelledby="step-indicator-1"
           >
 
             <p class="text-sm text-gray-600 mb-5">
@@ -506,8 +504,6 @@
           <div
             id="create-step-panel-2"
             class="wizard-panel hidden"
-            role="tabpanel"
-            aria-labelledby="step-indicator-2"
           >
 
             <p class="text-sm text-gray-600 mb-5">
@@ -1152,13 +1148,13 @@
             var label = segment.querySelector('.usa-step-indicator__segment-label')
             var text = i === 1 ? 'CiviForm setup' : 'AWS setup'
             if (i < targetStep) {
-              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--complete cursor-pointer'
+              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--complete'
               label.innerHTML = text + ' <span class="usa-sr-only">completed</span>'
             } else if (i === targetStep) {
-              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--current cursor-pointer'
+              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--current'
               label.innerHTML = text
             } else {
-              segment.className = 'usa-step-indicator__segment cursor-pointer'
+              segment.className = 'usa-step-indicator__segment'
               label.innerHTML = text + ' <span class="usa-sr-only">not completed</span>'
             }
           }
@@ -1292,16 +1288,6 @@
         setStepInputsDisabled(prevStep, false)
         setStepInputsDisabled(currentStep, true)
         showStep(prevStep)
-      }
-
-      // Navigate directly to a step via tab click
-      window.wizardGoTo = function (targetStep) {
-        clearError()
-        syncHiddenInputs()
-        for (var i = 1; i <= TOTAL_STEPS; i++) {
-          setStepInputsDisabled(i, i !== targetStep)
-        }
-        showStep(targetStep)
       }
 
       // Reset wizard to step 1 (called whenever the create-modal opens)
