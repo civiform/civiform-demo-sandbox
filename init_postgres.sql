@@ -84,3 +84,21 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
 CREATE UNIQUE INDEX IF NOT EXISTS sandbox_instances_subdomain_live_idx
   ON sandbox_instances (subdomain)
   WHERE deleted_at IS NULL AND subdomain IS NOT NULL;
+
+-- ============================================================
+-- persisted_durable_jobs: CiviForm-style durable background jobs
+-- ============================================================
+CREATE TABLE IF NOT EXISTS persisted_durable_jobs (
+  id                 BIGSERIAL     PRIMARY KEY,
+  job_name           VARCHAR(128)  NOT NULL,
+  job_type           VARCHAR(32)   NOT NULL,
+  execution_time     TIMESTAMPTZ   NOT NULL,
+  success_time       TIMESTAMPTZ,
+  create_time        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  remaining_attempts INTEGER       NOT NULL DEFAULT 3,
+  error_message      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS persisted_durable_jobs_ready_idx
+  ON persisted_durable_jobs (job_type, execution_time)
+  WHERE success_time IS NULL AND remaining_attempts > 0;
