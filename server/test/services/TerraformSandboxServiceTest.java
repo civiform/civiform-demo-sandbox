@@ -370,6 +370,48 @@ public class TerraformSandboxServiceTest {
   }
 
   @Test
+  public void destroyExpiredSandbox_missingOrAlreadyDeletedCompletesWithoutTerraformDestroy()
+      throws Exception {
+    when(repository.findById("sb-missing")).thenReturn(Optional.empty());
+    newService().destroyExpiredSandbox("sb-missing").toCompletableFuture().get();
+
+    SandboxInstance deleted =
+        live("").toBuilder().status(SandboxStatus.DELETED).databaseName("sb_abcd1234").build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(deleted));
+    newService().destroyExpiredSandbox("sb-abcd1234").toCompletableFuture().get();
+
+    verify(terraform, never()).destroy(any(), any(), any());
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
+  public void destroyExpiredSandbox_terraformFailureCompletesExceptionally() {
+    SandboxInstance expired =
+        live("123456").toBuilder()
+            .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
+            .adminEmail("bd-lead@exygy.com")
+            .accessToken("tok-1")
+            .listenerPriority(1000)
+            .civiformVersion("latest")
+            .databaseName("sb_abcd1234")
+            .expiresAt(Instant.now().minus(2, ChronoUnit.DAYS))
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(expired));
+    org.mockito.Mockito.doThrow(new RuntimeException("S3 backend unreachable"))
+        .when(terraform)
+        .destroy(any(), any(), any());
+
+    assertThatThrownBy(
+            () -> newService().destroyExpiredSandbox("sb-abcd1234").toCompletableFuture().join())
+        .hasCauseInstanceOf(RuntimeException.class)
+        .hasStackTraceContaining("S3 backend unreachable");
+
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
   public void construction_ensuresSchemaAndFailsInterruptedOperationsOnStartup() {
     newService();
 

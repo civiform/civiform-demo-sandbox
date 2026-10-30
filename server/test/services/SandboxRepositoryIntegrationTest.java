@@ -389,7 +389,75 @@ public class SandboxRepositoryIntegrationTest {
     repo.ensureSchemaInitialized();
   }
 
-  // ── PersistedDurableJobRepository ──────────────────────────────────────────
+  // ── Scheduled expiry destruction (softDelete / recordDestroyFailure / findExpired) ──
+
+  @Test
+  public void softDelete_clearsDestroyErrorAndReleasesSubdomain() {
+    SandboxInstance first = makeTestInstance();
+    repo.save(first);
+    repo.recordDestroyFailure(testId, "transient terraform error");
+
+    Instant deletedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+    assertThat(repo.softDelete(testId, deletedAt)).isTrue();
+
+    SandboxInstance loaded = repo.findById(testId).orElseThrow();
+    assertThat(loaded.getStatus()).isEqualTo(SandboxStatus.DELETED);
+    assertThat(loaded.getDeletedAt()).isEqualTo(deletedAt);
+    assertThat(loaded.getPin()).isEmpty();
+    assertThat(loaded.getAccessToken()).isEmpty();
+    assertThat(loaded.getAdminEmail()).isEmpty();
+    assertThat(loaded.getLastDestroyError()).isNull();
+
+    // A new sandbox can reuse the exact same subdomain once the old row is DELETED.
+    String secondId = testId + "-reuse";
+    Database db = app.injector().instanceOf(Database.class);
+    try {
+      repo.save(first.toBuilder().id(secondId).status(SandboxStatus.RUNNING).build());
+      assertThat(repo.findById(secondId)).isPresent();
+    } finally {
+      db.withConnection(
+          conn -> {
+            try (var ps = conn.prepareStatement("DELETE FROM sandbox_instances WHERE id = ?")) {
+              ps.setString(1, secondId);
+              ps.executeUpdate();
+            }
+            return null;
+          });
+    }
+  }
+
+  @Test
+  public void findExpiredForDestruction_andRecordDestroyFailure_enforcesCutoffAndThreeAttemptCap() {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    SandboxInstance expired =
+        makeTestInstance().toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff.minus(Duration.ofHours(12)))
+            .build();
+    repo.save(expired);
+
+    // Initially eligible with 0 attempts.
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .anyMatch(s -> s.getId().equals(testId));
+
+    // Failures 1 and 2 remain eligible for next daily retry.
+    assertThat(repo.recordDestroyFailure(testId, "err 1")).isEqualTo(1);
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .anyMatch(s -> s.getId().equals(testId) && s.getDestroyAttempts() == 1);
+
+    assertThat(repo.recordDestroyFailure(testId, "err 2")).isEqualTo(2);
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .anyMatch(s -> s.getId().equals(testId) && s.getDestroyAttempts() == 2);
+
+    // Failure 3 hits the cap and pauses further auto-retries.
+    assertThat(repo.recordDestroyFailure(testId, "err 3")).isEqualTo(3);
+    SandboxInstance loaded = repo.findById(testId).orElseThrow();
+    assertThat(loaded.getStatus()).isEqualTo(SandboxStatus.DELETE_FAILED);
+    assertThat(loaded.getDestroyAttempts()).isEqualTo(3);
+    assertThat(loaded.getLastDestroyError()).isEqualTo("err 3");
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .noneMatch(s -> s.getId().equals(testId));
+  }
 
   @Test
   public void persistedDurableJobRepository_roundTripScheduleClaimAndCleanup() throws Exception {

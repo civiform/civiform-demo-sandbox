@@ -10,6 +10,7 @@ import durablejobs.DurableJobRegistry;
 import durablejobs.RecurringDurableJobRunner;
 import durablejobs.RecurringJobExecutionTimeResolvers;
 import durablejobs.RecurringJobScheduler;
+import durablejobs.jobs.DestroyExpiredSandboxesJob;
 import durablejobs.jobs.OldJobCleanupJob;
 import java.time.Clock;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +30,8 @@ import play.Logger.ALogger;
 import play.inject.ApplicationLifecycle;
 import services.PersistedDurableJobRepository;
 import services.SandboxRepository;
+import services.SandboxService;
+import services.SlackAlertClient;
 
 /**
  * Configures recurring {@link durablejobs.DurableJob}s and starts the background poller that
@@ -155,8 +158,24 @@ public final class DurableJobModule extends AbstractModule {
   @Singleton
   @RecurringJobsProviderName
   public DurableJobRegistry provideRecurringDurableJobRegistry(
-      Provider<PersistedDurableJobRepository> persistedDurableJobRepositoryProvider) {
+      Clock clock,
+      Provider<SandboxRepository> sandboxRepositoryProvider,
+      Provider<SandboxService> sandboxServiceProvider,
+      Provider<PersistedDurableJobRepository> persistedDurableJobRepositoryProvider,
+      Provider<SlackAlertClient> slackAlertClientProvider) {
     DurableJobRegistry durableJobRegistry = new DurableJobRegistry();
+
+    durableJobRegistry.register(
+        DurableJobName.DESTROY_EXPIRED_SANDBOXES,
+        JobType.RECURRING,
+        persistedDurableJob ->
+            new DestroyExpiredSandboxesJob(
+                clock,
+                sandboxRepositoryProvider.get(),
+                sandboxServiceProvider.get(),
+                slackAlertClientProvider.get(),
+                persistedDurableJob),
+        new RecurringJobExecutionTimeResolvers.Daily2Am());
 
     durableJobRegistry.register(
         DurableJobName.OLD_JOB_CLEANUP,

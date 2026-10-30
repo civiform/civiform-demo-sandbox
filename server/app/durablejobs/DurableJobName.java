@@ -8,6 +8,7 @@ import models.PersistedDurableJobModel;
  * PersistedDurableJobModel#getJobName()}.
  */
 public enum DurableJobName {
+  DESTROY_EXPIRED_SANDBOXES("DESTROY_EXPIRED_SANDBOXES"),
   OLD_JOB_CLEANUP("OLD_JOB_CLEANUP"),
   // Job name reserved for unit/integration tests
   TEST("TEST");

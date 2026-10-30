@@ -114,5 +114,31 @@ public class InMemorySandboxServiceTest {
         .isEqualTo(before.getExpiresAt().plus(java.time.Duration.ofDays(15)));
     assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
   }
+
+  @Test
+  public void destroyExpiredSandbox_marksDeletedScrubsPiiAndBlocksReuseActions()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance created =
+        service
+            .createSandbox(makeRequest("Expired City", "expired-city", "654321"))
+            .toCompletableFuture()
+            .get();
+
+    service.destroyExpiredSandbox(created.getId()).toCompletableFuture().get();
+
+    SandboxInstance deleted =
+        service.getSandbox(created.getId()).toCompletableFuture().get().orElseThrow();
+    assertThat(deleted.getStatus()).isEqualTo(SandboxStatus.DELETED);
+    assertThat(deleted.getPin()).isEmpty();
+    assertThat(deleted.getAccessToken()).isEmpty();
+    assertThat(deleted.getAdminEmail()).isEmpty();
+    assertThat(deleted.getDeletedAt()).isNotNull();
+
+    // Deleted sandboxes reject PIN access, extension, re-provisioning, and duplicate deletion.
+    assertThat(service.validatePin(created.getId(), "654321").toCompletableFuture().get()).isEmpty();
+    assertThat(service.extendSandbox(created.getId(), 7).toCompletableFuture().get()).isEmpty();
+    assertThat(service.reprovisionSandbox(created.getId()).toCompletableFuture().get()).isEmpty();
+    assertThat(service.deleteSandbox(created.getId()).toCompletableFuture().get()).isFalse();
+  }
 }
 

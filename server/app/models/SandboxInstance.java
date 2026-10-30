@@ -99,5 +99,11 @@ public class SandboxInstance {
    * Null for all other statuses.
    */
   private Instant deletedAt;
+
+  /** Number of consecutive failed scheduled destruction attempts. */
+  private int destroyAttempts;
+
+  /** Error output from the most recent failed scheduled destruction attempt, if any. */
+  private String lastDestroyError;
 }
 

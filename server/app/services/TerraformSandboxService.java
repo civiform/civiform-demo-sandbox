@@ -358,10 +358,10 @@ public class TerraformSandboxService implements SandboxService {
     }
     SandboxInstance sandbox = maybeSandbox.get();
 
-    // A DELETED row is a tombstone: everything is already gone. A DELETING row already has
-    // a teardown running in the background; launching a second one would collide on the S3
-    // state lock (HTTP 412 PreconditionFailed on the .tflock object) and flip the row to
-    // DELETE_FAILED while the first teardown is still succeeding.
+    // A DELETED row is already torn down. A DELETING row already has a teardown running
+    // in the background; launching a second one would collide on the S3 state lock (HTTP 412
+    // PreconditionFailed on the .tflock object) and flip the row to DELETE_FAILED while the first
+    // teardown is still succeeding.
     if (sandbox.getStatus() == SandboxStatus.DELETED
         || sandbox.getStatus() == SandboxStatus.DELETING) {
       return CompletableFuture.completedFuture(false);
@@ -377,7 +377,29 @@ public class TerraformSandboxService implements SandboxService {
     return CompletableFuture.completedFuture(true);
   }
 
-  /** The long-running half of deletion. Runs on {@link #provisioningPool}. */
+  @Override
+  public CompletionStage<Void> destroyExpiredSandbox(String id) {
+    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+    if (maybeSandbox.isEmpty()) {
+      return CompletableFuture.completedFuture(null);
+    }
+    SandboxInstance sandbox = maybeSandbox.get();
+
+    if (sandbox.getStatus() == SandboxStatus.DELETED) {
+      return CompletableFuture.completedFuture(null);
+    }
+    if (sandbox.getStatus() == SandboxStatus.DELETING) {
+      return CompletableFuture.failedFuture(
+          new IllegalStateException(
+              "Sandbox " + id + " is already in DELETING status; skipping concurrent teardown."));
+    }
+
+    repository.updateStatus(id, SandboxStatus.DELETING);
+
+    return enqueueForSandbox(id, () -> destroyExpired(sandbox));
+  }
+
+  /** The long-running half of manual deletion. Runs on {@link #provisioningPool}. */
   private void destroy(SandboxInstance sandbox) {
     String id = sandbox.getId();
     Path workDir = null;
@@ -418,6 +440,49 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   /**
+   * Synchronous teardown path for {@link #destroyExpiredSandbox(String)}. Runs on {@link
+   * #provisioningPool}, serialized through {@link #inFlight}. Marks the sandbox {@link
+   * SandboxStatus#DELETED} on success and propagates failures so scheduled jobs can track retry
+   * attempts and alert SRE.
+   */
+  private void destroyExpired(SandboxInstance sandbox) {
+    String id = sandbox.getId();
+    Path workDir = null;
+
+    try {
+      log.info("[{}] Scheduled expired-sandbox teardown started", id);
+      workDir = createWorkspace(id);
+      Path varFile = workDir.resolve("sandbox.tfvars.json");
+      writeTfVars(varFile, sandbox, sandbox.getDatabaseName(), DESTROY_PLACEHOLDER_PASSWORD);
+
+      terraform.init(workDir, stateBucket, stateKey(id), awsRegion);
+      terraform.destroy(workDir, varFile, line -> log.debug("[{}] {}", id, line));
+      log.info("[{}] Terraform destroy complete", id);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Terraform destroy failed for sandbox " + id + ": " + e.getMessage(), e);
+    } finally {
+      deleteRecursively(workDir);
+    }
+
+    try {
+      dropDatabase(sandbox.getDatabaseName());
+      log.info("[{}] Database dropped", id);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Could not drop database "
+              + sandbox.getDatabaseName()
+              + " for sandbox "
+              + id
+              + ": "
+              + e.getMessage(),
+          e);
+    }
+
+    repository.softDelete(id, Instant.now());
+  }
+
+  /**
    * Schedules {@code work} on {@link #provisioningPool}, chained after any job already running for
    * the same sandbox.
    *
@@ -425,7 +490,7 @@ public class TerraformSandboxService implements SandboxService {
    * sandbox — e.g. a delete requested while provisioning is still mid-apply — share a state lock
    * and must run sequentially rather than race against S3.
    */
-  private void enqueueForSandbox(String id, Runnable work) {
+  private CompletableFuture<Void> enqueueForSandbox(String id, Runnable work) {
     CompletableFuture<Void> next =
         inFlight.compute(
             id,
@@ -439,6 +504,7 @@ public class TerraformSandboxService implements SandboxService {
                         },
                         provisioningPool));
     next.whenComplete((r, e) -> inFlight.remove(id, next));
+    return next;
   }
 
   private boolean isDeleting(String id) {
