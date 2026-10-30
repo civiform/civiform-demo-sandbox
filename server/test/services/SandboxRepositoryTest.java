@@ -402,8 +402,8 @@ public class SandboxRepositoryTest {
     ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
     verify(conn).prepareStatement(sqlCaptor.capture());
     assertThat(sqlCaptor.getValue())
-        .contains(
-            "SET status = ?, deleted_at = ?, pin = '', access_token = '', admin_email = ''");
+        .contains("SET status = ?, deleted_at = ?, pin = '', access_token = '', admin_email = '',")
+        .contains("last_destroy_error = NULL");
 
     verify(ps).setString(1, "DELETED");
     verify(ps).setTimestamp(2, Timestamp.from(deletedAt));
@@ -419,6 +419,58 @@ public class SandboxRepositoryTest {
     boolean softDeleted = repository.softDelete("sb-missing", Instant.now());
 
     assertThat(softDeleted).isFalse();
+  }
+
+  @Test
+  public void findExpiredForDestruction_bindsCutoffAndMaxAttempts() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    ResultSet rs = mock(ResultSet.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(true, false);
+    setupResultSetRow(rs, "sb-exp", SandboxStatus.DELETE_FAILED);
+    when(rs.getInt("destroy_attempts")).thenReturn(2);
+    when(rs.getString("last_destroy_error")).thenReturn("ENI timeout");
+
+    Instant cutoff = Instant.parse("2026-08-15T00:00:00Z");
+    ImmutableList<SandboxInstance> results = repository.findExpiredForDestruction(cutoff, 3);
+
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(conn).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .contains("WHERE status IN ('RUNNING', 'DELETE_FAILED')")
+        .contains("AND expires_at < ?")
+        .contains("AND destroy_attempts < ?");
+    verify(ps).setTimestamp(1, Timestamp.from(cutoff));
+    verify(ps).setInt(2, 3);
+
+    assertThat(results).hasSize(1);
+    assertThat(results.get(0).getId()).isEqualTo("sb-exp");
+    assertThat(results.get(0).getDestroyAttempts()).isEqualTo(2);
+    assertThat(results.get(0).getLastDestroyError()).isEqualTo("ENI timeout");
+  }
+
+  @Test
+  public void recordDestroyFailure_incrementsDestroyAttemptsAndReturnsNewCount() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    ResultSet rs = mock(ResultSet.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(true);
+    when(rs.getInt("destroy_attempts")).thenReturn(3);
+
+    int attempts = repository.recordDestroyFailure("sb-1", "Terraform exit 1");
+
+    assertThat(attempts).isEqualTo(3);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(conn).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .contains("SET status = ?")
+        .contains("destroy_attempts = destroy_attempts + 1")
+        .contains("RETURNING destroy_attempts");
+    verify(ps).setString(1, "DELETE_FAILED");
+    verify(ps).setString(2, "Terraform exit 1");
+    verify(ps).setString(3, "sb-1");
   }
 
   private void setupResultSetRow(ResultSet rs, String id, SandboxStatus status) throws Exception {
@@ -439,6 +491,8 @@ public class SandboxRepositoryTest {
     when(rs.getObject("listener_priority", Integer.class)).thenReturn(100);
     when(rs.getString("google_analytics_id")).thenReturn("ga-id");
     when(rs.getString("google_analytics_url")).thenReturn("ga-url");
+    when(rs.getInt("destroy_attempts")).thenReturn(0);
+    when(rs.getString("last_destroy_error")).thenReturn(null);
 
     when(rs.getTimestamp("created_at"))
         .thenReturn(new Timestamp(Instant.now().toEpochMilli()));

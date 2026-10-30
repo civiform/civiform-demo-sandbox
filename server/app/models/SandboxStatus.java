@@ -13,7 +13,9 @@ public enum SandboxStatus {
    * record of the database name.
    */
   DELETE_FAILED,
-  DESTROYED,
-  /** Soft-delete tombstone: sandbox is gone from AWS but kept in the list with "Deleted [date]". */
+  /**
+   * Soft-delete tombstone: sandbox infrastructure and database have been destroyed (manually or via
+   * scheduled expiration), and the scrubbed row is retained with {@code deleted_at} recorded.
+   */
   DELETED
 }
