@@ -19,6 +19,13 @@ public interface SandboxService {
   CompletionStage<Boolean> deleteSandbox(String id);
 
   /**
+   * Synchronously (as an awaitable stage) destroys an expired sandbox's infrastructure and per-sandbox
+   * database, then marks its database record {@link models.SandboxStatus#DELETED}. Completes
+   * exceptionally if teardown fails so scheduled jobs can track retry counts and alert SRE.
+   */
+  CompletionStage<Void> destroyExpiredSandbox(String id);
+
+  /**
    * Extends a sandbox's expiry by {@code days} days and triggers re-provisioning so the running
    * instance picks up the updated expiration date. Returns the updated instance (with status
    * PROVISIONING), or empty if the sandbox was not found or cannot be extended in its current

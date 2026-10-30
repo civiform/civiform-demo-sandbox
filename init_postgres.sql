@@ -72,10 +72,18 @@ CREATE TABLE IF NOT EXISTS sandbox_instances (
   google_analytics_url VARCHAR(512),
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   expires_at      TIMESTAMPTZ   NOT NULL,
-  -- Set when a sandbox is torn down. The row is kept as a scrubbed tombstone
-  -- rather than deleted; see SandboxRepository.softDelete.
-  deleted_at      TIMESTAMPTZ
+  -- Set when a sandbox is torn down via the portal UI delete button.
+  deleted_at      TIMESTAMPTZ,
+  -- Number of failed automated destruction attempts by DestroyExpiredSandboxesJob.
+  destroy_attempts   INTEGER    NOT NULL DEFAULT 0,
+  -- Most recent error from automated destruction, retained for SRE debugging.
+  last_destroy_error TEXT
 );
+
+-- Ensure existing databases created before scheduled teardown gain the retry columns.
+ALTER TABLE sandbox_instances
+  ADD COLUMN IF NOT EXISTS destroy_attempts INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_destroy_error TEXT;
 
 -- Two live sandboxes sharing a subdomain would produce conflicting load balancer
 -- host-header rules, so the hostname must be unique among them. Scoped to live

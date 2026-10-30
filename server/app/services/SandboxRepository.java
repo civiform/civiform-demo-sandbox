@@ -308,12 +308,65 @@ public class SandboxRepository {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "UPDATE sandbox_instances "
-              + "SET status = ?, deleted_at = ?, pin = '', access_token = '', admin_email = '' "
+              + "SET status = ?, deleted_at = ?, pin = '', access_token = '', admin_email = '', "
+              + "    last_destroy_error = NULL "
               + "WHERE id = ?")) {
         ps.setString(1, SandboxStatus.DELETED.name());
         ps.setTimestamp(2, Timestamp.from(deletedAt));
         ps.setString(3, id);
         return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
+  /**
+   * Finds all sandboxes eligible for scheduled destruction: those currently {@link
+   * SandboxStatus#RUNNING} or {@link SandboxStatus#DELETE_FAILED} whose {@code expires_at} is
+   * strictly before {@code expiredBefore} and that have fewer than {@code maxAttempts} failed
+   * destruction attempts.
+   */
+  public ImmutableList<SandboxInstance> findExpiredForDestruction(
+      Instant expiredBefore, int maxAttempts) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "SELECT * FROM sandbox_instances "
+              + "WHERE status IN ('RUNNING', 'DELETE_FAILED') "
+              + "  AND expires_at < ? "
+              + "  AND destroy_attempts < ? "
+              + "ORDER BY expires_at ASC")) {
+        ps.setTimestamp(1, Timestamp.from(expiredBefore));
+        ps.setInt(2, maxAttempts);
+        try (ResultSet rs = ps.executeQuery()) {
+          List<SandboxInstance> result = new ArrayList<>();
+          while (rs.next()) {
+            result.add(mapRow(rs));
+          }
+          return ImmutableList.copyOf(result);
+        }
+      }
+    });
+  }
+
+  /**
+   * Records a failed scheduled destruction attempt: marks the sandbox {@link
+   * SandboxStatus#DELETE_FAILED}, increments {@code destroy_attempts}, stores {@code errorMessage},
+   * and returns the updated attempt count.
+   */
+  public int recordDestroyFailure(String id, String errorMessage) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET status = ?, "
+              + "    destroy_attempts = destroy_attempts + 1, "
+              + "    last_destroy_error = ? "
+              + "WHERE id = ? "
+              + "RETURNING destroy_attempts")) {
+        ps.setString(1, SandboxStatus.DELETE_FAILED.name());
+        ps.setString(2, errorMessage);
+        ps.setString(3, id);
+        try (ResultSet rs = ps.executeQuery()) {
+          return rs.next() ? rs.getInt("destroy_attempts") : 0;
+        }
       }
     });
   }
@@ -342,6 +395,8 @@ public class SandboxRepository {
         .createdAt(rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toInstant() : null)
         .expiresAt(rs.getTimestamp("expires_at") != null ? rs.getTimestamp("expires_at").toInstant() : null)
         .deletedAt(rs.getTimestamp("deleted_at") != null ? rs.getTimestamp("deleted_at").toInstant() : null)
+        .destroyAttempts(rs.getInt("destroy_attempts"))
+        .lastDestroyError(rs.getString("last_destroy_error"))
         .build();
   }
 }
