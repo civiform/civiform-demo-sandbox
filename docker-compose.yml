@@ -42,6 +42,8 @@ services:
       - AUTH0_CLIENT_ID
       - AUTH0_CLIENT_SECRET
       - AUTH0_CALLBACK_URL
+      - SLACK_SRE_ALERTS_WEBHOOK_URL
+      - SLACK_SRE_ALERTS_CHANNEL
       # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
       # In AWS these are set on the ECS task definition, with the RDS admin
       # password sourced from Secrets Manager rather than plain env.

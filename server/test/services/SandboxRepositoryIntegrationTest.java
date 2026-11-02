@@ -388,4 +388,67 @@ public class SandboxRepositoryIntegrationTest {
     repo.ensureSchemaInitialized();
     repo.ensureSchemaInitialized();
   }
+
+  // ── PersistedDurableJobRepository ──────────────────────────────────────────
+
+  @Test
+  public void persistedDurableJobRepository_roundTripScheduleClaimAndCleanup() throws Exception {
+    Database db = app.injector().instanceOf(Database.class);
+    Instant now = Instant.parse("2026-08-15T02:05:00Z");
+    java.time.Clock clock = java.time.Clock.fixed(now, java.time.ZoneOffset.UTC);
+    PersistedDurableJobRepository jobRepo = new PersistedDurableJobRepository(db, clock);
+
+    String uniqueJobName = "INTEG_TEST_JOB_" + UUID.randomUUID();
+    Long createdId = null;
+    Long staleId = null;
+    try {
+      models.PersistedDurableJobModel dueJob =
+          new models.PersistedDurableJobModel(
+              uniqueJobName, models.JobType.RECURRING, now.minusSeconds(60));
+
+      models.PersistedDurableJobModel staleCompletedJob =
+          models.PersistedDurableJobModel.builder()
+              .jobName(uniqueJobName + "_OLD")
+              .jobType(models.JobType.RECURRING)
+              .executionTime(now.minus(Duration.ofDays(200)))
+              .successTime(now.minus(Duration.ofDays(200)))
+              .remainingAttempts(2)
+              .build();
+
+      try (java.sql.Connection conn = db.getConnection(true)) {
+        jobRepo.save(conn, dueJob);
+        jobRepo.save(conn, staleCompletedJob);
+      }
+      createdId = dueJob.getId();
+      staleId = staleCompletedJob.getId();
+
+      assertThat(createdId).isNotNull();
+      assertThat(jobRepo.findScheduledRecurringJob(uniqueJobName)).isPresent();
+
+      try (java.sql.Connection conn = db.getConnection(false)) {
+        // Querying FOR UPDATE SKIP LOCKED should execute validly against Postgres 16.
+        Optional<models.PersistedDurableJobModel> claimed = jobRepo.getRecurringJobForExecution(conn);
+        assertThat(claimed).isPresent();
+        conn.rollback();
+      }
+
+      int cleaned = jobRepo.deleteJobsOlderThanSixMonths();
+      assertThat(cleaned).isGreaterThanOrEqualTo(1);
+      final Long finalStaleId = staleId;
+      assertThat(jobRepo.getJobs()).noneMatch(j -> finalStaleId.equals(j.getId()));
+    } finally {
+      final Long id1 = createdId;
+      final Long id2 = staleId;
+      db.withConnection(
+          conn -> {
+            if (id1 != null) {
+              jobRepo.delete(conn, id1);
+            }
+            if (id2 != null) {
+              jobRepo.delete(conn, id2);
+            }
+            return null;
+          });
+    }
+  }
 }
