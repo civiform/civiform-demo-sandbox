@@ -321,16 +321,16 @@ public class SandboxRepository {
 
   /**
    * Finds all sandboxes eligible for scheduled destruction: those currently {@link
-   * SandboxStatus#RUNNING} or {@link SandboxStatus#DELETE_FAILED} whose {@code expires_at} is
-   * strictly before {@code expiredBefore} and that have fewer than {@code maxAttempts} failed
-   * destruction attempts.
+   * SandboxStatus#RUNNING}, {@link SandboxStatus#FAILED}, or {@link SandboxStatus#DELETE_FAILED}
+   * whose {@code expires_at} is strictly before {@code expiredBefore} and that have fewer than
+   * {@code maxAttempts} failed destruction attempts.
    */
   public ImmutableList<SandboxInstance> findExpiredForDestruction(
       Instant expiredBefore, int maxAttempts) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "SELECT * FROM sandbox_instances "
-              + "WHERE status IN ('RUNNING', 'DELETE_FAILED') "
+              + "WHERE status IN ('RUNNING', 'FAILED', 'DELETE_FAILED') "
               + "  AND expires_at < ? "
               + "  AND destroy_attempts < ? "
               + "ORDER BY expires_at ASC")) {

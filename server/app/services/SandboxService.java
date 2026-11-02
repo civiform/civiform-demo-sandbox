@@ -24,10 +24,11 @@ public interface SandboxService {
    * per-sandbox database, then marks its database record {@link models.SandboxStatus#DELETED}.
    *
    * <p>Re-reads the row at execution time and skips destruction (completing with {@code false})
-   * unless the sandbox is still {@link models.SandboxStatus#RUNNING} or {@link
-   * models.SandboxStatus#DELETE_FAILED} and its {@code expiresAt} is strictly before {@code
-   * expiredBefore}. Completes with {@code true} when destroyed, or exceptionally if teardown fails
-   * so scheduled jobs can track retry counts and alert SRE.
+   * unless the sandbox is still {@link models.SandboxStatus#RUNNING}, {@link
+   * models.SandboxStatus#FAILED}, or {@link models.SandboxStatus#DELETE_FAILED} and its {@code
+   * expiresAt} is strictly before {@code expiredBefore}. Completes with {@code true} when
+   * destroyed, or exceptionally if teardown fails so scheduled jobs can track retry counts and
+   * alert SRE.
    */
   CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore);
 

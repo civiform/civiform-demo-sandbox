@@ -299,6 +299,7 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
           if ((sandbox.getStatus() != SandboxStatus.RUNNING
+                  && sandbox.getStatus() != SandboxStatus.FAILED
                   && sandbox.getStatus() != SandboxStatus.DELETE_FAILED)
               || sandbox.getExpiresAt() == null
               || !sandbox.getExpiresAt().isBefore(expiredBefore)) {

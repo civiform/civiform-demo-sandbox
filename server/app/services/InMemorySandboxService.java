@@ -108,6 +108,7 @@ public class InMemorySandboxService implements SandboxService {
     SandboxInstance existing = sandboxes.get(id);
     if (existing == null
         || (existing.getStatus() != SandboxStatus.RUNNING
+            && existing.getStatus() != SandboxStatus.FAILED
             && existing.getStatus() != SandboxStatus.DELETE_FAILED)
         || existing.getExpiresAt() == null
         || !existing.getExpiresAt().isBefore(expiredBefore)) {

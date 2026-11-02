@@ -438,7 +438,7 @@ public class SandboxRepositoryTest {
     ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
     verify(conn).prepareStatement(sqlCaptor.capture());
     assertThat(sqlCaptor.getValue())
-        .contains("WHERE status IN ('RUNNING', 'DELETE_FAILED')")
+        .contains("WHERE status IN ('RUNNING', 'FAILED', 'DELETE_FAILED')")
         .contains("AND expires_at < ?")
         .contains("AND destroy_attempts < ?");
     verify(ps).setTimestamp(1, Timestamp.from(cutoff));

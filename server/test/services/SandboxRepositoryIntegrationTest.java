@@ -431,12 +431,17 @@ public class SandboxRepositoryIntegrationTest {
     Instant cutoff = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     SandboxInstance expired =
         makeTestInstance().toBuilder()
-            .status(SandboxStatus.RUNNING)
+            .status(SandboxStatus.FAILED)
             .expiresAt(cutoff.minus(Duration.ofHours(12)))
             .build();
     repo.save(expired);
 
-    // Initially eligible with 0 attempts.
+    // Expired FAILED sandboxes (half-provisioned resources) are eligible for cleanup.
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .anyMatch(s -> s.getId().equals(testId));
+
+    // RUNNING sandboxes are also eligible.
+    repo.updateStatus(testId, SandboxStatus.RUNNING);
     assertThat(repo.findExpiredForDestruction(cutoff, 3))
         .anyMatch(s -> s.getId().equals(testId));
 

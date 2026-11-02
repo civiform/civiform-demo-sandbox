@@ -599,6 +599,23 @@ public class DockerSandboxServiceTest {
     verify(repository).updateStatus("sb-exp-docker", SandboxStatus.DELETING);
     verify(dockerClient).removeContainerCmd("container-exp");
     verify(repository).softDelete(eq("sb-exp-docker"), any());
+
+    // Expired FAILED sandboxes (left behind after failed provisioning) are also torn down.
+    SandboxInstance expiredFailed =
+        makeSandboxWithContainer("sb-exp-failed", null).toBuilder()
+            .status(SandboxStatus.FAILED)
+            .expiresAt(cutoff.minus(Duration.ofDays(1)))
+            .build();
+    when(repository.findById("sb-exp-failed")).thenReturn(Optional.of(expiredFailed));
+    when(repository.softDelete(eq("sb-exp-failed"), any())).thenReturn(true);
+
+    assertThat(
+            service
+                .destroyExpiredSandbox("sb-exp-failed", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isTrue();
+    verify(repository).softDelete(eq("sb-exp-failed"), any());
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
