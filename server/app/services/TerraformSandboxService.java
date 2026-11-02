@@ -395,30 +395,58 @@ public class TerraformSandboxService implements SandboxService {
 
     java.util.concurrent.atomic.AtomicBoolean destroyed =
         new java.util.concurrent.atomic.AtomicBoolean(false);
-    return enqueueForSandbox(
-            id,
-            () -> {
-              // Re-read inside the serialized per-sandbox queue in case the sandbox was extended,
-              // re-provisioned, or manually deleted while waiting for a prior in-flight task.
-              Optional<SandboxInstance> latest = repository.findById(id);
-              if (latest.isEmpty()
-                  || !isEligibleForExpiredDestruction(latest.get(), expiredBefore)) {
-                latest.ifPresent(
-                    sb ->
-                        log.info(
-                            "[{}] Skipping expired-sandbox teardown after queue wait: status={},"
-                                + " expiresAt={}, cutoff={}",
-                            id,
-                            sb.getStatus(),
-                            sb.getExpiresAt(),
-                            expiredBefore));
-                return;
-              }
-              repository.updateStatus(id, SandboxStatus.DELETING);
-              destroyExpired(latest.get());
-              destroyed.set(true);
-            })
-        .thenApply(ignored -> destroyed.get());
+    java.util.concurrent.atomic.AtomicBoolean cancelled =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+    java.util.concurrent.atomic.AtomicReference<Thread> workerThread =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    CompletableFuture<Boolean> result =
+        enqueueForSandbox(
+                id,
+                () -> {
+                  if (cancelled.get()) {
+                    return;
+                  }
+                  workerThread.set(Thread.currentThread());
+                  try {
+                    if (cancelled.get() || Thread.currentThread().isInterrupted()) {
+                      return;
+                    }
+                    // Re-read inside the serialized per-sandbox queue in case the sandbox was
+                    // extended, re-provisioned, or manually deleted while waiting for a prior task.
+                    Optional<SandboxInstance> latest = repository.findById(id);
+                    if (latest.isEmpty()
+                        || !isEligibleForExpiredDestruction(latest.get(), expiredBefore)) {
+                      latest.ifPresent(
+                          sb ->
+                              log.info(
+                                  "[{}] Skipping expired-sandbox teardown after queue wait:"
+                                      + " status={}, expiresAt={}, cutoff={}",
+                                  id,
+                                  sb.getStatus(),
+                                  sb.getExpiresAt(),
+                                  expiredBefore));
+                      return;
+                    }
+                    repository.updateStatus(id, SandboxStatus.DELETING);
+                    destroyExpired(latest.get());
+                    destroyed.set(true);
+                  } finally {
+                    workerThread.set(null);
+                    Thread.interrupted();
+                  }
+                })
+            .thenApply(ignored -> destroyed.get());
+    result.whenComplete(
+        (ignored, ex) -> {
+          if (ex instanceof java.util.concurrent.CancellationException) {
+            cancelled.set(true);
+            Thread running = workerThread.get();
+            if (running != null) {
+              running.interrupt();
+            }
+          }
+        });
+    return result;
   }
 
   private static boolean isEligibleForExpiredDestruction(

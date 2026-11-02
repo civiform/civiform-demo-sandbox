@@ -164,6 +164,41 @@ public class DestroyExpiredSandboxesJobTest {
   }
 
   @Test
+  public void run_hungSandboxTimesOutCountsAsFailureAndAllowsNextSandboxToProceed() {
+    SandboxInstance hung = expiredSandbox("sb-hung", SandboxStatus.RUNNING, 2);
+    SandboxInstance healthyNext = expiredSandbox("sb-next", SandboxStatus.RUNNING, 0);
+    CompletableFuture<Boolean> neverCompletes = new CompletableFuture<>();
+
+    when(sandboxRepository.findExpiredForDestruction(EXPECTED_CUTOFF, 3))
+        .thenReturn(ImmutableList.of(hung, healthyNext));
+    when(sandboxService.destroyExpiredSandbox("sb-hung", EXPECTED_CUTOFF))
+        .thenReturn(neverCompletes);
+    when(sandboxService.destroyExpiredSandbox("sb-next", EXPECTED_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(true));
+    when(sandboxRepository.recordDestroyFailure(eq("sb-hung"), anyString())).thenReturn(3);
+
+    DestroyExpiredSandboxesJob jobWithShortTimeout =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            java.time.Duration.ofMillis(40));
+
+    jobWithShortTimeout.run();
+
+    assertThat(neverCompletes.isCancelled()).isTrue();
+    verify(sandboxRepository)
+        .recordDestroyFailure(
+            eq("sb-hung"), eq("Timed out after 0s waiting for expired-sandbox teardown"));
+    verify(slackAlertClient, times(1))
+        .sendSandboxDestroyFailureAlert(
+            eq(hung), eq(3), eq("Timed out after 0s waiting for expired-sandbox teardown"));
+    verify(sandboxService).destroyExpiredSandbox("sb-next", EXPECTED_CUTOFF);
+  }
+
+  @Test
   public void getPersistedDurableJob_returnsAssociatedJobModel() {
     assertThat(newJob().getPersistedDurableJob()).isSameAs(jobModel);
     assertThat(newJob().jobName()).isEqualTo("DESTROY_EXPIRED_SANDBOXES");

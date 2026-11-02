@@ -158,12 +158,18 @@ public final class DurableJobModule extends AbstractModule {
   @Singleton
   @RecurringJobsProviderName
   public DurableJobRegistry provideRecurringDurableJobRegistry(
+      Config config,
       Clock clock,
       Provider<SandboxRepository> sandboxRepositoryProvider,
       Provider<SandboxService> sandboxServiceProvider,
       Provider<PersistedDurableJobRepository> persistedDurableJobRepositoryProvider,
       Provider<SlackAlertClient> slackAlertClientProvider) {
     DurableJobRegistry durableJobRegistry = new DurableJobRegistry();
+    java.time.Duration destroySandboxTimeout =
+        config.hasPath("durable_jobs.destroy_sandbox_timeout_minutes")
+            ? java.time.Duration.ofMinutes(
+                Math.max(1, config.getInt("durable_jobs.destroy_sandbox_timeout_minutes")))
+            : DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT;
 
     durableJobRegistry.register(
         DurableJobName.DESTROY_EXPIRED_SANDBOXES,
@@ -174,7 +180,8 @@ public final class DurableJobModule extends AbstractModule {
                 sandboxRepositoryProvider.get(),
                 sandboxServiceProvider.get(),
                 slackAlertClientProvider.get(),
-                persistedDurableJob),
+                persistedDurableJob,
+                destroySandboxTimeout),
         new RecurringJobExecutionTimeResolvers.Daily2Am());
 
     durableJobRegistry.register(
