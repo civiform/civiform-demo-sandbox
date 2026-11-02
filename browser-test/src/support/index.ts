@@ -74,7 +74,7 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 }
 
 /**
- * Fills the 3-step "Create new demo" wizard with the given values.
+ * Fills the 2-step "Create new demo" wizard with the given values.
  * Assumes the modal is already open (call openCreateModal() first).
  */
 export async function fillCreateWizard(
@@ -88,14 +88,14 @@ export async function fillCreateWizard(
     googleAnalyticsId?: string
   },
 ): Promise<void> {
-  // Step 1
+  // Step 1: CiviForm setup
   await page.fill('[name="cityName"]', opts.cityName)
   if (opts.expirationDays !== undefined) {
     await page.fill('[name="expirationDays"]', String(opts.expirationDays))
   }
   await page.click('button:has-text("Next")')
 
-  // Step 2
+  // Step 2: AWS setup + submit
   await page.fill('[name="adminEmail"]', opts.adminEmail ?? 'test@example.com')
   // Subdomain may be pre-filled via JS — clear and re-type
   await page.fill('[name="subdomain"]', opts.subdomain)
@@ -103,9 +103,6 @@ export async function fillCreateWizard(
   if (opts.googleAnalyticsId) {
     await page.fill('[name="googleAnalyticsId"]', opts.googleAnalyticsId)
   }
-  await page.click('button:has-text("Next")')
-
-  // Step 3 — just click Provision demo
   await page.click('button:has-text("Provision demo")')
 }
 
