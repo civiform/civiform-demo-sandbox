@@ -178,13 +178,16 @@
         </div>
       </dl>
 
-      <div class="mt-6 pt-4 border-t border-gray-200 flex gap-3 flex-wrap">
+      <div
+        th:if="${model.sandbox.status.name() != 'DELETED'}"
+        class="mt-6 pt-4 border-t border-gray-200 flex gap-3 flex-wrap"
+      >
         <button type="button" onclick="openExtendModal()" class="usa-button">
           Extend Demo
         </button>
         <button
           type="button"
-          th:if="${model.sandbox.status.name() != 'DELETED' and model.sandbox.status.name() != 'DELETING' and model.sandbox.status.name() != 'PROVISIONING'}"
+          th:if="${model.sandbox.status.name() != 'DELETING' and model.sandbox.status.name() != 'PROVISIONING'}"
           onclick="openReprovisionModal()"
           class="usa-button usa-button--outline"
         >
@@ -192,7 +195,7 @@
         </button>
         <button
           type="button"
-          th:if="${model.sandbox.status.name() != 'DELETED' and model.sandbox.status.name() != 'DELETING'}"
+          th:if="${model.sandbox.status.name() != 'DELETING'}"
           onclick="openDestroyModal()"
           class="usa-button usa-button--secondary"
         >

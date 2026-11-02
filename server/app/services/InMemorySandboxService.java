@@ -90,15 +90,31 @@ public class InMemorySandboxService implements SandboxService {
       return CompletableFuture.completedFuture(false);
     }
     // Soft-delete: mark as DELETED with timestamp so the dashboard can show the tombstone row.
-    // PIN and admin email are cleared to match the scrubbed tombstone the JDBC path keeps.
+    // PIN, token, and admin email are cleared to match the scrubbed tombstone the JDBC path keeps.
     SandboxInstance deleted = existing.toBuilder()
         .status(SandboxStatus.DELETED)
         .deletedAt(Instant.now())
         .pin("")
+        .accessToken("")
         .adminEmail("")
+        .lastDestroyError(null)
         .build();
     sandboxes.put(id, deleted);
     return CompletableFuture.completedFuture(true);
+  }
+
+  @Override
+  public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null
+        || (existing.getStatus() != SandboxStatus.RUNNING
+            && existing.getStatus() != SandboxStatus.FAILED
+            && existing.getStatus() != SandboxStatus.DELETE_FAILED)
+        || existing.getExpiresAt() == null
+        || !existing.getExpiresAt().isBefore(expiredBefore)) {
+      return CompletableFuture.completedFuture(false);
+    }
+    return deleteSandbox(id);
   }
 
   @Override
@@ -144,6 +160,10 @@ public class InMemorySandboxService implements SandboxService {
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.completedFuture(
         Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
+          if (sandbox.getStatus() == SandboxStatus.DELETED
+              || sandbox.getStatus() == SandboxStatus.DELETING) {
+            return false;
+          }
           // Constant-time comparison to prevent timing attacks
           return MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
         }));

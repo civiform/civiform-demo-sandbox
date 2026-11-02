@@ -370,6 +370,133 @@ public class TerraformSandboxServiceTest {
   }
 
   @Test
+  public void destroyExpiredSandbox_skipsMissingNonEligibleStatusOrExtendedExpiry()
+      throws Exception {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.DAYS);
+
+    when(repository.findById("sb-missing")).thenReturn(Optional.empty());
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-missing", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Already DELETED -> skipped
+    SandboxInstance deleted =
+        live("").toBuilder()
+            .status(SandboxStatus.DELETED)
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-deleted")).thenReturn(Optional.of(deleted));
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-deleted", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Extended mid-run (status moved to PROVISIONING and expires_at pushed out) -> skipped
+    SandboxInstance extendedMidRun =
+        live("123456").toBuilder()
+            .status(SandboxStatus.PROVISIONING)
+            .expiresAt(cutoff.plus(30, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-extended")).thenReturn(Optional.of(extendedMidRun));
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-extended", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // RUNNING but expires_at >= cutoff -> skipped
+    SandboxInstance futureExpiry =
+        live("123456").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-unexpired")).thenReturn(Optional.of(futureExpiry));
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-unexpired", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Manual delete already running (DELETING) -> skipped cleanly without throwing
+    SandboxInstance deleting =
+        live("123456").toBuilder()
+            .status(SandboxStatus.DELETING)
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-deleting")).thenReturn(Optional.of(deleting));
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-deleting", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Extended while waiting in the per-sandbox queue (1st read eligible, 2nd read PROVISIONING)
+    SandboxInstance initiallyExpired =
+        live("123456").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-queued-race"))
+        .thenReturn(Optional.of(initiallyExpired))
+        .thenReturn(Optional.of(extendedMidRun));
+    assertThat(
+            newService()
+                .destroyExpiredSandbox("sb-queued-race", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.DELETING));
+    verify(terraform, never()).destroy(any(), any(), any());
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
+  public void destroyExpiredSandbox_terraformFailureCompletesExceptionally() {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    SandboxInstance expired =
+        live("123456").toBuilder()
+            .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
+            .adminEmail("bd-lead@exygy.com")
+            .accessToken("tok-1")
+            .listenerPriority(1000)
+            .civiformVersion("latest")
+            .databaseName("sb_abcd1234")
+            .expiresAt(cutoff.minus(2, ChronoUnit.DAYS))
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(expired));
+    org.mockito.Mockito.doThrow(new RuntimeException("S3 backend unreachable"))
+        .when(terraform)
+        .destroy(any(), any(), any());
+
+    assertThatThrownBy(
+            () ->
+                newService()
+                    .destroyExpiredSandbox("sb-abcd1234", cutoff)
+                    .toCompletableFuture()
+                    .join())
+        .hasCauseInstanceOf(RuntimeException.class)
+        .hasStackTraceContaining("S3 backend unreachable");
+
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
   public void construction_ensuresSchemaAndFailsInterruptedOperationsOnStartup() {
     newService();
 

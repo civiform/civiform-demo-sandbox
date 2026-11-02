@@ -15,6 +15,7 @@ import java.time.Duration;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import models.PersistedDurableJobModel;
+import models.SandboxInstance;
 import play.Logger;
 import play.Logger.ALogger;
 
@@ -57,6 +58,31 @@ public class SlackAlertClient {
             : "";
     this.channel = configuredChannel.isEmpty() ? DEFAULT_CHANNEL : configuredChannel;
     this.httpClient = checkNotNull(httpClient);
+  }
+
+  /**
+   * Alerts {@code #civiform-sre-alerts} when an expired sandbox fails scheduled destruction 3
+   * times.
+   */
+  public void sendSandboxDestroyFailureAlert(
+      SandboxInstance sandbox, int attempts, String errorMessage) {
+    String text =
+        String.format(
+            ":rotating_light: *CiviForm Sandbox automated teardown failed %d times*\n"
+                + "• *Sandbox ID:* `%s`\n"
+                + "• *City:* %s\n"
+                + "• *Subdomain:* `%s`\n"
+                + "• *Database:* `%s`\n"
+                + "• *Expired At:* `%s`\n"
+                + "• *Last Error:*\n```%s```",
+            attempts,
+            sandbox.getId(),
+            sandbox.getCityName(),
+            sandbox.getSubdomain() != null ? sandbox.getSubdomain() : "(none)",
+            sandbox.getDatabaseName(),
+            sandbox.getExpiresAt(),
+            truncate(errorMessage, 2000));
+    postMessage(text);
   }
 
   /**

@@ -247,7 +247,7 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
 
-          // A DELETED row is a tombstone: the container and database are already gone.
+          // A DELETED row is already torn down.
           // Re-running teardown would fail the DROP DATABASE and flip the tombstone to
           // DELETE_FAILED, which would falsely signal a retryable drop.
           if (sandbox.getStatus() == SandboxStatus.DELETED) {
@@ -290,6 +290,65 @@ public class DockerSandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return false;
+          }
+          SandboxInstance sandbox = maybeSandbox.get();
+          if ((sandbox.getStatus() != SandboxStatus.RUNNING
+                  && sandbox.getStatus() != SandboxStatus.FAILED
+                  && sandbox.getStatus() != SandboxStatus.DELETE_FAILED)
+              || sandbox.getExpiresAt() == null
+              || !sandbox.getExpiresAt().isBefore(expiredBefore)) {
+            log.info(
+                "[{}] Skipping expired-sandbox teardown: status={}, expiresAt={}, cutoff={}",
+                id,
+                sandbox.getStatus(),
+                sandbox.getExpiresAt(),
+                expiredBefore);
+            return false;
+          }
+
+          repository.updateStatus(id, SandboxStatus.DELETING);
+
+          if (sandbox.getContainerId() != null) {
+            try {
+              dockerClient.stopContainerCmd(sandbox.getContainerId()).withTimeout(10).exec();
+            } catch (Exception e) {
+              log.warn("[{}] Could not stop container during expiry teardown: {}", id, e.getMessage());
+            }
+            try {
+              dockerClient.removeContainerCmd(sandbox.getContainerId()).withForce(true).exec();
+              log.info("[{}] Container removed during expiry teardown", id);
+            } catch (Exception e) {
+              log.warn("[{}] Could not remove container during expiry teardown: {}", id, e.getMessage());
+            }
+          }
+
+          try {
+            dropDatabase(sandbox.getDatabaseName());
+            log.info("[{}] Database dropped during expiry teardown", id);
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Could not drop database "
+                    + sandbox.getDatabaseName()
+                    + " for sandbox "
+                    + id
+                    + ": "
+                    + e.getMessage(),
+                e);
+          }
+
+          repository.softDelete(id, Instant.now());
+          return true;
+        },
+        provisioningPool);
+  }
+
+  @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -298,6 +357,10 @@ public class DockerSandboxService implements SandboxService {
             return Optional.empty();
           }
           SandboxInstance sandbox = maybeSandbox.get();
+          if (sandbox.getStatus() == SandboxStatus.DELETED
+              || sandbox.getStatus() == SandboxStatus.DELETING) {
+            return Optional.empty();
+          }
 
           // Constant-time comparison to prevent timing attacks
           boolean matches = MessageDigest.isEqual(sandbox.getPin().getBytes(), pin.getBytes());
