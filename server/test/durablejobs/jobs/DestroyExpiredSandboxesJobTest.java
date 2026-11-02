@@ -77,26 +77,30 @@ public class DestroyExpiredSandboxesJobTest {
     verify(sandboxRepository)
         .findExpiredForDestruction(
             EXPECTED_CUTOFF, DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
-    verify(sandboxService, never()).destroyExpiredSandbox(anyString());
+    verify(sandboxService, never()).destroyExpiredSandbox(anyString(), any());
     verify(slackAlertClient, never())
         .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
   }
 
   @Test
-  public void run_destroysAllEligibleSandboxes() {
+  public void run_destroysAllEligibleSandboxesAndHandlesMidRunSkipsCleanly() {
     SandboxInstance sb1 = expiredSandbox("sb-1111", SandboxStatus.RUNNING, 0);
     SandboxInstance sb2 = expiredSandbox("sb-2222", SandboxStatus.DELETE_FAILED, 1);
+    SandboxInstance sbExtendedMidRun = expiredSandbox("sb-3333", SandboxStatus.RUNNING, 0);
     when(sandboxRepository.findExpiredForDestruction(EXPECTED_CUTOFF, 3))
-        .thenReturn(ImmutableList.of(sb1, sb2));
-    when(sandboxService.destroyExpiredSandbox("sb-1111"))
-        .thenReturn(CompletableFuture.completedFuture(null));
-    when(sandboxService.destroyExpiredSandbox("sb-2222"))
-        .thenReturn(CompletableFuture.completedFuture(null));
+        .thenReturn(ImmutableList.of(sb1, sb2, sbExtendedMidRun));
+    when(sandboxService.destroyExpiredSandbox("sb-1111", EXPECTED_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(true));
+    when(sandboxService.destroyExpiredSandbox("sb-2222", EXPECTED_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(true));
+    when(sandboxService.destroyExpiredSandbox("sb-3333", EXPECTED_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(false));
 
     newJob().run();
 
-    verify(sandboxService).destroyExpiredSandbox("sb-1111");
-    verify(sandboxService).destroyExpiredSandbox("sb-2222");
+    verify(sandboxService).destroyExpiredSandbox("sb-1111", EXPECTED_CUTOFF);
+    verify(sandboxService).destroyExpiredSandbox("sb-2222", EXPECTED_CUTOFF);
+    verify(sandboxService).destroyExpiredSandbox("sb-3333", EXPECTED_CUTOFF);
     verify(sandboxRepository, never()).recordDestroyFailure(anyString(), anyString());
     verify(slackAlertClient, never())
         .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
@@ -108,11 +112,11 @@ public class DestroyExpiredSandboxesJobTest {
     SandboxInstance succeeding = expiredSandbox("sb-ok", SandboxStatus.RUNNING, 0);
     when(sandboxRepository.findExpiredForDestruction(EXPECTED_CUTOFF, 3))
         .thenReturn(ImmutableList.of(failing, succeeding));
-    when(sandboxService.destroyExpiredSandbox("sb-fail"))
+    when(sandboxService.destroyExpiredSandbox("sb-fail", EXPECTED_CUTOFF))
         .thenReturn(
             CompletableFuture.failedFuture(new RuntimeException("S3 state lock contention")));
-    when(sandboxService.destroyExpiredSandbox("sb-ok"))
-        .thenReturn(CompletableFuture.completedFuture(null));
+    when(sandboxService.destroyExpiredSandbox("sb-ok", EXPECTED_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(true));
     when(sandboxRepository.recordDestroyFailure(eq("sb-fail"), anyString())).thenReturn(1);
 
     // Must NOT throw — Option A isolates per-sandbox failure from the DurableJob sweep.
@@ -120,7 +124,7 @@ public class DestroyExpiredSandboxesJobTest {
 
     verify(sandboxRepository)
         .recordDestroyFailure("sb-fail", "S3 state lock contention");
-    verify(sandboxService).destroyExpiredSandbox("sb-ok");
+    verify(sandboxService).destroyExpiredSandbox("sb-ok", EXPECTED_CUTOFF);
     verify(slackAlertClient, never())
         .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
   }
@@ -130,7 +134,7 @@ public class DestroyExpiredSandboxesJobTest {
     SandboxInstance failing = expiredSandbox("sb-stuck", SandboxStatus.RUNNING, 0);
     when(sandboxRepository.findExpiredForDestruction(EXPECTED_CUTOFF, 3))
         .thenReturn(ImmutableList.of(failing));
-    when(sandboxService.destroyExpiredSandbox("sb-stuck"))
+    when(sandboxService.destroyExpiredSandbox("sb-stuck", EXPECTED_CUTOFF))
         .thenReturn(
             CompletableFuture.failedFuture(
                 new RuntimeException("Terraform destroy failed: ENI still attached")));

@@ -116,18 +116,47 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void destroyExpiredSandbox_marksDeletedScrubsPiiAndBlocksReuseActions()
+  public void destroyExpiredSandbox_skipsNonRunningOrUnexpiredAndMarksEligibleDeleted()
       throws ExecutionException, InterruptedException {
-    SandboxInstance created =
+    // PROVISIONING sandbox is skipped even if cutoff is in the future
+    SandboxInstance provisioning =
         service
-            .createSandbox(makeRequest("Expired City", "expired-city", "654321"))
+            .createSandbox(makeRequest("Provisioning City", "prov-city", "654321"))
             .toCompletableFuture()
             .get();
+    assertThat(
+            service
+                .destroyExpiredSandbox(
+                    provisioning.getId(),
+                    provisioning.getExpiresAt().plus(java.time.Duration.ofDays(1)))
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+    assertThat(
+            service.getSandbox(provisioning.getId()).toCompletableFuture().get().orElseThrow()
+                .getStatus())
+        .isEqualTo(SandboxStatus.PROVISIONING);
 
-    service.destroyExpiredSandbox(created.getId()).toCompletableFuture().get();
+    // Seeded RUNNING sandbox skipped when cutoff is at/before its expiresAt
+    SandboxInstance demo = service.getSandbox("sb-demo0001").toCompletableFuture().get().orElseThrow();
+    assertThat(
+            service
+                .destroyExpiredSandbox("sb-demo0001", demo.getExpiresAt())
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Seeded RUNNING sandbox destroyed when its expiresAt is strictly before cutoff
+    assertThat(
+            service
+                .destroyExpiredSandbox(
+                    "sb-demo0001", demo.getExpiresAt().plusSeconds(1))
+                .toCompletableFuture()
+                .get())
+        .isTrue();
 
     SandboxInstance deleted =
-        service.getSandbox(created.getId()).toCompletableFuture().get().orElseThrow();
+        service.getSandbox("sb-demo0001").toCompletableFuture().get().orElseThrow();
     assertThat(deleted.getStatus()).isEqualTo(SandboxStatus.DELETED);
     assertThat(deleted.getPin()).isEmpty();
     assertThat(deleted.getAccessToken()).isEmpty();
@@ -135,10 +164,10 @@ public class InMemorySandboxServiceTest {
     assertThat(deleted.getDeletedAt()).isNotNull();
 
     // Deleted sandboxes reject PIN access, extension, re-provisioning, and duplicate deletion.
-    assertThat(service.validatePin(created.getId(), "654321").toCompletableFuture().get()).isEmpty();
-    assertThat(service.extendSandbox(created.getId(), 7).toCompletableFuture().get()).isEmpty();
-    assertThat(service.reprovisionSandbox(created.getId()).toCompletableFuture().get()).isEmpty();
-    assertThat(service.deleteSandbox(created.getId()).toCompletableFuture().get()).isFalse();
+    assertThat(service.validatePin("sb-demo0001", "482917").toCompletableFuture().get()).isEmpty();
+    assertThat(service.extendSandbox("sb-demo0001", 7).toCompletableFuture().get()).isEmpty();
+    assertThat(service.reprovisionSandbox("sb-demo0001").toCompletableFuture().get()).isEmpty();
+    assertThat(service.deleteSandbox("sb-demo0001").toCompletableFuture().get()).isFalse();
   }
 }
 

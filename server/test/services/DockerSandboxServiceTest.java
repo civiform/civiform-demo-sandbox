@@ -3,6 +3,7 @@ package services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -533,6 +534,71 @@ public class DockerSandboxServiceTest {
     assertThat(result).isPresent();
     assertThat(result.get().getExpiresAt())
         .isAfterOrEqualTo(beforeCall.plus(Duration.ofDays(7)));
+  }
+
+  @Test
+  public void destroyExpiredSandbox_skipsExtendedOrNonEligibleSandbox()
+      throws ExecutionException, InterruptedException {
+    Instant cutoff = Instant.now();
+
+    // Extended mid-run -> status PROVISIONING and future expiresAt
+    SandboxInstance extended =
+        makeSandboxWithContainer("sb-ext-mid", "container-live").toBuilder()
+            .status(SandboxStatus.PROVISIONING)
+            .expiresAt(cutoff.plus(Duration.ofDays(30)))
+            .build();
+    when(repository.findById("sb-ext-mid")).thenReturn(Optional.of(extended));
+    assertThat(
+            service
+                .destroyExpiredSandbox("sb-ext-mid", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Still RUNNING, but expiresAt is at/after cutoff
+    SandboxInstance unexpired =
+        makeSandboxWithContainer("sb-unexp", "container-live").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff)
+            .build();
+    when(repository.findById("sb-unexp")).thenReturn(Optional.of(unexpired));
+    assertThat(
+            service
+                .destroyExpiredSandbox("sb-unexp", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.DELETING));
+    verify(dockerClient, never()).stopContainerCmd(anyString());
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void destroyExpiredSandbox_destroysRunningOrDeleteFailedSandboxPastCutoff()
+      throws ExecutionException, InterruptedException {
+    Instant cutoff = Instant.now();
+    SandboxInstance expired =
+        makeSandboxWithContainer("sb-exp-docker", "container-exp").toBuilder()
+            .status(SandboxStatus.DELETE_FAILED)
+            .expiresAt(cutoff.minus(Duration.ofDays(1)))
+            .build();
+    when(repository.findById("sb-exp-docker")).thenReturn(Optional.of(expired));
+    stubDockerStop("container-exp");
+    when(db.withConnection(any(ConnectionCallable.class))).thenReturn(null);
+    when(repository.softDelete(eq("sb-exp-docker"), any())).thenReturn(true);
+
+    boolean destroyed =
+        service
+            .destroyExpiredSandbox("sb-exp-docker", cutoff)
+            .toCompletableFuture()
+            .get();
+
+    assertThat(destroyed).isTrue();
+    verify(repository).updateStatus("sb-exp-docker", SandboxStatus.DELETING);
+    verify(dockerClient).removeContainerCmd("container-exp");
+    verify(repository).softDelete(eq("sb-exp-docker"), any());
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

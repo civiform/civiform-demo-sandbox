@@ -290,16 +290,25 @@ public class DockerSandboxService implements SandboxService {
   }
 
   @Override
-  public CompletionStage<Void> destroyExpiredSandbox(String id) {
-    return CompletableFuture.runAsync(
+  public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
+    return CompletableFuture.supplyAsync(
         () -> {
           Optional<SandboxInstance> maybeSandbox = repository.findById(id);
           if (maybeSandbox.isEmpty()) {
-            return;
+            return false;
           }
           SandboxInstance sandbox = maybeSandbox.get();
-          if (sandbox.getStatus() == SandboxStatus.DELETED) {
-            return;
+          if ((sandbox.getStatus() != SandboxStatus.RUNNING
+                  && sandbox.getStatus() != SandboxStatus.DELETE_FAILED)
+              || sandbox.getExpiresAt() == null
+              || !sandbox.getExpiresAt().isBefore(expiredBefore)) {
+            log.info(
+                "[{}] Skipping expired-sandbox teardown: status={}, expiresAt={}, cutoff={}",
+                id,
+                sandbox.getStatus(),
+                sandbox.getExpiresAt(),
+                expiredBefore);
+            return false;
           }
 
           repository.updateStatus(id, SandboxStatus.DELETING);
@@ -333,6 +342,7 @@ public class DockerSandboxService implements SandboxService {
           }
 
           repository.softDelete(id, Instant.now());
+          return true;
         },
         provisioningPool);
   }

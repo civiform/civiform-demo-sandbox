@@ -20,7 +20,7 @@ import services.SlackAlertClient;
 /**
  * Daily {@link DurableJob} that finds all sandboxes that expired yesterday or earlier ({@code
  * expires_at < startOfToday}), destroys their infrastructure and database via {@link
- * SandboxService#destroyExpiredSandbox(String)}, and marks their rows {@code DELETED}.
+ * SandboxService#destroyExpiredSandbox(String, Instant)}, and marks their rows {@code DELETED}.
  *
  * <p>Per-sandbox failures are isolated (Option A): if destroying one sandbox fails, it is marked
  * {@code DELETE_FAILED} with {@code destroy_attempts} incremented so it will be retried on the next
@@ -72,11 +72,22 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
 
     for (SandboxInstance sandbox : expired) {
       try {
-        sandboxService.destroyExpiredSandbox(sandbox.getId()).toCompletableFuture().join();
-        log.info(
-            "[{}] Expired sandbox destroyed and marked DELETED (expiredAt={})",
-            sandbox.getId(),
-            sandbox.getExpiresAt());
+        boolean destroyed =
+            Boolean.TRUE.equals(
+                sandboxService
+                    .destroyExpiredSandbox(sandbox.getId(), startOfToday)
+                    .toCompletableFuture()
+                    .join());
+        if (destroyed) {
+          log.info(
+              "[{}] Expired sandbox destroyed and marked DELETED (expiredAt={})",
+              sandbox.getId(),
+              sandbox.getExpiresAt());
+        } else {
+          log.info(
+              "[{}] Skipped expired-sandbox teardown (no longer eligible at execution time)",
+              sandbox.getId());
+        }
       } catch (Exception e) {
         Throwable cause =
             e instanceof CompletionException && e.getCause() != null ? e.getCause() : e;

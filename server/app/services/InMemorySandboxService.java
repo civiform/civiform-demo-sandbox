@@ -104,9 +104,16 @@ public class InMemorySandboxService implements SandboxService {
   }
 
   @Override
-  public CompletionStage<Void> destroyExpiredSandbox(String id) {
-    deleteSandbox(id);
-    return CompletableFuture.completedFuture(null);
+  public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null
+        || (existing.getStatus() != SandboxStatus.RUNNING
+            && existing.getStatus() != SandboxStatus.DELETE_FAILED)
+        || existing.getExpiresAt() == null
+        || !existing.getExpiresAt().isBefore(expiredBefore)) {
+      return CompletableFuture.completedFuture(false);
+    }
+    return deleteSandbox(id);
   }
 
   @Override

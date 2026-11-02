@@ -378,25 +378,55 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   @Override
-  public CompletionStage<Void> destroyExpiredSandbox(String id) {
+  public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
     Optional<SandboxInstance> maybeSandbox = repository.findById(id);
-    if (maybeSandbox.isEmpty()) {
-      return CompletableFuture.completedFuture(null);
+    if (maybeSandbox.isEmpty()
+        || !isEligibleForExpiredDestruction(maybeSandbox.get(), expiredBefore)) {
+      maybeSandbox.ifPresent(
+          sb ->
+              log.info(
+                  "[{}] Skipping expired-sandbox teardown: status={}, expiresAt={}, cutoff={}",
+                  id,
+                  sb.getStatus(),
+                  sb.getExpiresAt(),
+                  expiredBefore));
+      return CompletableFuture.completedFuture(false);
     }
-    SandboxInstance sandbox = maybeSandbox.get();
 
-    if (sandbox.getStatus() == SandboxStatus.DELETED) {
-      return CompletableFuture.completedFuture(null);
-    }
-    if (sandbox.getStatus() == SandboxStatus.DELETING) {
-      return CompletableFuture.failedFuture(
-          new IllegalStateException(
-              "Sandbox " + id + " is already in DELETING status; skipping concurrent teardown."));
-    }
+    java.util.concurrent.atomic.AtomicBoolean destroyed =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+    return enqueueForSandbox(
+            id,
+            () -> {
+              // Re-read inside the serialized per-sandbox queue in case the sandbox was extended,
+              // re-provisioned, or manually deleted while waiting for a prior in-flight task.
+              Optional<SandboxInstance> latest = repository.findById(id);
+              if (latest.isEmpty()
+                  || !isEligibleForExpiredDestruction(latest.get(), expiredBefore)) {
+                latest.ifPresent(
+                    sb ->
+                        log.info(
+                            "[{}] Skipping expired-sandbox teardown after queue wait: status={},"
+                                + " expiresAt={}, cutoff={}",
+                            id,
+                            sb.getStatus(),
+                            sb.getExpiresAt(),
+                            expiredBefore));
+                return;
+              }
+              repository.updateStatus(id, SandboxStatus.DELETING);
+              destroyExpired(latest.get());
+              destroyed.set(true);
+            })
+        .thenApply(ignored -> destroyed.get());
+  }
 
-    repository.updateStatus(id, SandboxStatus.DELETING);
-
-    return enqueueForSandbox(id, () -> destroyExpired(sandbox));
+  private static boolean isEligibleForExpiredDestruction(
+      SandboxInstance sandbox, Instant expiredBefore) {
+    return (sandbox.getStatus() == SandboxStatus.RUNNING
+            || sandbox.getStatus() == SandboxStatus.DELETE_FAILED)
+        && sandbox.getExpiresAt() != null
+        && sandbox.getExpiresAt().isBefore(expiredBefore);
   }
 
   /** The long-running half of manual deletion. Runs on {@link #provisioningPool}. */
