@@ -11,6 +11,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import models.SandboxInstance;
 import models.SandboxStatus;
 import org.junit.Test;
@@ -47,6 +48,7 @@ public class SeedingEngineIntegrationTest extends WithApplication {
         .url(baseUrl)
         .adminEmail("test@exygy.com")
         .pin("123456")
+        .accessToken("test-access-token-xyz")
         .createdAt(Instant.now())
         .expiresAt(Instant.now().plus(Duration.ofDays(30)))
         .build();
@@ -174,5 +176,69 @@ public class SeedingEngineIntegrationTest extends WithApplication {
 
     assertThat(result).isFalse();
     verify(repository).updateStatus("sb-int-test", SandboxStatus.SEEDING);
+  }
+
+  @Test
+  public void seedSandbox_sendsAccessCookieInRequest() throws Exception {
+    AtomicReference<String> receivedCookie = new AtomicReference<>();
+
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    try {
+      server.createContext(
+          "/dev/seedProgramsHeadless",
+          exchange -> {
+            receivedCookie.set(exchange.getRequestHeaders().getFirst("Cookie"));
+            exchange.sendResponseHeaders(200, 0);
+            exchange.close();
+          });
+      server.start();
+
+      String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+      SandboxRepository repository = mock(SandboxRepository.class);
+      WSClient ws = app.injector().instanceOf(WSClient.class);
+
+      SeedingEngine engine = new SeedingEngine(ws, repository);
+      SandboxInstance sandbox = testSandbox(baseUrl);
+
+      engine.seedSandbox(sandbox).toCompletableFuture().get();
+
+      // Cookie name: sb_access_ + id with dashes replaced by underscores
+      assertThat(receivedCookie.get()).contains("sb_access_sb_int_test=test-access-token-xyz");
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  public void seedSandbox_returnsFalseOn302Redirect() throws Exception {
+    AtomicInteger hitCount = new AtomicInteger(0);
+
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    try {
+      server.createContext(
+          "/dev/seedProgramsHeadless",
+          exchange -> {
+            hitCount.incrementAndGet();
+            exchange.getResponseHeaders().set("Location", "/pin-gate");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+          });
+      server.start();
+
+      String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+      SandboxRepository repository = mock(SandboxRepository.class);
+      WSClient ws = app.injector().instanceOf(WSClient.class);
+
+      SeedingEngine engine = new SeedingEngine(ws, repository);
+      SandboxInstance sandbox = testSandbox(baseUrl);
+
+      Boolean result = engine.seedSandbox(sandbox).toCompletableFuture().get();
+
+      assertThat(result).isFalse();
+      // Should have retried all 3 attempts
+      assertThat(hitCount.get()).isEqualTo(3);
+    } finally {
+      server.stop(0);
+    }
   }
 }

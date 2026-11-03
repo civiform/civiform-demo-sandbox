@@ -2,10 +2,9 @@ package services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +16,7 @@ import models.SandboxStatus;
 import org.junit.Before;
 import org.junit.Test;
 import play.libs.ws.WSClient;
+import play.libs.ws.WSCookie;
 import play.libs.ws.WSRequest;
 import play.libs.ws.WSResponse;
 
@@ -28,10 +28,12 @@ import play.libs.ws.WSResponse;
  *
  * <ul>
  *   <li>Seeding sets status to SEEDING before calling the endpoint
- *   <li>Successful 200 response → returns true
- *   <li>Non-200 response after all retries → returns false
- *   <li>Connection failure after all retries → returns false
+ *   <li>Successful 200 response returns true
+ *   <li>Non-200 response after all retries returns false
+ *   <li>Connection failure after all retries returns false
  *   <li>Retries on transient failure before succeeding
+ *   <li>Redirect following is disabled (non-200 treated as failure)
+ *   <li>ALB access cookie is sent with the request
  * </ul>
  */
 public class SeedingEngineTest {
@@ -52,6 +54,7 @@ public class SeedingEngineTest {
         .url(baseUrl)
         .adminEmail("test@exygy.com")
         .pin("123456")
+        .accessToken("test-access-token-abc")
         .createdAt(Instant.now())
         .expiresAt(Instant.now().plus(Duration.ofDays(30)))
         .build();
@@ -67,13 +70,15 @@ public class SeedingEngineTest {
     // Chain the WSRequest fluent API
     when(ws.url(anyString())).thenReturn(wsRequest);
     when(wsRequest.setRequestTimeout(any(Duration.class))).thenReturn(wsRequest);
+    when(wsRequest.setFollowRedirects(anyBoolean())).thenReturn(wsRequest);
+    when(wsRequest.addCookie(any(WSCookie.class))).thenReturn(wsRequest);
     when(wsRequest.post(anyString()))
         .thenReturn(CompletableFuture.completedFuture(wsResponse));
 
     engine = new SeedingEngine(ws, repository);
   }
 
-  // ── Happy path ──────────────────────────────────────────────────────────────
+  // -- Happy path -------------------------------------------------------------
 
   @Test
   public void seedSandbox_setsStatusToSeedingBeforeCallingEndpoint() throws Exception {
@@ -105,7 +110,41 @@ public class SeedingEngineTest {
     assertThat(result).isTrue();
   }
 
-  // ── Failure paths ───────────────────────────────────────────────────────────
+  @Test
+  public void seedSandbox_disablesRedirectFollowing() throws Exception {
+    when(wsResponse.getStatus()).thenReturn(200);
+
+    SandboxInstance sandbox = testSandbox("http://localhost:10000");
+    engine.seedSandbox(sandbox).toCompletableFuture().get();
+
+    verify(wsRequest).setFollowRedirects(false);
+  }
+
+  @Test
+  public void seedSandbox_sendsAccessCookie() throws Exception {
+    when(wsResponse.getStatus()).thenReturn(200);
+
+    SandboxInstance sandbox = testSandbox("http://localhost:10000");
+    engine.seedSandbox(sandbox).toCompletableFuture().get();
+
+    verify(wsRequest).addCookie(any(WSCookie.class));
+  }
+
+  @Test
+  public void seedSandbox_treats302AsFailure() throws Exception {
+    // 302 means the ALB redirected to the PIN page (cookie not accepted)
+    when(wsResponse.getStatus()).thenReturn(302);
+    when(wsResponse.getBody()).thenReturn("Redirect to PIN gate");
+
+    SeedingEngine fastEngine = new TestSeedingEngine(ws, repository);
+
+    SandboxInstance sandbox = testSandbox("http://localhost:10000");
+    Boolean result = fastEngine.seedSandbox(sandbox).toCompletableFuture().get();
+
+    assertThat(result).isFalse();
+  }
+
+  // -- Failure paths ----------------------------------------------------------
 
   @Test
   public void seedSandbox_returnsFalseOnHttp500AfterAllRetries() throws Exception {
@@ -135,7 +174,7 @@ public class SeedingEngineTest {
     assertThat(result).isFalse();
   }
 
-  // ── Retry behavior ─────────────────────────────────────────────────────────
+  // -- Retry behavior ---------------------------------------------------------
 
   @Test
   public void seedSandbox_retriesAndSucceedsOnSecondAttempt() throws Exception {
@@ -172,7 +211,7 @@ public class SeedingEngineTest {
     assertThat(result).isTrue();
   }
 
-  // ── URL construction ────────────────────────────────────────────────────────
+  // -- URL construction -------------------------------------------------------
 
   @Test
   public void seedSandbox_usesHttpsSandboxUrlWhenProvided() throws Exception {
@@ -184,7 +223,15 @@ public class SeedingEngineTest {
     verify(ws).url("https://burlington-vt.sandbox.civiform.dev/dev/seedProgramsHeadless");
   }
 
-  // ── Test helper ─────────────────────────────────────────────────────────────
+  // -- Cookie name ------------------------------------------------------------
+
+  @Test
+  public void accessCookieName_replacesDashesWithUnderscores() {
+    assertThat(SeedingEngine.accessCookieName("sb-test-123"))
+        .isEqualTo("sb_access_sb_test_123");
+  }
+
+  // -- Test helper ------------------------------------------------------------
 
   /**
    * Subclass that overrides retry delay to 0 so tests don't wait 5 seconds per retry.

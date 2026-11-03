@@ -273,6 +273,24 @@ public class TerraformSandboxService implements SandboxService {
           provisionDatabase(instance.getDatabaseName(), dbUser, dbPassword);
           log.info("[{}] Database created", instance.getId());
         });
+
+    // Seed demo programs only on initial creation (not reprovision/extend).
+    // CiviForm's seedProgramsInternal does not check for existing programs, so
+    // re-seeding would create duplicates.
+    String id = instance.getId();
+    if (!isDeleting(id)) {
+      try {
+        SandboxInstance readyInstance = repository.findById(id).orElse(instance);
+        boolean seeded = seedingEngine.seedSandbox(readyInstance).toCompletableFuture().get();
+        if (seeded) {
+          log.info("[{}] Demo programs seeded successfully", id);
+        } else {
+          log.warn("[{}] Seeding returned false; sandbox will run without demo programs", id);
+        }
+      } catch (Exception e) {
+        log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
+      }
+    }
   }
 
   /**
@@ -335,19 +353,6 @@ public class TerraformSandboxService implements SandboxService {
       // If a delete was requested while apply or readiness polling was running,
       // leave DELETING in place — the queued destroy runs next.
       if (!isDeleting(id)) {
-        // Seed demo programs
-        try {
-          SandboxInstance readyInstance = repository.findById(id).orElse(instance);
-          boolean seeded = seedingEngine.seedSandbox(readyInstance).toCompletableFuture().get();
-          if (seeded) {
-            log.info("[{}] Demo programs seeded successfully", id);
-          } else {
-            log.warn("[{}] Seeding returned false — sandbox will run without demo programs", id);
-          }
-        } catch (Exception e) {
-          log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
-        }
-
         repository.updateStatus(id, SandboxStatus.RUNNING);
         log.info("[{}] Status → RUNNING at {}", id, sandboxUrl);
       }
