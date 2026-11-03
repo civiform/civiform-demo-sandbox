@@ -687,7 +687,7 @@ public class TerraformSandboxServiceTest {
         "{\"base_domain\": \"sandbox.civiform.dev\", \"rds_endpoint\": \"rds.inline.internal\"}");
 
     TerraformSandboxService service =
-        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform, seedingEngine);
 
     SandboxInstance created = service.createSandbox(request()).toCompletableFuture().get();
     assertThat(created.getUrl()).isEqualTo("https://burlington-vt.sandbox.civiform.dev");
@@ -812,7 +812,7 @@ public class TerraformSandboxServiceTest {
     values.put("sandbox.terraform.readinessTimeoutMinutes", 0);
 
     TerraformSandboxService service =
-        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform, seedingEngine);
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(live("123456")));
 
     assertThatThrownBy(
