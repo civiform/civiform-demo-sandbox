@@ -98,17 +98,17 @@ test.describe('PIN Gate', () => {
     await page.click('button:has-text("Continue")')
 
     // Should NOT redirect — should stay on /access
-    await page.waitForSelector('.usa-alert--error, [data-error]')
+    await page.waitForSelector('[role="alert"], .usa-alert--error, [data-error]')
     expect(page.url()).toContain('/access')
     await expect(
-      page.locator('.usa-alert--error, [data-error]'),
+      page.locator('[role="alert"], .usa-alert--error, [data-error]'),
     ).toBeVisible()
   })
 
   test('Wrong PIN screenshot shows error state', async ({page}) => {
     await page.fill('input[type="password"]', '000000')
     await page.click('button:has-text("Continue")')
-    await page.waitForSelector('.usa-alert--error, [data-error]')
+    await page.waitForSelector('[role="alert"], .usa-alert--error, [data-error]')
 
     await test.step('Screenshot error state', async () => {
       await validateScreenshot(page, 'pin-gate-error')
@@ -118,7 +118,7 @@ test.describe('PIN Gate', () => {
   test('Wrong PIN error state passes accessibility audit', async ({page}) => {
     await page.fill('input[type="password"]', '000000')
     await page.click('button:has-text("Continue")')
-    await page.waitForSelector('.usa-alert--error, [data-error]')
+    await page.waitForSelector('[role="alert"], .usa-alert--error, [data-error]')
     await validateAccessibility(page)
   })
 
