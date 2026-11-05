@@ -120,6 +120,7 @@ public abstract class BaseView<TModel extends BaseViewModel> {
 
     context.setVariable("view", this);
     context.setVariable("model", model);
+    context.setVariable("flash", request.flash().data());
 
     if (layoutTemplate().isPresent()) {
       return templateEngine.process(layoutTemplate().get().getPath(), context);
