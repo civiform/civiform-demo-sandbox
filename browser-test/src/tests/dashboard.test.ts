@@ -84,6 +84,14 @@ test.describe('Sandbox Dashboard', () => {
       await expect(page.locator('#edit-cityName')).toHaveValue('Burlington, VT')
       await expect(page.locator('#edit-expirationDate')).not.toHaveValue('')
       await expect(page.locator('#edit-civiformVersion')).not.toHaveValue('')
+      await expect(page.locator('#edit-past-expiration-warning')).toBeHidden()
+      await validateAccessibility(page)
+    })
+
+    await test.step('Entering a past expiration date shows deletion warning', async () => {
+      await page.locator('#edit-expirationDate').fill('2020-01-01')
+      await expect(page.locator('#edit-past-expiration-warning')).toBeVisible()
+      await expect(page.locator('#edit-past-expiration-warning')).toContainText(/expired/i)
       await validateAccessibility(page)
     })
   })

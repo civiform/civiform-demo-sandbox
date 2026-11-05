@@ -114,6 +114,8 @@ public class SandboxInstance {
         .expiresAt(request.getExpiresAt())
         .adminEmail(request.getAdminEmail())
         .civiformVersion(request.getCiviformVersion())
+        .destroyAttempts(0)
+        .lastDestroyError(null)
         .build();
   }
 }

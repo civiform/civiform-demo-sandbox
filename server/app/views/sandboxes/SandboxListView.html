@@ -1138,6 +1138,14 @@
                 class="usa-input"
                 aria-required="true"
               />
+              <div
+                id="edit-past-expiration-warning"
+                role="status"
+                aria-live="polite"
+                class="hidden mt-2 mb-1 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900"
+              >
+                Warning: This expiration date is in the past. Saving will mark the sandbox as expired and eligible for automatic deletion.
+              </div>
 
               <label class="usa-label" for="edit-adminEmail">
                 Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
@@ -1287,6 +1295,19 @@
       openEditModal(currentOptionsSandbox)
     }
 
+    function updatePastExpirationWarning() {
+      var expInput = document.getElementById('edit-expirationDate')
+      var warnEl = document.getElementById('edit-past-expiration-warning')
+      if (!expInput || !warnEl) return
+      var expVal = (expInput.value || '').trim()
+      var todayUtc = new Date().toISOString().slice(0, 10)
+      if (expVal && expVal < todayUtc) {
+        warnEl.classList.remove('hidden')
+      } else {
+        warnEl.classList.add('hidden')
+      }
+    }
+
     function openEditModal(sandboxData) {
       document.getElementById('edit-title-city-name').textContent =
         sandboxData.cityName
@@ -1307,10 +1328,17 @@
         errEl.textContent = ''
         errEl.classList.add('hidden')
       }
+      updatePastExpirationWarning()
       openModal('edit-modal')
     }
 
     ;(function () {
+      var expInput = document.getElementById('edit-expirationDate')
+      if (expInput) {
+        expInput.addEventListener('input', updatePastExpirationWarning)
+        expInput.addEventListener('change', updatePastExpirationWarning)
+      }
+
       var editForm = document.getElementById('edit-form')
       if (!editForm) return
       editForm.addEventListener('submit', function (e) {

@@ -1073,6 +1073,7 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).contains("id=\"options-modal\"");
     assertThat(body).contains("id=\"edit-modal\"");
     assertThat(body).contains("id=\"edit-form\"");
+    assertThat(body).contains("id=\"edit-past-expiration-warning\"");
   }
 
   @Test

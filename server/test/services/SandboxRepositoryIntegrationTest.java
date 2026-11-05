@@ -284,12 +284,16 @@ public class SandboxRepositoryIntegrationTest {
   @Test
   public void updateExpiry_persistsNewExpiresAt() {
     repo.save(makeTestInstance());
+    repo.recordDestroyFailure(testId, "Previous teardown failure");
 
     Instant newExpiry = Instant.now().plus(Duration.ofDays(60)).truncatedTo(ChronoUnit.MILLIS);
     boolean updated = repo.updateExpiry(testId, newExpiry);
 
     assertThat(updated).isTrue();
-    assertThat(repo.findById(testId).orElseThrow().getExpiresAt()).isEqualTo(newExpiry);
+    SandboxInstance loaded = repo.findById(testId).orElseThrow();
+    assertThat(loaded.getExpiresAt()).isEqualTo(newExpiry);
+    assertThat(loaded.getDestroyAttempts()).isEqualTo(0);
+    assertThat(loaded.getLastDestroyError()).isNull();
   }
 
   @Test
@@ -317,6 +321,7 @@ public class SandboxRepositoryIntegrationTest {
     // While PROVISIONING, updateSettings must be rejected
     assertThat(repo.updateSettings(testId, req)).isFalse();
 
+    repo.recordDestroyFailure(testId, "Previous teardown failure");
     repo.updateStatus(testId, SandboxStatus.RUNNING);
     boolean updated = repo.updateSettings(testId, req);
 
@@ -327,6 +332,8 @@ public class SandboxRepositoryIntegrationTest {
     assertThat(loaded.getExpiresAt()).isEqualTo(newExpiry);
     assertThat(loaded.getAdminEmail()).isEqualTo("updated@exygy.com");
     assertThat(loaded.getCiviformVersion()).isEqualTo("v2.25.0");
+    assertThat(loaded.getDestroyAttempts()).isEqualTo(0);
+    assertThat(loaded.getLastDestroyError()).isNull();
   }
 
   // ── save → updateTerraformOutputs → findById ──────────────────────────────

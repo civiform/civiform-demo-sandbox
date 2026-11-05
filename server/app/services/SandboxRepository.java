@@ -198,7 +198,9 @@ public class SandboxRepository {
   public boolean updateExpiry(String id, Instant expiresAt) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
-          "UPDATE sandbox_instances SET expires_at = ? WHERE id = ?")) {
+          "UPDATE sandbox_instances "
+              + "SET expires_at = ?, destroy_attempts = 0, last_destroy_error = NULL "
+              + "WHERE id = ?")) {
         ps.setTimestamp(1, Timestamp.from(expiresAt));
         ps.setString(2, id);
         return ps.executeUpdate() > 0;
@@ -215,7 +217,8 @@ public class SandboxRepository {
       try (PreparedStatement ps = conn.prepareStatement(
           "UPDATE sandbox_instances "
               + "SET city_name = ?, google_analytics_id = ?, expires_at = ?, "
-              + "    admin_email = ?, civiform_version = ? "
+              + "    admin_email = ?, civiform_version = ?, "
+              + "    destroy_attempts = 0, last_destroy_error = NULL "
               + "WHERE id = ? AND status NOT IN ('PROVISIONING', 'DELETING', 'DELETED')")) {
         ps.setString(1, request.getCityName());
         ps.setString(2, request.getGoogleAnalyticsId());

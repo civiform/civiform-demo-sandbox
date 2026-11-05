@@ -234,7 +234,10 @@ public class SandboxRepositoryTest {
   @Test
   public void updateExpiry_existingId_returnsTrue() throws Exception {
     PreparedStatement ps = mock(PreparedStatement.class);
-    when(conn.prepareStatement("UPDATE sandbox_instances SET expires_at = ? WHERE id = ?"))
+    when(conn.prepareStatement(
+            "UPDATE sandbox_instances "
+                + "SET expires_at = ?, destroy_attempts = 0, last_destroy_error = NULL "
+                + "WHERE id = ?"))
         .thenReturn(ps);
     when(ps.executeUpdate()).thenReturn(1);
 
@@ -280,7 +283,8 @@ public class SandboxRepositoryTest {
     verify(conn).prepareStatement(sqlCaptor.capture());
     assertThat(sqlCaptor.getValue())
         .contains("SET city_name = ?, google_analytics_id = ?, expires_at = ?,")
-        .contains("admin_email = ?, civiform_version = ?")
+        .contains("admin_email = ?, civiform_version = ?,")
+        .contains("destroy_attempts = 0, last_destroy_error = NULL")
         .contains("WHERE id = ? AND status NOT IN ('PROVISIONING', 'DELETING', 'DELETED')");
     verify(ps).setString(1, "New City, WA");
     verify(ps).setString(2, "G-NEW123");
