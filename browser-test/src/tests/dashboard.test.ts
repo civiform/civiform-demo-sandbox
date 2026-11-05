@@ -63,6 +63,31 @@ test.describe('Sandbox Dashboard', () => {
     await expect(page.getByRole('button', {name: /^info$/i})).not.toBeVisible()
   })
 
+  test('Options button opens modal with Extend, Reprovision, and Edit actions', async ({page}) => {
+    const optionsButton = page.getByRole('button', {name: /^options$/i}).first()
+    await expect(optionsButton).toBeVisible()
+
+    await test.step('Click Options button to open Options modal', async () => {
+      await optionsButton.click()
+      const optionsModal = page.locator('#options-modal')
+      await expect(optionsModal).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /extend/i})).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /reprovision/i})).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /edit/i})).toBeVisible()
+      await validateAccessibility(page)
+    })
+
+    await test.step('Click Edit option to open Edit Sandbox Settings modal', async () => {
+      await page.locator('#options-modal').getByRole('button', {name: /edit/i}).click()
+      const editModal = page.locator('#edit-modal')
+      await expect(editModal).toBeVisible()
+      await expect(page.locator('#edit-city-name')).toHaveValue('Burlington, VT')
+      await expect(page.locator('#edit-expiration-date')).not.toHaveValue('')
+      await expect(page.locator('#edit-civiform-version')).not.toHaveValue('')
+      await validateAccessibility(page)
+    })
+  })
+
   test('Status badge is present on each row', async ({page}) => {
     const badges = page.locator('[data-status]')
     await expect(badges.first()).toBeVisible()

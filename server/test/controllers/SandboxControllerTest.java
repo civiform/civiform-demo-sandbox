@@ -2,7 +2,9 @@ package controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import models.SandboxInstance;
 import models.SandboxStatus;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import play.Application;
 import play.inject.guice.GuiceApplicationBuilder;
 import play.mvc.Http;
@@ -29,6 +32,7 @@ import play.mvc.Result;
 import play.test.Helpers;
 import play.test.WithApplication;
 import services.SandboxService;
+import services.UpdateSandboxRequest;
 
 /**
  * Unit tests for {@link SandboxController}.
@@ -743,6 +747,190 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
 
+  // ── POST /sandboxes/:id/edit — update settings and re-provision ───────────
+
+  @Test
+  public void edit_withoutAuth_redirectsToLogin() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "G-123456",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "admin@seattle.gov",
+                    "civiformVersion", "v2.11.0"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
+  public void edit_validRequest_updatesAndRedirectsToDashboardWithFlash() {
+    SandboxInstance updated =
+        makeSandbox("sb-edit1", SandboxStatus.PROVISIONING).toBuilder()
+            .cityName("Seattle, WA")
+            .googleAnalyticsId("G-123456")
+            .expiresAt(Instant.parse("2026-12-31T23:59:59Z"))
+            .adminEmail("admin@seattle.gov")
+            .civiformVersion("v2.11.0")
+            .build();
+    when(sandboxService.updateSandbox(eq("sb-edit1"), any(UpdateSandboxRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(updated)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "G-123456",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "admin@seattle.gov",
+                    "civiformVersion", "v2.11.0"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).isPresent();
+    assertThat(result.redirectLocation().get()).isEqualTo(routes.SandboxController.index().url());
+    assertThat(result.flash().get("success")).isPresent();
+    assertThat(result.flash().get("success").get())
+        .contains("Settings updated and re-provisioning initiated for Seattle, WA.");
+
+    ArgumentCaptor<UpdateSandboxRequest> captor =
+        ArgumentCaptor.forClass(UpdateSandboxRequest.class);
+    verify(sandboxService).updateSandbox(eq("sb-edit1"), captor.capture());
+    UpdateSandboxRequest captured = captor.getValue();
+    assertThat(captured.getCityName()).isEqualTo("Seattle, WA");
+    assertThat(captured.getGoogleAnalyticsId()).isEqualTo("G-123456");
+    assertThat(captured.getExpiresAt()).isEqualTo(Instant.parse("2026-12-31T23:59:59Z"));
+    assertThat(captured.getAdminEmail()).isEqualTo("admin@seattle.gov");
+    assertThat(captured.getCiviformVersion()).isEqualTo("v2.11.0");
+  }
+
+  @Test
+  public void edit_blankCityName_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "",
+                    "googleAnalyticsId", "",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "",
+                    "civiformVersion", "latest"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("City name");
+    verify(sandboxService, never()).updateSandbox(any(), any());
+  }
+
+  @Test
+  public void edit_invalidExpirationDate_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "",
+                    "expirationDate", "not-a-date",
+                    "adminEmail", "",
+                    "civiformVersion", "latest"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("Expiration date");
+    verify(sandboxService, never()).updateSandbox(any(), any());
+  }
+
+  @Test
+  public void edit_invalidAdminEmail_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "invalid-email",
+                    "civiformVersion", "latest"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get())
+        .containsIgnoringCase("admin notification email");
+    verify(sandboxService, never()).updateSandbox(any(), any());
+  }
+
+  @Test
+  public void edit_invalidCiviformVersion_redirectsWithErrorFlash() {
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-edit1/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "admin@seattle.gov",
+                    "civiformVersion", "bad version!"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.flash().get("error")).isPresent();
+    assertThat(result.flash().get("error").get()).contains("CiviForm version");
+    verify(sandboxService, never()).updateSandbox(any(), any());
+  }
+
+  @Test
+  public void edit_missingSandbox_returns404() {
+    when(sandboxService.updateSandbox(eq("sb-missing"), any(UpdateSandboxRequest.class)))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("POST")
+            .uri("/sandboxes/sb-missing/edit")
+            .session(AuthController.SESSION_KEY, "true")
+            .bodyForm(
+                com.google.common.collect.ImmutableMap.of(
+                    "cityName", "Seattle, WA",
+                    "googleAnalyticsId", "",
+                    "expirationDate", "2026-12-31",
+                    "adminEmail", "admin@seattle.gov",
+                    "civiformVersion", "latest"));
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(NOT_FOUND);
+  }
+
   // ── GET /sandboxes/:id/access — PIN gate page ─────────────────────────────
 
   @Test
@@ -863,6 +1051,28 @@ public class SandboxControllerTest extends WithApplication {
     String body = contentAsString(result);
     assertThat(body).contains("id=\"sandbox-row-sb-run1\"");
     assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
+  }
+
+  @Test
+  public void index_runningRow_rendersOptionsButtonAndEditModal() {
+    SandboxInstance running = makeSandbox("sb-run1", SandboxStatus.RUNNING);
+    when(sandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(running)));
+
+    Http.RequestBuilder request =
+        Helpers.fakeRequest()
+            .method("GET")
+            .uri("/sandboxes")
+            .session(AuthController.SESSION_KEY, "true");
+
+    Result result = Helpers.route(app, request);
+
+    assertThat(result.status()).isEqualTo(OK);
+    String body = contentAsString(result);
+    assertThat(body).contains("openOptionsModal(this)");
+    assertThat(body).contains("id=\"options-modal\"");
+    assertThat(body).contains("id=\"edit-modal\"");
+    assertThat(body).contains("id=\"edit-form\"");
   }
 
   @Test

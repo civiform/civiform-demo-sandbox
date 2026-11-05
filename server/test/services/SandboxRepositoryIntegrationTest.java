@@ -298,6 +298,33 @@ public class SandboxRepositoryIntegrationTest {
     assertThat(updated).isFalse();
   }
 
+  // ── save → updateSettings → findById ───────────────────────────────────────
+
+  @Test
+  public void updateSettings_persistsAllEditableFields() {
+    repo.save(makeTestInstance());
+
+    Instant newExpiry = Instant.now().plus(Duration.ofDays(45)).truncatedTo(ChronoUnit.MILLIS);
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("Updated City, OR")
+            .googleAnalyticsId("G-UPDATED99")
+            .expiresAt(newExpiry)
+            .adminEmail("updated@exygy.com")
+            .civiformVersion("v2.25.0")
+            .build();
+
+    boolean updated = repo.updateSettings(testId, req);
+
+    assertThat(updated).isTrue();
+    SandboxInstance loaded = repo.findById(testId).orElseThrow();
+    assertThat(loaded.getCityName()).isEqualTo("Updated City, OR");
+    assertThat(loaded.getGoogleAnalyticsId()).isEqualTo("G-UPDATED99");
+    assertThat(loaded.getExpiresAt()).isEqualTo(newExpiry);
+    assertThat(loaded.getAdminEmail()).isEqualTo("updated@exygy.com");
+    assertThat(loaded.getCiviformVersion()).isEqualTo("v2.25.0");
+  }
+
   // ── save → updateTerraformOutputs → findById ──────────────────────────────
 
   @Test

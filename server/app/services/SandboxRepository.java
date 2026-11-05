@@ -207,6 +207,27 @@ public class SandboxRepository {
   }
 
   /**
+   * Updates the editable settings of an existing sandbox row before re-provisioning.
+   */
+  public boolean updateSettings(String id, UpdateSandboxRequest request) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances "
+              + "SET city_name = ?, google_analytics_id = ?, expires_at = ?, "
+              + "    admin_email = ?, civiform_version = ? "
+              + "WHERE id = ?")) {
+        ps.setString(1, request.getCityName());
+        ps.setString(2, request.getGoogleAnalyticsId());
+        ps.setTimestamp(3, Timestamp.from(request.getExpiresAt()));
+        ps.setString(4, request.getAdminEmail());
+        ps.setString(5, request.getCiviformVersion());
+        ps.setString(6, id);
+        return ps.executeUpdate() > 0;
+      }
+    });
+  }
+
+  /**
    * Records the AWS resources a Terraform apply produced.
    *
    * <p>Written as a single statement so a sandbox row never shows a URL without the ARNs needed to

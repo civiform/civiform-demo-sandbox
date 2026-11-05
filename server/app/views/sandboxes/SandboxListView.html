@@ -241,7 +241,7 @@
                 </svg>
               </a>
 
-              <!-- AWS, Info, Extend button group -->
+              <!-- Details, Options, AWS button group -->
               <ul class="usa-button-group usa-button-group--segmented">
                 <li class="usa-button-group__item">
                   <!-- Details → modal with URL + PIN (password) -->
@@ -259,30 +259,22 @@
                   </button>
                 </li>
                 <li class="usa-button-group__item">
-                  <!-- Extend → modal -->
-                  <button
-                    type="button"
-                    th:data-id="${sb.sandbox.id}"
-                    th:data-city-name="${sb.cityName}"
-                    th:onclick="openExtendModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
-                    class="usa-button usa-button--outline"
-                  >
-                    Extend
-                  </button>
-                </li>
-                <li class="usa-button-group__item">
-                  <!-- Re-provision → modal -->
+                  <!-- Options → modal with Extend, Reprovision, and Edit -->
                   <button
                     type="button"
                     th:if="${sb.sandbox.status.name() != 'DELETED' and sb.sandbox.status.name() != 'DELETING'}"
                     th:data-id="${sb.sandbox.id}"
                     th:data-city-name="${sb.cityName}"
-                    th:onclick="openReprovisionModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
+                    th:data-ga-id="${sb.sandbox.googleAnalyticsId}"
+                    th:data-expiration-date="${sb.expiryIsoDate}"
+                    th:data-admin-email="${sb.sandbox.adminEmail}"
+                    th:data-civiform-version="${sb.sandbox.civiformVersion}"
+                    th:onclick="openOptionsModal(this)"
                     class="usa-button usa-button--outline"
                     th:disabled="${sb.provisioning}"
                     th:classappend="${sb.provisioning} ? 'opacity-50 cursor-not-allowed' : ''"
                   >
-                    Re-provision
+                    Options
                   </button>
                 </li>
                 <li class="usa-button-group__item">
@@ -1000,6 +992,209 @@
     </div>
   </div>
 
+  <!-- ── Options Modal (USWDS Modal component) ──────────────────────── -->
+  <div
+    id="options-modal"
+    class="usa-modal-wrapper is-hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="options-modal-title"
+  >
+    <div class="usa-modal-overlay" onclick="closeModal('options-modal')">
+      <div
+        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
+        style="width: calc(100% - 0.5rem)"
+        onclick="event.stopPropagation()"
+      >
+        <div class="usa-modal__content">
+          <div class="usa-modal__main">
+            <h2 class="usa-modal__heading" id="options-modal-title">
+              Options: <span id="options-city-name"></span>
+            </h2>
+            <div class="usa-prose">
+              <p>
+                Choose an action to perform on this sandbox demo.
+              </p>
+            </div>
+            <div class="flex flex-col gap-3 margin-top-3">
+              <button
+                type="button"
+                onclick="selectOptionExtend()"
+                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+              >
+                <span>Extend</span>
+              </button>
+              <button
+                type="button"
+                onclick="selectOptionReprovision()"
+                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+              >
+                <span>Reprovision</span>
+              </button>
+              <button
+                type="button"
+                onclick="selectOptionEdit()"
+                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+              >
+                <span>Edit</span>
+              </button>
+            </div>
+            <ul class="usa-button-group margin-top-3">
+              <li class="usa-button-group__item">
+                <button
+                  type="button"
+                  onclick="closeModal('options-modal')"
+                  class="usa-button usa-button--unstyled"
+                >
+                  Cancel
+                </button>
+              </li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            class="usa-button usa-modal__close"
+            aria-label="Close this window"
+            onclick="closeModal('options-modal')"
+          >
+            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+              <use href="/assets/dist/img/sprite.svg#close"></use>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Edit Modal (USWDS Modal component) ─────────────────────────── -->
+  <div
+    id="edit-modal"
+    class="usa-modal-wrapper is-hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-modal-title"
+  >
+    <div class="usa-modal-overlay" onclick="closeModal('edit-modal')">
+      <div
+        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
+        style="max-height: 85vh; overflow-y: auto; width: calc(100% - 0.5rem)"
+        onclick="event.stopPropagation()"
+      >
+        <div class="usa-modal__content">
+          <div class="usa-modal__main">
+            <h2 class="usa-modal__heading" id="edit-modal-title">
+              Edit Demo: <span id="edit-title-city-name"></span>
+            </h2>
+            <div class="usa-prose">
+              <p>
+                Modify settings for this sandbox demo.
+              </p>
+              <p class="text-xs text-gray-500">
+                Note: Updating settings will trigger a sandbox re-provisioning and make it unavailable for ~15 minutes.
+              </p>
+            </div>
+
+            <div
+              id="edit-modal-error"
+              role="alert"
+              aria-live="polite"
+              class="hidden mt-3 mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+            ></div>
+
+            <form id="edit-form" method="POST" novalidate>
+              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
+
+              <label class="usa-label" for="edit-cityName">
+                Name of civic entity<span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="edit-cityName"
+                name="cityName"
+                type="text"
+                class="usa-input"
+                autocomplete="off"
+                aria-required="true"
+              />
+
+              <label class="usa-label" for="edit-googleAnalyticsId">
+                Google analytics ID <span class="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                id="edit-googleAnalyticsId"
+                name="googleAnalyticsId"
+                type="text"
+                class="usa-input"
+                placeholder="G-ABC123XYZ"
+                autocomplete="off"
+              />
+
+              <label class="usa-label" for="edit-expirationDate">
+                Expiration date<span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="edit-expirationDate"
+                name="expirationDate"
+                type="date"
+                class="usa-input"
+                aria-required="true"
+              />
+
+              <label class="usa-label" for="edit-adminEmail">
+                Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="edit-adminEmail"
+                name="adminEmail"
+                type="email"
+                class="usa-input"
+                autocomplete="email"
+                aria-required="true"
+              />
+
+              <label class="usa-label" for="edit-civiformVersion">
+                CiviForm version<span class="text-red-600" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="edit-civiformVersion"
+                name="civiformVersion"
+                type="text"
+                class="usa-input"
+                placeholder="e.g. latest or v2.22.0"
+                autocomplete="off"
+                aria-required="true"
+              />
+
+              <ul class="usa-button-group margin-top-3">
+                <li class="usa-button-group__item">
+                  <button type="submit" class="usa-button">Save &amp; Re-provision</button>
+                </li>
+                <li class="usa-button-group__item">
+                  <button
+                    type="button"
+                    onclick="closeModal('edit-modal')"
+                    class="usa-button usa-button--unstyled"
+                  >
+                    Cancel
+                  </button>
+                </li>
+              </ul>
+            </form>
+          </div>
+          <button
+            type="button"
+            class="usa-button usa-modal__close"
+            aria-label="Close this window"
+            onclick="closeModal('edit-modal')"
+          >
+            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
+              <use href="/assets/dist/img/sprite.svg#close"></use>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Copy success alert (USWDS Alert component, success variant) ──── -->
   <div
     id="copy-alert"
@@ -1015,6 +1210,8 @@
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
+    var currentOptionsSandbox = null
+
     function showCopyAlert(message) {
       var alert = document.getElementById('copy-alert')
       var text = document.getElementById('copy-alert-text')
@@ -1054,6 +1251,114 @@
 
       openModal('info-modal')
     }
+
+    function openOptionsModal(btn) {
+      currentOptionsSandbox = {
+        id: btn.getAttribute('data-id') || '',
+        cityName: btn.getAttribute('data-city-name') || '',
+        gaId: btn.getAttribute('data-ga-id') || '',
+        expirationDate: btn.getAttribute('data-expiration-date') || '',
+        adminEmail: btn.getAttribute('data-admin-email') || '',
+        civiformVersion: btn.getAttribute('data-civiform-version') || 'latest',
+      }
+      document.getElementById('options-city-name').textContent =
+        currentOptionsSandbox.cityName
+      openModal('options-modal')
+    }
+
+    function selectOptionExtend() {
+      if (!currentOptionsSandbox) return
+      closeModal('options-modal')
+      openExtendModal(currentOptionsSandbox.id, currentOptionsSandbox.cityName)
+    }
+
+    function selectOptionReprovision() {
+      if (!currentOptionsSandbox) return
+      closeModal('options-modal')
+      openReprovisionModal(
+        currentOptionsSandbox.id,
+        currentOptionsSandbox.cityName,
+      )
+    }
+
+    function selectOptionEdit() {
+      if (!currentOptionsSandbox) return
+      closeModal('options-modal')
+      openEditModal(currentOptionsSandbox)
+    }
+
+    function openEditModal(sandboxData) {
+      document.getElementById('edit-title-city-name').textContent =
+        sandboxData.cityName
+      document.getElementById('edit-form').action =
+        '/sandboxes/' + sandboxData.id + '/edit'
+      document.getElementById('edit-cityName').value = sandboxData.cityName || ''
+      document.getElementById('edit-googleAnalyticsId').value =
+        sandboxData.gaId || ''
+      document.getElementById('edit-expirationDate').value =
+        sandboxData.expirationDate || ''
+      document.getElementById('edit-adminEmail').value =
+        sandboxData.adminEmail || ''
+      document.getElementById('edit-civiformVersion').value =
+        sandboxData.civiformVersion || 'latest'
+
+      var errEl = document.getElementById('edit-modal-error')
+      if (errEl) {
+        errEl.textContent = ''
+        errEl.classList.add('hidden')
+      }
+      openModal('edit-modal')
+    }
+
+    ;(function () {
+      var editForm = document.getElementById('edit-form')
+      if (!editForm) return
+      editForm.addEventListener('submit', function (e) {
+        var cityVal = (
+          document.getElementById('edit-cityName').value || ''
+        ).trim()
+        var expVal = (
+          document.getElementById('edit-expirationDate').value || ''
+        ).trim()
+        var emailVal = (
+          document.getElementById('edit-adminEmail').value || ''
+        ).trim()
+        var verVal = (
+          document.getElementById('edit-civiformVersion').value || ''
+        ).trim()
+        var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var errEl = document.getElementById('edit-modal-error')
+
+        function fail(msg) {
+          e.preventDefault()
+          if (errEl) {
+            errEl.textContent = msg
+            errEl.classList.remove('hidden')
+          }
+        }
+
+        if (!cityVal) {
+          fail('Name of civic entity is required.')
+          return
+        }
+        if (!expVal) {
+          fail('Expiration date is required.')
+          return
+        }
+        if (!emailVal || !emailRe.test(emailVal)) {
+          fail(
+            !emailVal
+              ? 'Admin notification email is required.'
+              : 'Please enter a valid admin notification email.',
+          )
+          return
+        }
+        if (!verVal) {
+          fail('CiviForm version is required.')
+          return
+        }
+      })
+    })()
 
     function openDeleteModal(id, cityName) {
       document.getElementById('delete-city-name').textContent = cityName

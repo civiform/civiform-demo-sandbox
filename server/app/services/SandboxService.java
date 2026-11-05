@@ -49,6 +49,14 @@ public interface SandboxService {
   CompletionStage<Optional<SandboxInstance>> reprovisionSandbox(String id);
 
   /**
+   * Updates editable settings on an existing sandbox (city name, Google Analytics ID, expiration
+   * date, admin email, and CiviForm version) and triggers re-provisioning so the running instance
+   * picks up the new settings. Returns the updated instance (with status PROVISIONING), or empty if
+   * the sandbox does not exist or cannot be updated in its current state.
+   */
+  CompletionStage<Optional<SandboxInstance>> updateSandbox(String id, UpdateSandboxRequest request);
+
+  /**
    * Validates a PIN for a sandbox. Returns the sandbox if PIN matches, empty otherwise.
    * Must use constant-time comparison to prevent timing attacks.
    */

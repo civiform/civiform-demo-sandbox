@@ -424,6 +424,44 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> updateSandbox(
+      String id, UpdateSandboxRequest request) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return Optional.empty();
+          }
+          SandboxInstance existing = maybeSandbox.get();
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+
+          repository.updateSettings(id, request);
+          log.info(
+              "[{}] Sandbox settings updated (cityName={}, civiformVersion={}, expiresAt={})",
+              id,
+              request.getCityName(),
+              request.getCiviformVersion(),
+              request.getExpiresAt());
+
+          SandboxInstance updated =
+              existing.toBuilder()
+                  .cityName(request.getCityName())
+                  .googleAnalyticsId(request.getGoogleAnalyticsId())
+                  .expiresAt(request.getExpiresAt())
+                  .adminEmail(request.getAdminEmail())
+                  .civiformVersion(request.getCiviformVersion())
+                  .build();
+
+          return Optional.of(startReprovision(updated));
+        },
+        provisioningPool);
+  }
+
   private SandboxInstance startReprovision(SandboxInstance existing) {
     String id = existing.getId();
     String accessToken = existing.getAccessToken();
@@ -641,11 +679,11 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
-   * Polls CiviForm's /health endpoint until it returns 200, or throws after max attempts. Uses
+   * Polls CiviForm's /programs endpoint until it returns 200, or throws after max attempts. Uses
    * WSClient so the HTTP call is non-blocking relative to Play's pool.
    */
   private void waitForHealthy(String sandboxId, int hostPort) throws Exception {
-    String healthUrl = "http://host.docker.internal:" + hostPort + "/health";
+    String healthUrl = "http://host.docker.internal:" + hostPort + "/programs";
     for (int attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
       try {
         int status =

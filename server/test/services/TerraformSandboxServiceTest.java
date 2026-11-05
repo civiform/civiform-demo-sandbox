@@ -668,6 +668,72 @@ public class TerraformSandboxServiceTest {
     verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.PROVISIONING));
   }
 
+  // ── updateSandbox ───────────────────────────────────────────────────────────
+
+  @Test
+  public void updateSandbox_updatesSettingsAndTriggersReprovision() throws Exception {
+    SandboxInstance running =
+        live("123456").toBuilder()
+            .accessToken("existing-token")
+            .listenerPriority(1002)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(running));
+
+    Instant newExpiry = Instant.parse("2026-12-25T23:59:59Z");
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("Seattle, WA")
+            .googleAnalyticsId("G-SEA999")
+            .expiresAt(newExpiry)
+            .adminEmail("seattle@exygy.com")
+            .civiformVersion("v2.24.0")
+            .build();
+
+    Optional<SandboxInstance> result =
+        newService().updateSandbox("sb-abcd1234", req).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getCityName()).isEqualTo("Seattle, WA");
+    assertThat(result.get().getGoogleAnalyticsId()).isEqualTo("G-SEA999");
+    assertThat(result.get().getExpiresAt()).isEqualTo(newExpiry);
+    assertThat(result.get().getAdminEmail()).isEqualTo("seattle@exygy.com");
+    assertThat(result.get().getCiviformVersion()).isEqualTo("v2.24.0");
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+
+    verify(repository).updateSettings("sb-abcd1234", req);
+    verify(repository).updateStatus("sb-abcd1234", SandboxStatus.PROVISIONING);
+    verify(repository, never()).save(any());
+  }
+
+  @Test
+  public void updateSandbox_unknownOrInFlightOrDeletedIdReturnsEmpty() throws Exception {
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("Seattle, WA")
+            .googleAnalyticsId(null)
+            .expiresAt(Instant.now().plus(30, ChronoUnit.DAYS))
+            .adminEmail("seattle@exygy.com")
+            .civiformVersion("latest")
+            .build();
+
+    when(repository.findById("sb-nope")).thenReturn(Optional.empty());
+    assertThat(newService().updateSandbox("sb-nope", req).toCompletableFuture().get()).isEmpty();
+
+    for (SandboxStatus disallowed :
+        new SandboxStatus[] {
+          SandboxStatus.PROVISIONING, SandboxStatus.DELETING, SandboxStatus.DELETED
+        }) {
+      SandboxInstance instance = live("123456").toBuilder().status(disallowed).build();
+      when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(instance));
+
+      assertThat(newService().updateSandbox("sb-abcd1234", req).toCompletableFuture().get())
+          .isEmpty();
+    }
+    verify(repository, never()).updateSettings(anyString(), any());
+    verify(repository, never()).updateStatus(anyString(), eq(SandboxStatus.PROVISIONING));
+  }
+
   // ── platform outputs ────────────────────────────────────────────────────────
 
   @Test
