@@ -105,5 +105,18 @@ public class SandboxInstance {
 
   /** Error output from the most recent failed scheduled destruction attempt, if any. */
   private String lastDestroyError;
+
+  /** Returns a copy of this sandbox instance with updated settings from {@code request}. */
+  public SandboxInstance withUpdatedSettings(services.UpdateSandboxRequest request) {
+    return this.toBuilder()
+        .cityName(request.getCityName())
+        .googleAnalyticsId(request.getGoogleAnalyticsId())
+        .expiresAt(request.getExpiresAt())
+        .adminEmail(request.getAdminEmail())
+        .civiformVersion(request.getCiviformVersion())
+        .destroyAttempts(0)
+        .lastDestroyError(null)
+        .build();
+  }
 }
 

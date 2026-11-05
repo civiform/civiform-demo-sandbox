@@ -157,6 +157,21 @@ public class InMemorySandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Optional<SandboxInstance>> updateSandbox(
+      String id, UpdateSandboxRequest request) {
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null
+        || existing.getStatus() == SandboxStatus.PROVISIONING
+        || existing.getStatus() == SandboxStatus.DELETING
+        || existing.getStatus() == SandboxStatus.DELETED) {
+      return CompletableFuture.completedFuture(Optional.empty());
+    }
+    SandboxInstance updated = existing.withUpdatedSettings(request);
+    sandboxes.put(id, updated);
+    return reprovisionSandbox(id);
+  }
+
+  @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.completedFuture(
         Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {

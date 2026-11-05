@@ -12,10 +12,11 @@
  */
 
 import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility, openCreateModal} from '../support'
+import {validateScreenshot, validateAccessibility, openCreateModal, loginAsAdmin} from '../support'
 
 test.describe('Create Sandbox Wizard (modal)', () => {
   test.beforeEach(async ({page}) => {
+    await loginAsAdmin(page)
     await page.goto('/sandboxes')
     await page.waitForSelector('table')
   })
@@ -24,13 +25,13 @@ test.describe('Create Sandbox Wizard (modal)', () => {
 
   test('Clicking "Create new demo" opens the wizard modal', async ({page}) => {
     await openCreateModal(page)
-    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.locator('#create-modal .usa-modal__main')).toBeVisible()
   })
 
   test('Modal is dismissed when X button is clicked', async ({page}) => {
     await openCreateModal(page)
     await page.click('[aria-label="Close"]')
-    await expect(page.getByRole('dialog')).not.toBeVisible()
+    await expect(page.locator('#create-modal .usa-modal__main')).not.toBeVisible()
   })
 
   // ── Step 1: CiviForm setup ─────────────────────────────────────────────────
@@ -38,7 +39,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
   test('Step 1 screenshot matches baseline', async ({page}) => {
     await openCreateModal(page)
     await test.step('Screenshot Step 1', async () => {
-      await validateScreenshot(page.getByRole('dialog'), 'wizard-step-1')
+      await validateScreenshot(page.locator('#create-modal .usa-modal__main'), 'wizard-step-1')
     })
   })
 
@@ -75,7 +76,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     await page.waitForSelector('[name="subdomain"]')
 
     await test.step('Screenshot Step 2', async () => {
-      await validateScreenshot(page.getByRole('dialog'), 'wizard-step-2')
+      await validateScreenshot(page.locator('#create-modal .usa-modal__main'), 'wizard-step-2')
     })
   })
 

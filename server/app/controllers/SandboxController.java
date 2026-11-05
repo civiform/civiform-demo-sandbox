@@ -7,6 +7,9 @@ import com.google.inject.Inject;
 import com.typesafe.config.Config;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -22,6 +25,7 @@ import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.PinAttemptLimiter;
 import services.SandboxService;
+import services.UpdateSandboxRequest;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
 import views.sandboxes.SandboxDetailsView;
@@ -401,6 +405,113 @@ public class SandboxController extends Controller {
       return redirect(controllers.routes.SandboxController.index())
           .flashing("success", "Re-provisioning initiated for " + instance.getCityName() + ".");
     });
+  }
+
+  /**
+   * POST /sandboxes/:id/edit — updates sandbox settings (city name, Google Analytics ID,
+   * expiration date, admin email, and CiviForm version) and triggers re-provisioning.
+   */
+  @RequireCSRFCheck
+  public CompletionStage<Result> edit(Http.Request request, String id) {
+    String cityName;
+    String googleAnalyticsId;
+    String expirationDateStr;
+    String adminEmail;
+    String civiformVersion;
+
+    if (request.hasBody() && request.body().asJson() != null) {
+      JsonNode json = request.body().asJson();
+      cityName = json.has("cityName") ? json.get("cityName").asText().trim() : "";
+      googleAnalyticsId =
+          json.has("googleAnalyticsId") && !json.get("googleAnalyticsId").isNull()
+              ? json.get("googleAnalyticsId").asText().trim()
+              : "";
+      expirationDateStr =
+          json.has("expirationDate") ? json.get("expirationDate").asText().trim() : "";
+      adminEmail = json.has("adminEmail") ? json.get("adminEmail").asText().trim() : "";
+      civiformVersion =
+          json.has("civiformVersion") ? json.get("civiformVersion").asText().trim() : "";
+    } else {
+      DynamicForm form = formFactory.form().bindFromRequest(request);
+      cityName = orDefault(form.get("cityName"), "").trim();
+      googleAnalyticsId = orDefault(form.get("googleAnalyticsId"), "").trim();
+      expirationDateStr = orDefault(form.get("expirationDate"), "").trim();
+      adminEmail = orDefault(form.get("adminEmail"), "").trim();
+      civiformVersion = orDefault(form.get("civiformVersion"), "").trim();
+    }
+
+    Optional<String> validationError =
+        validateEditRequest(cityName, expirationDateStr, adminEmail, civiformVersion);
+    if (validationError.isPresent()) {
+      if (isJsonRequest(request)) {
+        return CompletableFuture.completedFuture(
+            badRequest(Json.newObject().put("error", validationError.get())));
+      }
+      return CompletableFuture.completedFuture(
+          redirect(controllers.routes.SandboxController.index())
+              .flashing("error", validationError.get()));
+    }
+
+    LocalDate expirationDate = LocalDate.parse(expirationDateStr);
+    Instant expiresAt = expirationDate.atTime(23, 59, 59).toInstant(ZoneOffset.UTC);
+
+    UpdateSandboxRequest updateRequest =
+        UpdateSandboxRequest.builder()
+            .cityName(cityName)
+            .googleAnalyticsId(googleAnalyticsId.isEmpty() ? null : googleAnalyticsId)
+            .expiresAt(expiresAt)
+            .adminEmail(adminEmail)
+            .civiformVersion(civiformVersion)
+            .build();
+
+    return sandboxService
+        .updateSandbox(id, updateRequest)
+        .thenApply(
+            maybeUpdated -> {
+              if (maybeUpdated.isEmpty()) {
+                return notFound("Sandbox not found or cannot be edited: " + id);
+              }
+              SandboxInstance instance = maybeUpdated.get();
+              if (isJsonRequest(request)) {
+                return ok(Json.toJson(instance));
+              }
+              return redirect(controllers.routes.SandboxController.index())
+                  .flashing(
+                      "success",
+                      "Settings updated and re-provisioning initiated for "
+                          + instance.getCityName()
+                          + ".");
+            });
+  }
+
+  private Optional<String> validateEditRequest(
+      String cityName, String expirationDateStr, String adminEmail, String civiformVersion) {
+    if (cityName == null || cityName.isBlank()) {
+      return Optional.of("City name is required.");
+    }
+    if (cityName.length() > 200) {
+      return Optional.of("City name must be at most 200 characters.");
+    }
+    if (expirationDateStr == null || expirationDateStr.isBlank()) {
+      return Optional.of("Expiration date is required.");
+    }
+    try {
+      LocalDate.parse(expirationDateStr);
+    } catch (DateTimeParseException e) {
+      return Optional.of("Expiration date must be in YYYY-MM-DD format.");
+    }
+    if (adminEmail != null
+        && !adminEmail.isBlank()
+        && !adminEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+      return Optional.of("Please enter a valid admin notification email.");
+    }
+    if (civiformVersion == null || civiformVersion.isBlank()) {
+      return Optional.of("CiviForm version is required.");
+    }
+    if (!civiformVersion.matches("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")) {
+      return Optional.of("CiviForm version must be a valid image tag.");
+    }
+    return Optional.empty();
   }
 
 

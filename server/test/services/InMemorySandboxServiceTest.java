@@ -116,6 +116,34 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
+  public void updateSandbox_updatesSettingsAndTransitionsToProvisioning()
+      throws ExecutionException, InterruptedException {
+    java.time.Instant newExpiry = java.time.Instant.parse("2026-12-31T23:59:59Z");
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("Montpelier, VT")
+            .googleAnalyticsId("G-VT12345")
+            .expiresAt(newExpiry)
+            .adminEmail("montpelier@civiform.dev")
+            .civiformVersion("v2.24.0")
+            .build();
+
+    var result = service.updateSandbox("sb-demo0001", req).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    SandboxInstance updated = result.get();
+    assertThat(updated.getCityName()).isEqualTo("Montpelier, VT");
+    assertThat(updated.getGoogleAnalyticsId()).isEqualTo("G-VT12345");
+    assertThat(updated.getExpiresAt()).isEqualTo(newExpiry);
+    assertThat(updated.getAdminEmail()).isEqualTo("montpelier@civiform.dev");
+    assertThat(updated.getCiviformVersion()).isEqualTo("v2.24.0");
+    assertThat(updated.getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+
+    // Calling updateSandbox again while PROVISIONING returns empty
+    assertThat(service.updateSandbox("sb-demo0001", req).toCompletableFuture().get()).isEmpty();
+  }
+
+  @Test
   public void destroyExpiredSandbox_skipsNonRunningOrUnexpiredAndMarksEligibleDeleted()
       throws ExecutionException, InterruptedException {
     // PROVISIONING sandbox is skipped even if cutoff is in the future

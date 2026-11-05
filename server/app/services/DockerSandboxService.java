@@ -209,7 +209,9 @@ public class DockerSandboxService implements SandboxService {
                     dbPassword,
                     appSecret,
                     instance.getCityName(),
-                    formatExpirationDate(instance.getExpiresAt()));
+                    formatExpirationDate(instance.getExpiresAt()),
+                    instance.getAdminEmail(),
+                    instance.getGoogleAnalyticsId());
             repository.updateContainerId(id, containerId);
             log.info("[{}] Container launched: {}", id, containerId);
 
@@ -424,6 +426,39 @@ public class DockerSandboxService implements SandboxService {
         provisioningPool);
   }
 
+  @Override
+  public CompletionStage<Optional<SandboxInstance>> updateSandbox(
+      String id, UpdateSandboxRequest request) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return Optional.empty();
+          }
+          SandboxInstance existing = maybeSandbox.get();
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+
+          if (!repository.updateSettings(id, request)) {
+            return Optional.empty();
+          }
+          log.info(
+              "[{}] Sandbox settings updated (cityName={}, civiformVersion={}, expiresAt={})",
+              id,
+              request.getCityName(),
+              request.getCiviformVersion(),
+              request.getExpiresAt());
+
+          SandboxInstance updated = existing.withUpdatedSettings(request);
+
+          return Optional.of(startReprovision(updated));
+        },
+        provisioningPool);
+  }
+
   private SandboxInstance startReprovision(SandboxInstance existing) {
     String id = existing.getId();
     String accessToken = existing.getAccessToken();
@@ -480,7 +515,9 @@ public class DockerSandboxService implements SandboxService {
                     dbPassword,
                     appSecret,
                     updated.getCityName(),
-                    formatExpirationDate(updated.getExpiresAt()));
+                    formatExpirationDate(updated.getExpiresAt()),
+                    updated.getAdminEmail(),
+                    updated.getGoogleAnalyticsId());
             repository.updateContainerId(id, containerId);
 
             waitForHealthy(id, hostPort);
@@ -583,7 +620,9 @@ public class DockerSandboxService implements SandboxService {
       String dbPassword,
       String appSecret,
       String cityName,
-      String expirationDate) {
+      String expirationDate,
+      String adminEmail,
+      String googleAnalyticsId) {
 
     ExposedPort internalPort = ExposedPort.tcp(9000);
     Ports portBindings = new Ports();
@@ -633,6 +672,8 @@ public class DockerSandboxService implements SandboxService {
                 "WHITELABEL_CIVIC_ENTITY_LONG_NAME=" + cityName,
                 "BANNER_TYPE=demo",
                 "DEMO_BANNER_EXPIRATION_DATE=" + expirationDate,
+                "STAGING_ADMIN_LIST=" + (adminEmail != null ? adminEmail : ""),
+                "MEASUREMENT_ID=" + (googleAnalyticsId != null ? googleAnalyticsId : ""),
                 "PORT=9000")
             .exec();
 
@@ -641,22 +682,25 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
-   * Polls CiviForm's /health endpoint until it returns 200, or throws after max attempts. Uses
-   * WSClient so the HTTP call is non-blocking relative to Play's pool.
+   * Polls CiviForm's /programs endpoint until it responds (200 or 302/303 guest redirect), or
+   * throws after max attempts. Disables redirect following so CiviForm's guest session redirect
+   * chain ({@code /programs} → {@code /callback?client_name=GuestClient} → {@code /programs}) does
+   * not loop without a cookie jar.
    */
   private void waitForHealthy(String sandboxId, int hostPort) throws Exception {
-    String healthUrl = "http://host.docker.internal:" + hostPort + "/health";
+    String healthUrl = "http://host.docker.internal:" + hostPort + "/programs";
     for (int attempt = 1; attempt <= HEALTH_CHECK_MAX_ATTEMPTS; attempt++) {
       try {
         int status =
             ws.url(healthUrl)
+                .setFollowRedirects(false)
                 .setRequestTimeout(Duration.ofSeconds(4))
                 .get()
                 .toCompletableFuture()
                 .get()
                 .getStatus();
-        if (status == 200) {
-          log.info("[{}] Health check passed on attempt {}", sandboxId, attempt);
+        if (status == 200 || status == 302 || status == 303) {
+          log.info("[{}] Health check passed on attempt {} (HTTP {})", sandboxId, attempt, status);
           return;
         }
       } catch (Exception e) {

@@ -2,6 +2,7 @@ package views.sandboxes;
 
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import lombok.Value;
@@ -19,6 +20,9 @@ public class SandboxRowViewModel {
   private static final DateTimeFormatter DISPLAY_FMT =
       DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
+  private static final DateTimeFormatter ISO_DATE_FMT =
+      DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
+
   /** Days after expiry before autodeletion runs. */
   private static final long AUTODELETION_GRACE_DAYS = 7;
 
@@ -30,6 +34,9 @@ public class SandboxRowViewModel {
 
   /** Human-readable expiry date, e.g. "Sep 13, 2026". */
   String expiryFormatted;
+
+  /** ISO-8601 expiry date (YYYY-MM-DD in UTC) for pre-populating date inputs. */
+  String expiryIsoDate;
 
   /** City name shortcut (avoids sandbox.getCityName() in template). */
   String cityName;
@@ -60,6 +67,7 @@ public class SandboxRowViewModel {
         sandbox,
         Math.max(days, 0),
         DISPLAY_FMT.format(sandbox.getExpiresAt()),
+        ISO_DATE_FMT.format(sandbox.getExpiresAt()),
         sandbox.getCityName(),
         isDeleted,
         deletedFmt,

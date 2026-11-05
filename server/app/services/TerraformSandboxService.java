@@ -598,6 +598,39 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Optional<SandboxInstance>> updateSandbox(
+      String id, UpdateSandboxRequest request) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return Optional.empty();
+          }
+          SandboxInstance existing = maybeSandbox.get();
+          if (existing.getStatus() == SandboxStatus.PROVISIONING
+              || existing.getStatus() == SandboxStatus.DELETING
+              || existing.getStatus() == SandboxStatus.DELETED) {
+            return Optional.empty();
+          }
+
+          if (!repository.updateSettings(id, request)) {
+            return Optional.empty();
+          }
+          log.info(
+              "[{}] Settings updated (cityName={}, civiformVersion={}, expiresAt={})",
+              id,
+              request.getCityName(),
+              request.getCiviformVersion(),
+              request.getExpiresAt());
+
+          SandboxInstance updated = existing.withUpdatedSettings(request);
+
+          return Optional.of(startReprovision(updated));
+        },
+        provisioningPool);
+  }
+
+  @Override
   public CompletionStage<Optional<SandboxInstance>> validatePin(String sandboxId, String pin) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -648,6 +681,9 @@ public class TerraformSandboxService implements SandboxService {
     vars.put("listener_priority", instance.getListenerPriority());
     vars.put("access_token", instance.getAccessToken());
     vars.put("civiform_image_tag", instance.getCiviformVersion());
+    vars.put(
+        "google_analytics_id",
+        instance.getGoogleAnalyticsId() != null ? instance.getGoogleAnalyticsId() : "");
 
     vars.put("db_address", platformOutput("rds_endpoint").asText());
     vars.put("db_name", instance.getDatabaseName());

@@ -44,8 +44,8 @@ export async function validateAccessibility(
   exclude: string[] = [],
 ): Promise<void> {
   const builder = new AxeBuilder({page})
-  if (exclude.length > 0) {
-    builder.exclude(exclude)
+  for (const selector of exclude) {
+    builder.exclude(selector)
   }
   const results = await builder.analyze()
   expect(results.violations).toEqual([])
@@ -69,8 +69,8 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   await page.fill('input[name="email"]', PORTAL_EMAIL)
   await page.fill('input[name="password"]', PORTAL_PASSWORD)
   await page.click('button[type="submit"]')
-  // Wait until we're redirected to /sandboxes
-  await page.waitForURL('**/sandboxes**')
+  // Wait until we're redirected away from /login to the dashboard (/ or /sandboxes)
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'))
 }
 
 /**
@@ -111,5 +111,5 @@ export async function fillCreateWizard(
  */
 export async function openCreateModal(page: Page): Promise<void> {
   await page.click('button:has-text("Create new demo")')
-  await page.waitForSelector('[role="dialog"]')
+  await page.waitForSelector('#create-modal.is-visible .usa-modal__main')
 }

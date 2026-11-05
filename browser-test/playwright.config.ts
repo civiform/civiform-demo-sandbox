@@ -12,7 +12,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
 
   // Screenshot baselines live alongside the tests (committed to git)
-  snapshotPathTemplate: './image_snapshots/{arg}{ext}',
+  snapshotPathTemplate: './image_snapshots/{arg}-{projectName}{ext}',
 
   // Sequential — same as CiviForm (Play server isn't horizontally scaled locally)
   fullyParallel: false,

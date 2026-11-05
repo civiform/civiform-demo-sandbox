@@ -63,6 +63,41 @@ test.describe('Sandbox Dashboard', () => {
     await expect(page.getByRole('button', {name: /^info$/i})).not.toBeVisible()
   })
 
+  test('Options button opens modal with Extend, Reprovision, and Edit actions', async ({page}) => {
+    const firstRow = page.locator('tbody tr').first()
+    const firstRowCity = (await firstRow.locator('td').first().innerText()).trim()
+    const optionsButton = firstRow.getByRole('button', {name: /^options$/i})
+    await expect(optionsButton).toBeVisible()
+
+    await test.step('Click Options button to open Options modal', async () => {
+      await optionsButton.click()
+      const optionsModal = page.locator('#options-modal')
+      await expect(optionsModal.locator('.usa-modal__content')).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /extend/i})).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /reprovision/i})).toBeVisible()
+      await expect(optionsModal.getByRole('button', {name: /edit/i})).toBeVisible()
+      await validateAccessibility(page, ['table', 'footer'])
+    })
+
+    await test.step('Click Edit option to open Edit Sandbox Settings modal', async () => {
+      await page.locator('#options-modal').getByRole('button', {name: /edit/i}).click()
+      const editModal = page.locator('#edit-modal')
+      await expect(editModal.locator('.usa-modal__content')).toBeVisible()
+      await expect(page.locator('#edit-cityName')).toHaveValue(firstRowCity)
+      await expect(page.locator('#edit-expirationDate')).not.toHaveValue('')
+      await expect(page.locator('#edit-civiformVersion')).not.toHaveValue('')
+      await expect(page.locator('#edit-past-expiration-warning')).toBeHidden()
+      await validateAccessibility(page, ['table', 'footer'])
+    })
+
+    await test.step('Entering a past expiration date shows deletion warning', async () => {
+      await page.locator('#edit-expirationDate').fill('2020-01-01')
+      await expect(page.locator('#edit-past-expiration-warning')).toBeVisible()
+      await expect(page.locator('#edit-past-expiration-warning')).toContainText(/expired/i)
+      await validateAccessibility(page, ['table', 'footer'])
+    })
+  })
+
   test('Status badge is present on each row', async ({page}) => {
     const badges = page.locator('[data-status]')
     await expect(badges.first()).toBeVisible()

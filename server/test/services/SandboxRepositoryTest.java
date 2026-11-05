@@ -234,7 +234,10 @@ public class SandboxRepositoryTest {
   @Test
   public void updateExpiry_existingId_returnsTrue() throws Exception {
     PreparedStatement ps = mock(PreparedStatement.class);
-    when(conn.prepareStatement("UPDATE sandbox_instances SET expires_at = ? WHERE id = ?"))
+    when(conn.prepareStatement(
+            "UPDATE sandbox_instances "
+                + "SET expires_at = ?, destroy_attempts = 0, last_destroy_error = NULL "
+                + "WHERE id = ?"))
         .thenReturn(ps);
     when(ps.executeUpdate()).thenReturn(1);
 
@@ -255,6 +258,58 @@ public class SandboxRepositoryTest {
     boolean updated = repository.updateExpiry("sb-missing", Instant.now());
 
     assertThat(updated).isFalse();
+  }
+
+  @Test
+  public void updateSettings_existingId_bindsAllParametersAndReturnsTrue() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeUpdate()).thenReturn(1);
+
+    Instant expiresAt = Instant.parse("2026-12-31T23:59:59Z");
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("New City, WA")
+            .googleAnalyticsId("G-NEW123")
+            .expiresAt(expiresAt)
+            .adminEmail("new-admin@exygy.com")
+            .civiformVersion("v2.24.0")
+            .build();
+
+    boolean updated = repository.updateSettings("sb-1", req);
+
+    assertThat(updated).isTrue();
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(conn).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .contains("SET city_name = ?, google_analytics_id = ?, expires_at = ?,")
+        .contains("admin_email = ?, civiform_version = ?,")
+        .contains("destroy_attempts = 0, last_destroy_error = NULL")
+        .contains("WHERE id = ? AND status NOT IN ('PROVISIONING', 'DELETING', 'DELETED')");
+    verify(ps).setString(1, "New City, WA");
+    verify(ps).setString(2, "G-NEW123");
+    verify(ps).setTimestamp(3, Timestamp.from(expiresAt));
+    verify(ps).setString(4, "new-admin@exygy.com");
+    verify(ps).setString(5, "v2.24.0");
+    verify(ps).setString(6, "sb-1");
+  }
+
+  @Test
+  public void updateSettings_missingId_returnsFalse() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeUpdate()).thenReturn(0);
+
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("New City, WA")
+            .googleAnalyticsId(null)
+            .expiresAt(Instant.now())
+            .adminEmail("new-admin@exygy.com")
+            .civiformVersion("latest")
+            .build();
+
+    assertThat(repository.updateSettings("sb-missing", req)).isFalse();
   }
 
   @Test

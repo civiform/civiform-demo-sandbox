@@ -537,6 +537,52 @@ public class DockerSandboxServiceTest {
   }
 
   @Test
+  public void updateSandbox_updatesSettingsAndReprovisionsContainer()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance existing =
+        makeSandboxWithContainer("sb-upd1", "container-old").toBuilder()
+            .accessToken("existing-token")
+            .build();
+    when(repository.findById("sb-upd1")).thenReturn(Optional.of(existing));
+    stubDockerStop("container-old");
+    CreateContainerCmd createCmd = stubSuccessfulContainerLaunch("container-new");
+
+    Instant newExpiry = Instant.parse("2026-12-20T23:59:59Z");
+    UpdateSandboxRequest req =
+        UpdateSandboxRequest.builder()
+            .cityName("Updated City, VT")
+            .googleAnalyticsId("G-UPD123")
+            .expiresAt(newExpiry)
+            .adminEmail("updated@exygy.com")
+            .civiformVersion("v2.24.0")
+            .build();
+    when(repository.updateSettings("sb-upd1", req)).thenReturn(true);
+
+    Optional<SandboxInstance> result =
+        service.updateSandbox("sb-upd1", req).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    assertThat(result.get().getCityName()).isEqualTo("Updated City, VT");
+    assertThat(result.get().getGoogleAnalyticsId()).isEqualTo("G-UPD123");
+    assertThat(result.get().getExpiresAt()).isEqualTo(newExpiry);
+    assertThat(result.get().getAdminEmail()).isEqualTo("updated@exygy.com");
+    assertThat(result.get().getCiviformVersion()).isEqualTo("v2.24.0");
+    assertThat(result.get().getStatus()).isEqualTo(SandboxStatus.PROVISIONING);
+    verify(repository).updateSettings("sb-upd1", req);
+    verify(repository).updateStatus("sb-upd1", SandboxStatus.PROVISIONING);
+
+    org.mockito.ArgumentCaptor<String[]> envCaptor =
+        org.mockito.ArgumentCaptor.forClass(String[].class);
+    verify(createCmd, org.mockito.Mockito.timeout(2000)).withEnv(envCaptor.capture());
+    assertThat(envCaptor.getValue())
+        .contains(
+            "WHITELABEL_CIVIC_ENTITY_SHORT_NAME=Updated City, VT",
+            "DEMO_BANNER_EXPIRATION_DATE=2026-12-20",
+            "STAGING_ADMIN_LIST=updated@exygy.com",
+            "MEASUREMENT_ID=G-UPD123");
+  }
+
+  @Test
   public void destroyExpiredSandbox_skipsExtendedOrNonEligibleSandbox()
       throws ExecutionException, InterruptedException {
     Instant cutoff = Instant.now();

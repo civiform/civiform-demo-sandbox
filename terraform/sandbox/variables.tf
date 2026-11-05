@@ -91,6 +91,12 @@ variable "civiform_image_tag" {
   default     = "latest"
 }
 
+variable "google_analytics_id" {
+  description = "Optional Google Analytics measurement ID (e.g. G-ABC123XYZ) passed to CiviForm as MEASUREMENT_ID."
+  type        = string
+  default     = ""
+}
+
 variable "ecs_task_cpu" {
   description = "Fargate task CPU units. 1024 = 1 vCPU."
   type        = number
