@@ -152,12 +152,13 @@ public class SandboxRepository {
 
   /**
    * Transitions any sandboxes left in a transient in-flight state ({@link
-   * SandboxStatus#PROVISIONING} or {@link SandboxStatus#DELETING}) to their error equivalents
-   * ({@link SandboxStatus#FAILED} and {@link SandboxStatus#DELETE_FAILED}).
+   * SandboxStatus#PROVISIONING}, {@link SandboxStatus#SEEDING}, or {@link
+   * SandboxStatus#DELETING}) to their error equivalents ({@link SandboxStatus#FAILED} and {@link
+   * SandboxStatus#DELETE_FAILED}).
    *
-   * <p>Called once at service startup: provisioning and teardown run on an in-memory thread pool,
-   * so any row still in a pending state when the process boots was interrupted by a restart and
-   * will never complete on its own.
+   * <p>Called once at service startup: provisioning, seeding, and teardown run on an in-memory
+   * thread pool, so any row still in a pending state when the process boots was interrupted by a
+   * restart and will never complete on its own.
    *
    * @return the number of sandbox rows updated ({@code 0} on a clean startup, or {@code > 0} when
    *     interrupted provisioning/teardown operations were marked as failed)
@@ -168,9 +169,10 @@ public class SandboxRepository {
           "UPDATE sandbox_instances "
               + "SET status = CASE status "
               + "  WHEN 'PROVISIONING' THEN 'FAILED' "
+              + "  WHEN 'SEEDING'      THEN 'FAILED' "
               + "  WHEN 'DELETING'     THEN 'DELETE_FAILED' "
               + "END "
-              + "WHERE status IN ('PROVISIONING', 'DELETING')")) {
+              + "WHERE status IN ('PROVISIONING', 'SEEDING', 'DELETING')")) {
         return ps.executeUpdate();
       }
     });
