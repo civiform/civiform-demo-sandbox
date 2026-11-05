@@ -556,6 +556,7 @@ public class DockerSandboxServiceTest {
             .adminEmail("updated@exygy.com")
             .civiformVersion("v2.24.0")
             .build();
+    when(repository.updateSettings("sb-upd1", req)).thenReturn(true);
 
     Optional<SandboxInstance> result =
         service.updateSandbox("sb-upd1", req).toCompletableFuture().get();
@@ -576,7 +577,9 @@ public class DockerSandboxServiceTest {
     assertThat(envCaptor.getValue())
         .contains(
             "WHITELABEL_CIVIC_ENTITY_SHORT_NAME=Updated City, VT",
-            "DEMO_BANNER_EXPIRATION_DATE=2026-12-20");
+            "DEMO_BANNER_EXPIRATION_DATE=2026-12-20",
+            "STAGING_ADMIN_LIST=updated@exygy.com",
+            "MEASUREMENT_ID=G-UPD123");
   }
 
   @Test

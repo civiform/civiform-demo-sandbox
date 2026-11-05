@@ -583,6 +583,7 @@ public class TerraformSandboxServiceTest {
               .cityName("Burlington, VT")
               .subdomain("burlington-vt")
               .adminEmail("bd-lead@exygy.com")
+              .googleAnalyticsId("G-BURL123")
               .accessToken("token-123")
               .listenerPriority(1000)
               .civiformVersion("v2.22.0")
@@ -595,6 +596,7 @@ public class TerraformSandboxServiceTest {
       com.fasterxml.jackson.databind.JsonNode json =
           new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(varFile));
       assertThat(json.get("expiration_date").asText()).isEqualTo("2026-11-25");
+      assertThat(json.get("google_analytics_id").asText()).isEqualTo("G-BURL123");
     } finally {
       Files.deleteIfExists(varFile);
     }
@@ -689,6 +691,7 @@ public class TerraformSandboxServiceTest {
             .adminEmail("seattle@exygy.com")
             .civiformVersion("v2.24.0")
             .build();
+    when(repository.updateSettings("sb-abcd1234", req)).thenReturn(true);
 
     Optional<SandboxInstance> result =
         newService().updateSandbox("sb-abcd1234", req).toCompletableFuture().get();

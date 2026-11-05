@@ -224,6 +224,7 @@ module "civiform_app" {
     CIVIFORM_APPLICANT_IDP = "disabled"
 
     STAGING_ADMIN_LIST = var.admin_email
+    MEASUREMENT_ID     = var.google_analytics_id
 
     # CiviForm's program import page puts the full JSON in the URL query string
     # during the review redirect. Programs with many dropdown options (e.g.

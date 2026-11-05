@@ -500,10 +500,9 @@ public class SandboxController extends Controller {
     } catch (DateTimeParseException e) {
       return Optional.of("Expiration date must be in YYYY-MM-DD format.");
     }
-    if (adminEmail == null || adminEmail.isBlank()) {
-      return Optional.of("Admin notification email is required.");
-    }
-    if (!adminEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+    if (adminEmail != null
+        && !adminEmail.isBlank()
+        && !adminEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
       return Optional.of("Please enter a valid admin notification email.");
     }
     if (civiformVersion == null || civiformVersion.isBlank()) {

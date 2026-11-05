@@ -1327,6 +1327,7 @@
           document.getElementById('edit-civiformVersion').value || ''
         ).trim()
         var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        var versionRe = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/
         var errEl = document.getElementById('edit-modal-error')
 
         function fail(msg) {
@@ -1341,20 +1342,24 @@
           fail('Name of civic entity is required.')
           return
         }
+        if (cityVal.length > 200) {
+          fail('City name must be at most 200 characters.')
+          return
+        }
         if (!expVal) {
           fail('Expiration date is required.')
           return
         }
-        if (!emailVal || !emailRe.test(emailVal)) {
-          fail(
-            !emailVal
-              ? 'Admin notification email is required.'
-              : 'Please enter a valid admin notification email.',
-          )
+        if (emailVal && !emailRe.test(emailVal)) {
+          fail('Please enter a valid admin notification email.')
           return
         }
         if (!verVal) {
           fail('CiviForm version is required.')
+          return
+        }
+        if (!versionRe.test(verVal)) {
+          fail('CiviForm version must be a valid image tag.')
           return
         }
       })

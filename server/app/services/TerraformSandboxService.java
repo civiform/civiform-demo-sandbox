@@ -613,7 +613,9 @@ public class TerraformSandboxService implements SandboxService {
             return Optional.empty();
           }
 
-          repository.updateSettings(id, request);
+          if (!repository.updateSettings(id, request)) {
+            return Optional.empty();
+          }
           log.info(
               "[{}] Settings updated (cityName={}, civiformVersion={}, expiresAt={})",
               id,
@@ -621,14 +623,7 @@ public class TerraformSandboxService implements SandboxService {
               request.getCiviformVersion(),
               request.getExpiresAt());
 
-          SandboxInstance updated =
-              existing.toBuilder()
-                  .cityName(request.getCityName())
-                  .googleAnalyticsId(request.getGoogleAnalyticsId())
-                  .expiresAt(request.getExpiresAt())
-                  .adminEmail(request.getAdminEmail())
-                  .civiformVersion(request.getCiviformVersion())
-                  .build();
+          SandboxInstance updated = existing.withUpdatedSettings(request);
 
           return Optional.of(startReprovision(updated));
         },
@@ -686,6 +681,9 @@ public class TerraformSandboxService implements SandboxService {
     vars.put("listener_priority", instance.getListenerPriority());
     vars.put("access_token", instance.getAccessToken());
     vars.put("civiform_image_tag", instance.getCiviformVersion());
+    vars.put(
+        "google_analytics_id",
+        instance.getGoogleAnalyticsId() != null ? instance.getGoogleAnalyticsId() : "");
 
     vars.put("db_address", platformOutput("rds_endpoint").asText());
     vars.put("db_name", instance.getDatabaseName());

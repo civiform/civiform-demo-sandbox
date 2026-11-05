@@ -166,14 +166,7 @@ public class InMemorySandboxService implements SandboxService {
         || existing.getStatus() == SandboxStatus.DELETED) {
       return CompletableFuture.completedFuture(Optional.empty());
     }
-    SandboxInstance updated =
-        existing.toBuilder()
-            .cityName(request.getCityName())
-            .googleAnalyticsId(request.getGoogleAnalyticsId())
-            .expiresAt(request.getExpiresAt())
-            .adminEmail(request.getAdminEmail())
-            .civiformVersion(request.getCiviformVersion())
-            .build();
+    SandboxInstance updated = existing.withUpdatedSettings(request);
     sandboxes.put(id, updated);
     return reprovisionSandbox(id);
   }

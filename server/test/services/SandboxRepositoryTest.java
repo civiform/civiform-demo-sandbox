@@ -280,7 +280,8 @@ public class SandboxRepositoryTest {
     verify(conn).prepareStatement(sqlCaptor.capture());
     assertThat(sqlCaptor.getValue())
         .contains("SET city_name = ?, google_analytics_id = ?, expires_at = ?,")
-        .contains("admin_email = ?, civiform_version = ?");
+        .contains("admin_email = ?, civiform_version = ?")
+        .contains("WHERE id = ? AND status NOT IN ('PROVISIONING', 'DELETING', 'DELETED')");
     verify(ps).setString(1, "New City, WA");
     verify(ps).setString(2, "G-NEW123");
     verify(ps).setTimestamp(3, Timestamp.from(expiresAt));

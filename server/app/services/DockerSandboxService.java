@@ -209,7 +209,9 @@ public class DockerSandboxService implements SandboxService {
                     dbPassword,
                     appSecret,
                     instance.getCityName(),
-                    formatExpirationDate(instance.getExpiresAt()));
+                    formatExpirationDate(instance.getExpiresAt()),
+                    instance.getAdminEmail(),
+                    instance.getGoogleAnalyticsId());
             repository.updateContainerId(id, containerId);
             log.info("[{}] Container launched: {}", id, containerId);
 
@@ -440,7 +442,9 @@ public class DockerSandboxService implements SandboxService {
             return Optional.empty();
           }
 
-          repository.updateSettings(id, request);
+          if (!repository.updateSettings(id, request)) {
+            return Optional.empty();
+          }
           log.info(
               "[{}] Sandbox settings updated (cityName={}, civiformVersion={}, expiresAt={})",
               id,
@@ -448,14 +452,7 @@ public class DockerSandboxService implements SandboxService {
               request.getCiviformVersion(),
               request.getExpiresAt());
 
-          SandboxInstance updated =
-              existing.toBuilder()
-                  .cityName(request.getCityName())
-                  .googleAnalyticsId(request.getGoogleAnalyticsId())
-                  .expiresAt(request.getExpiresAt())
-                  .adminEmail(request.getAdminEmail())
-                  .civiformVersion(request.getCiviformVersion())
-                  .build();
+          SandboxInstance updated = existing.withUpdatedSettings(request);
 
           return Optional.of(startReprovision(updated));
         },
@@ -518,7 +515,9 @@ public class DockerSandboxService implements SandboxService {
                     dbPassword,
                     appSecret,
                     updated.getCityName(),
-                    formatExpirationDate(updated.getExpiresAt()));
+                    formatExpirationDate(updated.getExpiresAt()),
+                    updated.getAdminEmail(),
+                    updated.getGoogleAnalyticsId());
             repository.updateContainerId(id, containerId);
 
             waitForHealthy(id, hostPort);
@@ -621,7 +620,9 @@ public class DockerSandboxService implements SandboxService {
       String dbPassword,
       String appSecret,
       String cityName,
-      String expirationDate) {
+      String expirationDate,
+      String adminEmail,
+      String googleAnalyticsId) {
 
     ExposedPort internalPort = ExposedPort.tcp(9000);
     Ports portBindings = new Ports();
@@ -671,6 +672,8 @@ public class DockerSandboxService implements SandboxService {
                 "WHITELABEL_CIVIC_ENTITY_LONG_NAME=" + cityName,
                 "BANNER_TYPE=demo",
                 "DEMO_BANNER_EXPIRATION_DATE=" + expirationDate,
+                "STAGING_ADMIN_LIST=" + (adminEmail != null ? adminEmail : ""),
+                "MEASUREMENT_ID=" + (googleAnalyticsId != null ? googleAnalyticsId : ""),
                 "PORT=9000")
             .exec();
 
@@ -679,8 +682,10 @@ public class DockerSandboxService implements SandboxService {
   }
 
   /**
-   * Polls CiviForm's /programs endpoint until it returns 200, or throws after max attempts. Uses
-   * WSClient so the HTTP call is non-blocking relative to Play's pool.
+   * Polls CiviForm's /programs endpoint until it responds (200 or 302/303 guest redirect), or
+   * throws after max attempts. Disables redirect following so CiviForm's guest session redirect
+   * chain ({@code /programs} → {@code /callback?client_name=GuestClient} → {@code /programs}) does
+   * not loop without a cookie jar.
    */
   private void waitForHealthy(String sandboxId, int hostPort) throws Exception {
     String healthUrl = "http://host.docker.internal:" + hostPort + "/programs";
@@ -688,13 +693,14 @@ public class DockerSandboxService implements SandboxService {
       try {
         int status =
             ws.url(healthUrl)
+                .setFollowRedirects(false)
                 .setRequestTimeout(Duration.ofSeconds(4))
                 .get()
                 .toCompletableFuture()
                 .get()
                 .getStatus();
-        if (status == 200) {
-          log.info("[{}] Health check passed on attempt {}", sandboxId, attempt);
+        if (status == 200 || status == 302 || status == 303) {
+          log.info("[{}] Health check passed on attempt {} (HTTP {})", sandboxId, attempt, status);
           return;
         }
       } catch (Exception e) {

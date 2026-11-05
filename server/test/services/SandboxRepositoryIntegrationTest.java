@@ -301,7 +301,7 @@ public class SandboxRepositoryIntegrationTest {
   // ── save → updateSettings → findById ───────────────────────────────────────
 
   @Test
-  public void updateSettings_persistsAllEditableFields() {
+  public void updateSettings_persistsAllEditableFieldsWhenRunningAndRejectsProvisioning() {
     repo.save(makeTestInstance());
 
     Instant newExpiry = Instant.now().plus(Duration.ofDays(45)).truncatedTo(ChronoUnit.MILLIS);
@@ -314,6 +314,10 @@ public class SandboxRepositoryIntegrationTest {
             .civiformVersion("v2.25.0")
             .build();
 
+    // While PROVISIONING, updateSettings must be rejected
+    assertThat(repo.updateSettings(testId, req)).isFalse();
+
+    repo.updateStatus(testId, SandboxStatus.RUNNING);
     boolean updated = repo.updateSettings(testId, req);
 
     assertThat(updated).isTrue();

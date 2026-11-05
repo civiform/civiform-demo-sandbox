@@ -208,6 +208,7 @@ public class SandboxRepository {
 
   /**
    * Updates the editable settings of an existing sandbox row before re-provisioning.
+   * Only updates rows that are not currently provisioning, deleting, or deleted.
    */
   public boolean updateSettings(String id, UpdateSandboxRequest request) {
     return db.withConnection(conn -> {
@@ -215,7 +216,7 @@ public class SandboxRepository {
           "UPDATE sandbox_instances "
               + "SET city_name = ?, google_analytics_id = ?, expires_at = ?, "
               + "    admin_email = ?, civiform_version = ? "
-              + "WHERE id = ?")) {
+              + "WHERE id = ? AND status NOT IN ('PROVISIONING', 'DELETING', 'DELETED')")) {
         ps.setString(1, request.getCityName());
         ps.setString(2, request.getGoogleAnalyticsId());
         ps.setTimestamp(3, Timestamp.from(request.getExpiresAt()));
