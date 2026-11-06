@@ -68,6 +68,8 @@ public class DevToolsControllerTest extends WithApplication {
 
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-08-15T14:30:00Z"), ZoneOffset.UTC);
+  private static final String TEST_PROD_SECRET =
+      "test-only-prod-mode-application-secret-key-32chars";
 
   private SandboxService sandboxService;
   private PersistedDurableJobRepository persistedDurableJobRepository;
@@ -188,6 +190,7 @@ public class DevToolsControllerTest extends WithApplication {
     Application prodApp =
         new GuiceApplicationBuilder()
             .in(new Environment(app.path(), app.classloader(), Mode.PROD))
+            .configure("play.http.secret.key", TEST_PROD_SECRET)
             .configure("durable_jobs.enabled", false)
             .overrides(
                 new TestOverridesModule(
@@ -238,6 +241,7 @@ public class DevToolsControllerTest extends WithApplication {
     Application prodEnabledApp =
         new GuiceApplicationBuilder()
             .in(new Environment(app.path(), app.classloader(), Mode.PROD))
+            .configure("play.http.secret.key", TEST_PROD_SECRET)
             .configure("durable_jobs.enabled", false)
             .configure("dev_tools.enabled", true)
             .overrides(
