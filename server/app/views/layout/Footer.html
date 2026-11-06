@@ -12,10 +12,11 @@
           <p class="text-xs text-gray-400">
             Built with Play Framework, Thymeleaf, USWDS, and Containers.
           </p>
-          <p class="mt-2">
+          <p class="mt-2" th:if="${templateGlobals.isDevToolsEnabled()}">
             <a
               id="dev-tools-link"
               href="/dev"
+              th:href="${templateGlobals.devToolsUrl()}"
               class="text-sm text-gray-300 hover:text-white underline"
               th:text="#{footer.devtools}"
             >Dev tools</a>

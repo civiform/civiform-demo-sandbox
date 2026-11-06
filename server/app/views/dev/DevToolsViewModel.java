@@ -14,4 +14,7 @@ public class DevToolsViewModel implements BaseViewModel {
 
   /** Action URL for {@code POST /dev/runDurableJob}. */
   private final String runDurableJobUrl;
+
+  /** Navigation URL back to {@code GET /sandboxes}. */
+  private final String sandboxesUrl;
 }

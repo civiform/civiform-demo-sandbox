@@ -15,7 +15,7 @@ public final class DevToolsView extends BaseView<DevToolsViewModel> {
 
   @Override
   protected String pageTitle(DevToolsViewModel model, Messages messages) {
-    return messages.at("devtools.title") + " - CiviForm Sandbox Builder";
+    return messages.at("devtools.pageTitle", messages.at("devtools.title"));
   }
 
   @Override
