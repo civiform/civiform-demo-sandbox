@@ -1,6 +1,8 @@
 package views;
 
 import com.google.common.collect.ImmutableList;
+import com.typesafe.config.Config;
+import controllers.DevToolsController;
 import java.util.Optional;
 import modules.ThymeleafModule;
 import org.thymeleaf.TemplateEngine;
@@ -23,12 +25,14 @@ public abstract class BaseView<TModel extends BaseViewModel> {
   private final ThymeleafModule.PlayThymeleafContextFactory playThymeleafContextFactory;
   private final MessagesApi messagesApi;
   private final Environment environment;
+  private final Config config;
 
   public BaseView(BaseViewDeps baseViewDeps) {
     this.templateEngine = baseViewDeps.templateEngine();
     this.playThymeleafContextFactory = baseViewDeps.playThymeleafContextFactory();
     this.messagesApi = baseViewDeps.messagesApi();
     this.environment = baseViewDeps.environment();
+    this.config = baseViewDeps.config();
   }
 
   protected String pageTitle(TModel model, Messages messages) {
@@ -116,10 +120,13 @@ public abstract class BaseView<TModel extends BaseViewModel> {
             .csrfToken(play.filters.csrf.CSRF.getToken(request.asScala())
                 .map(t -> t.value()).getOrElse(() -> ""))
             .isDev(environment.isDev())
+            .isDevToolsEnabled(DevToolsController.isDevToolsEnabled(environment, config))
+            .devToolsUrl(controllers.routes.DevToolsController.index().url())
             .build());
 
     context.setVariable("view", this);
     context.setVariable("model", model);
+    context.setVariable("flash", request.flash().data());
 
     if (layoutTemplate().isPresent()) {
       return templateEngine.process(layoutTemplate().get().getPath(), context);

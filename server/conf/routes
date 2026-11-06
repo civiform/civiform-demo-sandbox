@@ -32,6 +32,10 @@ POST    /sandboxes/:id/edit         controllers.SandboxController.edit(request: 
 GET     /sandboxes/:id/access       controllers.SandboxController.pinGate(request: Request, id: String)
 POST    /sandboxes/:id/access       controllers.SandboxController.validateAccess(request: Request, id: String)
 
+# Dev Tools
+GET     /dev                        controllers.DevToolsController.index(request: Request)
+POST    /dev/runDurableJob          controllers.DevToolsController.runDurableJob(request: Request)
+
 # Trailing slash handler
 GET     /*path/                     controllers.UntrailingController.untrail(path: String)
 
