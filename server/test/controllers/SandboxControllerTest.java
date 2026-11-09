@@ -1098,6 +1098,45 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
   }
 
+  @Test
+  public void index_expiredRow_rendersConfiguredAutodeletionGraceDays() {
+    SandboxService customSandboxService = mock(SandboxService.class);
+    SandboxInstance expiredThreeDaysAgo =
+        makeSandbox("sb-exp1", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.now().minus(Duration.ofDays(3)).minus(Duration.ofHours(2)))
+            .build();
+    when(customSandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(expiredThreeDaysAgo)));
+
+    Application customApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", 14)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(customSandboxService);
+                  }
+                })
+            .build();
+
+    Helpers.running(
+        customApp,
+        () -> {
+          Http.RequestBuilder request =
+              Helpers.fakeRequest()
+                  .method("GET")
+                  .uri("/sandboxes")
+                  .session(AuthController.SESSION_KEY, "true");
+
+          Result result = Helpers.route(customApp, request);
+
+          assertThat(result.status()).isEqualTo(OK);
+          String body = contentAsString(result);
+          assertThat(body).contains("Autodeletion in 11 days");
+        });
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────
 
   private SandboxInstance makeSandbox(String id, SandboxStatus status) {

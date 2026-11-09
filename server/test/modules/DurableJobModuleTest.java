@@ -145,4 +145,44 @@ public class DurableJobModuleTest {
 
     verify(lifecycle, never()).addStopHook(any());
   }
+
+  @Test
+  public void provideRecurringDurableJobRegistry_wiresConfiguredAutodeletionGraceDays()
+      throws Exception {
+    java.time.Clock fixedClock =
+        java.time.Clock.fixed(
+            java.time.Instant.parse("2026-08-20T02:00:00Z"), java.time.ZoneOffset.UTC);
+    SandboxRepository sandboxRepository = mock(SandboxRepository.class);
+    when(sandboxRepository.findExpiredForDestruction(any(), org.mockito.ArgumentMatchers.anyInt()))
+        .thenReturn(com.google.common.collect.ImmutableList.of());
+    services.SandboxService sandboxService = mock(services.SandboxService.class);
+    services.PersistedDurableJobRepository jobRepo =
+        mock(services.PersistedDurableJobRepository.class);
+    services.SlackAlertClient slackClient = mock(services.SlackAlertClient.class);
+
+    Config config = ConfigFactory.parseMap(Map.of("sandbox.autodeletionGraceDays", 10));
+    durablejobs.DurableJobRegistry registry =
+        new DurableJobModule()
+            .provideRecurringDurableJobRegistry(
+                config,
+                fixedClock,
+                () -> sandboxRepository,
+                () -> sandboxService,
+                () -> jobRepo,
+                () -> slackClient);
+
+    models.PersistedDurableJobModel jobModel =
+        new models.PersistedDurableJobModel(
+            "DESTROY_EXPIRED_SANDBOXES", models.JobType.RECURRING, fixedClock.instant());
+    registry
+        .get(durablejobs.DurableJobName.DESTROY_EXPIRED_SANDBOXES)
+        .getFactory()
+        .create(jobModel)
+        .run();
+
+    verify(sandboxRepository)
+        .findExpiredForDestruction(
+            java.time.Instant.parse("2026-08-10T00:00:00Z"),
+            durablejobs.jobs.DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+  }
 }

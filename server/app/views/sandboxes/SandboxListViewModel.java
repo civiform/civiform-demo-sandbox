@@ -28,9 +28,10 @@ public class SandboxListViewModel implements BaseViewModel {
   int expiringCount;
 
   /** Convenience factory — builds from a raw sandbox list. */
-  public static SandboxListViewModel of(ImmutableList<SandboxInstance> instances) {
+  public static SandboxListViewModel of(
+      ImmutableList<SandboxInstance> instances, long autodeletionGraceDays) {
     ImmutableList<SandboxRowViewModel> rows = instances.stream()
-        .map(SandboxRowViewModel::of)
+        .map(instance -> SandboxRowViewModel.of(instance, autodeletionGraceDays))
         .collect(ImmutableList.toImmutableList());
 
     int total    = rows.size();

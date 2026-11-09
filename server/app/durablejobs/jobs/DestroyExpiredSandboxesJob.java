@@ -1,5 +1,6 @@
 package durablejobs.jobs;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.ImmutableList;
@@ -23,8 +24,9 @@ import services.SandboxService;
 import services.SlackAlertClient;
 
 /**
- * Daily {@link DurableJob} that finds all sandboxes that expired yesterday or earlier ({@code
- * expires_at < startOfToday}), destroys their infrastructure and database via {@link
+ * Daily {@link DurableJob} that finds all sandboxes past their post-expiration grace period ({@code
+ * expires_at < startOfToday - autodeletionGraceDays}, default {@value
+ * #DEFAULT_AUTODELETION_GRACE_DAYS} days), destroys their infrastructure and database via {@link
  * SandboxService#destroyExpiredSandbox(String, Instant)}, and marks their rows {@code DELETED}.
  *
  * <p>Per-sandbox failures and timeouts are isolated (Option A): if destroying one sandbox throws or
@@ -40,6 +42,7 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
 
   public static final int MAX_DESTROY_ATTEMPTS = 3;
   public static final Duration DEFAULT_PER_SANDBOX_TIMEOUT = Duration.ofMinutes(20);
+  public static final long DEFAULT_AUTODELETION_GRACE_DAYS = 7L;
 
   private final Clock clock;
   private final SandboxRepository sandboxRepository;
@@ -47,6 +50,7 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
   private final SlackAlertClient slackAlertClient;
   private final PersistedDurableJobModel persistedDurableJobModel;
   private final Duration perSandboxTimeout;
+  private final long autodeletionGraceDays;
 
   public DestroyExpiredSandboxesJob(
       Clock clock,
@@ -60,7 +64,8 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
         sandboxService,
         slackAlertClient,
         persistedDurableJobModel,
-        DEFAULT_PER_SANDBOX_TIMEOUT);
+        DEFAULT_PER_SANDBOX_TIMEOUT,
+        DEFAULT_AUTODELETION_GRACE_DAYS);
   }
 
   public DestroyExpiredSandboxesJob(
@@ -70,12 +75,32 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
       SlackAlertClient slackAlertClient,
       PersistedDurableJobModel persistedDurableJobModel,
       Duration perSandboxTimeout) {
+    this(
+        clock,
+        sandboxRepository,
+        sandboxService,
+        slackAlertClient,
+        persistedDurableJobModel,
+        perSandboxTimeout,
+        DEFAULT_AUTODELETION_GRACE_DAYS);
+  }
+
+  public DestroyExpiredSandboxesJob(
+      Clock clock,
+      SandboxRepository sandboxRepository,
+      SandboxService sandboxService,
+      SlackAlertClient slackAlertClient,
+      PersistedDurableJobModel persistedDurableJobModel,
+      Duration perSandboxTimeout,
+      long autodeletionGraceDays) {
+    checkArgument(autodeletionGraceDays >= 0, "autodeletionGraceDays must be >= 0");
     this.clock = checkNotNull(clock);
     this.sandboxRepository = checkNotNull(sandboxRepository);
     this.sandboxService = checkNotNull(sandboxService);
     this.slackAlertClient = checkNotNull(slackAlertClient);
     this.persistedDurableJobModel = checkNotNull(persistedDurableJobModel);
     this.perSandboxTimeout = checkNotNull(perSandboxTimeout);
+    this.autodeletionGraceDays = autodeletionGraceDays;
   }
 
   @Override
@@ -85,21 +110,27 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
 
   @Override
   public void run() {
-    Instant startOfToday = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
+    Instant cutoff =
+        LocalDate.now(clock)
+            .minusDays(autodeletionGraceDays)
+            .atStartOfDay(clock.getZone())
+            .toInstant();
     ImmutableList<SandboxInstance> expired =
-        sandboxRepository.findExpiredForDestruction(startOfToday, MAX_DESTROY_ATTEMPTS);
+        sandboxRepository.findExpiredForDestruction(cutoff, MAX_DESTROY_ATTEMPTS);
 
     log.info(
         "DestroyExpiredSandboxesJob starting: found {} expired sandbox(es) eligible for teardown"
-            + " (cutoff={}, perSandboxTimeout={})",
+            + " (cutoff={}, graceDays={}, perSandboxTimeout={})",
         expired.size(),
-        startOfToday,
+        cutoff,
+        autodeletionGraceDays,
         perSandboxTimeout);
 
     for (SandboxInstance sandbox : expired) {
       CompletableFuture<Boolean> future = null;
       try {
-        future = sandboxService.destroyExpiredSandbox(sandbox.getId(), startOfToday).toCompletableFuture();
+        future =
+            sandboxService.destroyExpiredSandbox(sandbox.getId(), cutoff).toCompletableFuture();
         boolean destroyed =
             Boolean.TRUE.equals(future.get(perSandboxTimeout.toMillis(), TimeUnit.MILLISECONDS));
         if (destroyed) {

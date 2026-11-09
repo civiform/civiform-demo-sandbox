@@ -43,6 +43,8 @@ public class SandboxController extends Controller {
   private final PinAttemptLimiter pinAttemptLimiter;
   /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
   private final String sandboxBaseDomain;
+  /** Days after expiry before DestroyExpiredSandboxesJob automatically deletes a sandbox. */
+  private final long autodeletionGraceDays;
 
   @Inject
   public SandboxController(
@@ -59,7 +61,12 @@ public class SandboxController extends Controller {
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
-    this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
+    checkNotNull(config);
+    this.sandboxBaseDomain = config.getString("sandbox.domain");
+    this.autodeletionGraceDays =
+        config.hasPath("sandbox.autodeletionGraceDays")
+            ? Math.max(0L, config.getLong("sandbox.autodeletionGraceDays"))
+            : durablejobs.jobs.DestroyExpiredSandboxesJob.DEFAULT_AUTODELETION_GRACE_DAYS;
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). */
@@ -73,7 +80,7 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
-      SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
+      SandboxListViewModel model = SandboxListViewModel.of(sandboxes, autodeletionGraceDays);
       Result result = ok(listView.render(request, model)).as("text/html");
 
       if (readyId != null && !readyId.isEmpty()) {

@@ -170,6 +170,10 @@ public final class DurableJobModule extends AbstractModule {
             ? java.time.Duration.ofMinutes(
                 Math.max(1, config.getInt("durable_jobs.destroy_sandbox_timeout_minutes")))
             : DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT;
+    long autodeletionGraceDays =
+        config.hasPath("sandbox.autodeletionGraceDays")
+            ? Math.max(0L, config.getLong("sandbox.autodeletionGraceDays"))
+            : DestroyExpiredSandboxesJob.DEFAULT_AUTODELETION_GRACE_DAYS;
 
     durableJobRegistry.register(
         DurableJobName.DESTROY_EXPIRED_SANDBOXES,
@@ -181,7 +185,8 @@ public final class DurableJobModule extends AbstractModule {
                 sandboxServiceProvider.get(),
                 slackAlertClientProvider.get(),
                 persistedDurableJob,
-                destroySandboxTimeout),
+                destroySandboxTimeout,
+                autodeletionGraceDays),
         new RecurringJobExecutionTimeResolvers.Daily2Am());
 
     durableJobRegistry.register(

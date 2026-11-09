@@ -23,9 +23,6 @@ public class SandboxRowViewModel {
   private static final DateTimeFormatter ISO_DATE_FMT =
       DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
 
-  /** Days after expiry before autodeletion runs. */
-  private static final long AUTODELETION_GRACE_DAYS = 7;
-
   /** The underlying sandbox. */
   SandboxInstance sandbox;
 
@@ -53,16 +50,22 @@ public class SandboxRowViewModel {
   /** Days until autodeletion (only meaningful when expired). 0 = imminent. */
   long autoDeletionDays;
 
-  public static SandboxRowViewModel of(SandboxInstance sandbox) {
-    long days = ChronoUnit.DAYS.between(Instant.now(), sandbox.getExpiresAt());
+  public static SandboxRowViewModel of(SandboxInstance sandbox, long autodeletionGraceDays) {
+    return of(sandbox, autodeletionGraceDays, Instant.now());
+  }
+
+  public static SandboxRowViewModel of(
+      SandboxInstance sandbox, long autodeletionGraceDays, Instant now) {
+    long clampedGraceDays = Math.max(0L, autodeletionGraceDays);
+    long days = ChronoUnit.DAYS.between(now, sandbox.getExpiresAt());
     boolean isDeleted = sandbox.getStatus() == SandboxStatus.DELETED;
     String deletedFmt = isDeleted && sandbox.getDeletedAt() != null
         ? DISPLAY_FMT.format(sandbox.getDeletedAt())
         : null;
     boolean isProv = sandbox.getStatus() == SandboxStatus.PROVISIONING;
     long autoDeleteDays = days < 0
-        ? Math.max(0, AUTODELETION_GRACE_DAYS + days)
-        : AUTODELETION_GRACE_DAYS;
+        ? Math.max(0L, clampedGraceDays + days)
+        : clampedGraceDays;
     return new SandboxRowViewModel(
         sandbox,
         Math.max(days, 0),
