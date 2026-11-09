@@ -1158,15 +1158,26 @@ public class SandboxControllerTest extends WithApplication {
 
   @Test
   public void negativeAutodeletionGraceDays_failsApplicationStartup() {
+    // Mock SandboxService like the rest of this class: the real DockerSandboxService is an eager
+    // singleton that connects to Postgres, which would fail first in CI (no database) and mask
+    // the config validation this test is about.
+    SandboxService mockService = mock(SandboxService.class);
+    Application badApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", -3)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(mockService);
+                  }
+                })
+            .build();
+
     org.assertj.core.api.Assertions.assertThatThrownBy(
-            () -> {
-              Application badApp =
-                  new GuiceApplicationBuilder()
-                      .configure("sandbox.autodeletionGraceDays", -3)
-                      .build();
-              // Force controller construction, which needs SandboxLifecycleConfig.
-              badApp.injector().instanceOf(SandboxController.class);
-            })
+            // Constructing the controller requires SandboxLifecycleConfig, which validates.
+            () -> badApp.injector().instanceOf(SandboxController.class))
+        .hasRootCauseInstanceOf(com.typesafe.config.ConfigException.BadValue.class)
         .hasStackTraceContaining("sandbox.autodeletionGraceDays");
   }
 
