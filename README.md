@@ -256,6 +256,7 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `DB_JDBC_URL` | `jdbc:postgresql://localhost:5432/sandbox_builder` | Builder metadata DB |
 | `DB_USER` | `postgres` | Builder DB user |
 | `DB_PASSWORD` | `example` | Builder DB password |
+| `DEV_TOOLS_ENABLED` | *(empty)* | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
 | `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local) or `terraform` (AWS) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | Base domain for sandbox subdomains and cookie scoping |
 | `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
