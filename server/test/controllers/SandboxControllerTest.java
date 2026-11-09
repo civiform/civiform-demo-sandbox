@@ -1074,6 +1074,10 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).contains("id=\"edit-modal\"");
     assertThat(body).contains("id=\"edit-form\"");
     assertThat(body).contains("id=\"edit-past-expiration-warning\"");
+    assertThat(body).contains("id=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("aria-describedby=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("https://github.com/civiform/civiform/releases");
+    assertThat(body).contains("or use &quot;latest&quot;.");
   }
 
   @Test

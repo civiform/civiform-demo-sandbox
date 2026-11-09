@@ -24,3 +24,6 @@ devtools.jobs.error.incomplete=Durable job {0} did not complete during this runn
 devtools.jobs.error.exception=Failed to run durable job {0}.
 devtools.jobs.flash.succeeded=Ran durable job: {0}
 devtools.jobs.flash.runningInBackground=Triggered durable job: {0} (still running in background).
+sandbox.edit.versionHint.prefix=Enter a version number from the
+sandbox.edit.versionHint.releasesLink=CiviForm releases list
+sandbox.edit.versionHint.suffix=or use "latest".
