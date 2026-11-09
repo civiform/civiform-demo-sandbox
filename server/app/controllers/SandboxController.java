@@ -24,6 +24,7 @@ import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.PinAttemptLimiter;
+import services.SandboxLifecycleConfig;
 import services.SandboxService;
 import services.UpdateSandboxRequest;
 import views.sandboxes.PinGateView;
@@ -54,19 +55,17 @@ public class SandboxController extends Controller {
       PinGateView pinGateView,
       FormFactory formFactory,
       PinAttemptLimiter pinAttemptLimiter,
-      Config config) {
+      Config config,
+      SandboxLifecycleConfig sandboxLifecycleConfig) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
-    checkNotNull(config);
-    this.sandboxBaseDomain = config.getString("sandbox.domain");
+    this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
     this.autodeletionGraceDays =
-        config.hasPath("sandbox.autodeletionGraceDays")
-            ? Math.max(0L, config.getLong("sandbox.autodeletionGraceDays"))
-            : durablejobs.jobs.DestroyExpiredSandboxesJob.DEFAULT_AUTODELETION_GRACE_DAYS;
+        checkNotNull(sandboxLifecycleConfig).getAutodeletionGraceDays();
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). */

@@ -1134,7 +1134,40 @@ public class SandboxControllerTest extends WithApplication {
           assertThat(result.status()).isEqualTo(OK);
           String body = contentAsString(result);
           assertThat(body).contains("Autodeletion in 11 days");
+          assertThat(body).contains("automatically deleted 14 days after its expiration date");
         });
+  }
+
+  @Test
+  public void index_editWarning_usesDefaultGracePeriod() {
+    SandboxInstance running = makeSandbox("sb-run1", SandboxStatus.RUNNING);
+    when(sandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(running)));
+
+    Result result =
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("GET")
+                .uri("/sandboxes")
+                .session(AuthController.SESSION_KEY, "true"));
+
+    assertThat(contentAsString(result))
+        .contains("automatically deleted 7 days after its expiration date");
+  }
+
+  @Test
+  public void negativeAutodeletionGraceDays_failsApplicationStartup() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> {
+              Application badApp =
+                  new GuiceApplicationBuilder()
+                      .configure("sandbox.autodeletionGraceDays", -3)
+                      .build();
+              // Force controller construction, which needs SandboxLifecycleConfig.
+              badApp.injector().instanceOf(SandboxController.class);
+            })
+        .hasStackTraceContaining("sandbox.autodeletionGraceDays");
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ import play.Logger;
 import play.Logger.ALogger;
 import play.inject.ApplicationLifecycle;
 import services.PersistedDurableJobRepository;
+import services.SandboxLifecycleConfig;
 import services.SandboxRepository;
 import services.SandboxService;
 import services.SlackAlertClient;
@@ -163,17 +164,15 @@ public final class DurableJobModule extends AbstractModule {
       Provider<SandboxRepository> sandboxRepositoryProvider,
       Provider<SandboxService> sandboxServiceProvider,
       Provider<PersistedDurableJobRepository> persistedDurableJobRepositoryProvider,
-      Provider<SlackAlertClient> slackAlertClientProvider) {
+      Provider<SlackAlertClient> slackAlertClientProvider,
+      SandboxLifecycleConfig sandboxLifecycleConfig) {
     DurableJobRegistry durableJobRegistry = new DurableJobRegistry();
     java.time.Duration destroySandboxTimeout =
         config.hasPath("durable_jobs.destroy_sandbox_timeout_minutes")
             ? java.time.Duration.ofMinutes(
                 Math.max(1, config.getInt("durable_jobs.destroy_sandbox_timeout_minutes")))
             : DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT;
-    long autodeletionGraceDays =
-        config.hasPath("sandbox.autodeletionGraceDays")
-            ? Math.max(0L, config.getLong("sandbox.autodeletionGraceDays"))
-            : DestroyExpiredSandboxesJob.DEFAULT_AUTODELETION_GRACE_DAYS;
+    long autodeletionGraceDays = sandboxLifecycleConfig.getAutodeletionGraceDays();
 
     durableJobRegistry.register(
         DurableJobName.DESTROY_EXPIRED_SANDBOXES,

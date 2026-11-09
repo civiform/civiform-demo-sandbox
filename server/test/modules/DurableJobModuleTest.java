@@ -160,7 +160,7 @@ public class DurableJobModuleTest {
         mock(services.PersistedDurableJobRepository.class);
     services.SlackAlertClient slackClient = mock(services.SlackAlertClient.class);
 
-    Config config = ConfigFactory.parseMap(Map.of("sandbox.autodeletionGraceDays", 10));
+    Config config = ConfigFactory.empty();
     durablejobs.DurableJobRegistry registry =
         new DurableJobModule()
             .provideRecurringDurableJobRegistry(
@@ -169,7 +169,8 @@ public class DurableJobModuleTest {
                 () -> sandboxRepository,
                 () -> sandboxService,
                 () -> jobRepo,
-                () -> slackClient);
+                () -> slackClient,
+                services.SandboxLifecycleConfig.withGraceDays(10));
 
     models.PersistedDurableJobModel jobModel =
         new models.PersistedDurableJobModel(

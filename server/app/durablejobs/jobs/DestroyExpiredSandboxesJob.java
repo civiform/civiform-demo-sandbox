@@ -19,6 +19,7 @@ import models.SandboxInstance;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import play.Logger;
 import play.Logger.ALogger;
+import services.SandboxLifecycleConfig;
 import services.SandboxRepository;
 import services.SandboxService;
 import services.SlackAlertClient;
@@ -42,7 +43,8 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
 
   public static final int MAX_DESTROY_ATTEMPTS = 3;
   public static final Duration DEFAULT_PER_SANDBOX_TIMEOUT = Duration.ofMinutes(20);
-  public static final long DEFAULT_AUTODELETION_GRACE_DAYS = 7L;
+  public static final long DEFAULT_AUTODELETION_GRACE_DAYS =
+      SandboxLifecycleConfig.DEFAULT_AUTODELETION_GRACE_DAYS;
 
   private final Clock clock;
   private final SandboxRepository sandboxRepository;
