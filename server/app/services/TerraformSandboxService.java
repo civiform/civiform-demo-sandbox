@@ -290,6 +290,9 @@ public class TerraformSandboxService implements SandboxService {
       } catch (Exception e) {
         log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
       }
+      // SeedingEngine sets SEEDING but leaves the final status to the caller.
+      // Set RUNNING so the UI status poll terminates.
+      repository.updateStatus(id, models.SandboxStatus.RUNNING);
     }
   }
 
