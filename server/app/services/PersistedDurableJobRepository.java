@@ -90,6 +90,28 @@ public class PersistedDurableJobRepository {
     }
   }
 
+  /** Inserts a new job or updates an existing job row inside a managed transaction. */
+  public PersistedDurableJobModel save(PersistedDurableJobModel job) {
+    return db.withTransaction(
+        conn -> {
+          return save(conn, job);
+        });
+  }
+
+  /** Finds a persisted durable job by primary key {@code id}, or empty if not found. */
+  public Optional<PersistedDurableJobModel> findById(long id) {
+    return db.withConnection(
+        conn -> {
+          try (PreparedStatement ps =
+              conn.prepareStatement("SELECT * FROM persisted_durable_jobs WHERE id = ?")) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+              return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
+            }
+          }
+        });
+  }
+
   /** Inserts a new job (setting its generated {@code id}) or updates an existing job row. */
   public PersistedDurableJobModel save(Connection conn, PersistedDurableJobModel job)
       throws SQLException {

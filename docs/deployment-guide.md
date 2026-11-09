@@ -424,6 +424,7 @@ A healthy rollout shows:
 | `DB_JDBC_URL` | `jdbc:postgresql://localhost:5432/sandbox_builder` | **Yes** | Builder metadata DB |
 | `DB_USER` | `postgres` | **Yes** | Builder DB user |
 | `DB_PASSWORD` | `example` | **Yes** | Builder DB password |
+| `DEV_TOOLS_ENABLED` | *(empty)* | No | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
 | `SANDBOX_RUNTIME` | `docker` | **Yes (prod)** | `docker` (local) or `terraform` (AWS) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | No | Base domain for sandboxes |
 | `AUTH0_DOMAIN` | *(empty)* | For prod | Auth0 tenant domain |

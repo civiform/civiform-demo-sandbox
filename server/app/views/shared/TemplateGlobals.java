@@ -10,4 +10,6 @@ public record TemplateGlobals(
     Optional<String> pageIntro,
     String cspNonce,
     String csrfToken,
-    Boolean isDev) {}
+    Boolean isDev,
+    Boolean isDevToolsEnabled,
+    String devToolsUrl) {}

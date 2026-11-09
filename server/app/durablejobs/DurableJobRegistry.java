@@ -4,7 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.Value;
@@ -18,7 +18,7 @@ import models.JobType;
  */
 public final class DurableJobRegistry {
 
-  private final Map<String, RegisteredJob> registeredJobs = new HashMap<>();
+  private final Map<String, RegisteredJob> registeredJobs = new LinkedHashMap<>();
 
   @Override
   public String toString() {
@@ -84,6 +84,11 @@ public final class DurableJobRegistry {
   public RegisteredJob get(DurableJobName jobName) throws JobNotFoundException {
     return Optional.ofNullable(registeredJobs.get(jobName.getJobNameString()))
         .orElseThrow(() -> new JobNotFoundException(jobName.getJobNameString()));
+  }
+
+  /** Returns all registered jobs in registration order. */
+  public ImmutableSet<RegisteredJob> getRegisteredJobs() {
+    return ImmutableSet.copyOf(registeredJobs.values());
   }
 
   /** Returns all jobs registered with a {@link JobExecutionTimeResolver}. */
