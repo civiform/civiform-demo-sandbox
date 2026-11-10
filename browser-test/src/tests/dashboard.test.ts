@@ -63,7 +63,7 @@ test.describe('Sandbox Dashboard', () => {
     await expect(page.getByRole('button', {name: /^info$/i})).not.toBeVisible()
   })
 
-  test('Options button opens modal with Extend, Reprovision, and Edit actions', async ({page}) => {
+  test('Options button opens modal with Extend, Re-provision, and Edit actions', async ({ page }) => {
     const firstRow = page.locator('tbody tr').first()
     const firstRowCity = (await firstRow.locator('td').first().innerText()).trim()
     const optionsButton = firstRow.getByRole('button', {name: /^options$/i})
@@ -74,7 +74,7 @@ test.describe('Sandbox Dashboard', () => {
       const optionsModal = page.locator('#options-modal')
       await expect(optionsModal.locator('.usa-modal__content')).toBeVisible()
       await expect(optionsModal.getByRole('button', {name: /extend/i})).toBeVisible()
-      await expect(optionsModal.getByRole('button', {name: /reprovision/i})).toBeVisible()
+      await expect(optionsModal.getByRole('button', { name: /re-provision/i })).toBeVisible()
       await expect(optionsModal.getByRole('button', {name: /edit/i})).toBeVisible()
       await validateAccessibility(page, ['table', 'footer'])
     })

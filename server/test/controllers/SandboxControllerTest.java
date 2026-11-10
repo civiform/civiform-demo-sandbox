@@ -590,51 +590,6 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
 
-  // ── GET /sandboxes/:id — detail page ─────────────────────────────────────
-
-  @Test
-  public void show_withoutAuth_redirectsToLogin() {
-    Http.RequestBuilder request = Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-show1");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(SEE_OTHER);
-    assertThat(result.redirectLocation()).contains("/login");
-  }
-
-  @Test
-  public void show_existingSandbox_returns200WithHtml() {
-    SandboxInstance sandbox = makeSandbox("sb-show1", SandboxStatus.RUNNING);
-    when(sandboxService.getSandbox("sb-show1"))
-        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
-
-    Http.RequestBuilder request =
-        Helpers.fakeRequest()
-            .method("GET")
-            .uri("/sandboxes/sb-show1")
-            .session(AuthController.SESSION_KEY, "true");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(OK);
-  }
-
-  @Test
-  public void show_missingSandbox_returns404() {
-    when(sandboxService.getSandbox("nope"))
-        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-
-    Http.RequestBuilder request =
-        Helpers.fakeRequest()
-            .method("GET")
-            .uri("/sandboxes/nope")
-            .session(AuthController.SESSION_KEY, "true");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(NOT_FOUND);
-  }
-
   // ── POST /sandboxes/:id/delete & extend ───────────────────────────────────
 
   @Test
@@ -1074,6 +1029,10 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).contains("id=\"edit-modal\"");
     assertThat(body).contains("id=\"edit-form\"");
     assertThat(body).contains("id=\"edit-past-expiration-warning\"");
+    assertThat(body).contains("id=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("aria-describedby=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("https://github.com/civiform/civiform/releases");
+    assertThat(body).contains("or use &quot;latest&quot;.");
   }
 
   @Test

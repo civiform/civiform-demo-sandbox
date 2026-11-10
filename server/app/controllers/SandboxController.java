@@ -29,8 +29,6 @@ import services.SandboxService;
 import services.UpdateSandboxRequest;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
-import views.sandboxes.SandboxDetailsView;
-import views.sandboxes.SandboxDetailsViewModel;
 import views.sandboxes.SandboxListView;
 import views.sandboxes.SandboxListViewModel;
 
@@ -38,7 +36,6 @@ public class SandboxController extends Controller {
 
   private final SandboxService sandboxService;
   private final SandboxListView listView;
-  private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
   private final PinAttemptLimiter pinAttemptLimiter;
@@ -51,7 +48,6 @@ public class SandboxController extends Controller {
   public SandboxController(
       SandboxService sandboxService,
       SandboxListView listView,
-      SandboxDetailsView detailsView,
       PinGateView pinGateView,
       FormFactory formFactory,
       PinAttemptLimiter pinAttemptLimiter,
@@ -59,7 +55,6 @@ public class SandboxController extends Controller {
       SandboxLifecycleConfig sandboxLifecycleConfig) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
-    this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
@@ -188,30 +183,10 @@ public class SandboxController extends Controller {
         .build();
   }
 
-
-  /** GET /sandboxes/:id — detail page or JSON. */
-  @AddCSRFToken
-  public CompletionStage<Result> show(Http.Request request, String id) {
-    return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
-      if (maybeSandbox.isEmpty()) {
-        return notFound("Sandbox not found: " + id);
-      }
-      SandboxInstance sandbox = maybeSandbox.get();
-      if (isJsonRequest(request)) {
-        return ok(Json.toJson(sandbox));
-      }
-      SandboxDetailsViewModel model = SandboxDetailsViewModel.builder()
-          .sandbox(sandbox)
-          .expired(sandbox.getExpiresAt().isBefore(java.time.Instant.now()))
-          .build();
-      return ok(detailsView.render(request, model)).as("text/html");
-    });
-  }
-
   /**
    * GET /sandboxes/:id/status — HTMX partial: status badge only, no layout wrapper.
    * Returns bare HTML that HTMX swaps in. Stops self-polling once
-   * RUNNING or FAILED. Auto-navigates to detail page when RUNNING.
+   * RUNNING or FAILED. Auto-navigates to sandbox list when RUNNING.
    */
   public CompletionStage<Result> statusFragment(Http.Request request, String id) {
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
