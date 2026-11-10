@@ -46,6 +46,7 @@ public class TerraformSandboxServiceTest {
 
   private SandboxRepository repository;
   private TerraformCli terraform;
+  private SeedingEngine seedingEngine;
   private Config config;
   private Path platformOutputsFile;
   private Path moduleDir;
@@ -74,6 +75,11 @@ public class TerraformSandboxServiceTest {
   public void setUp() throws IOException {
     repository = mock(SandboxRepository.class);
     terraform = mock(TerraformCli.class);
+    seedingEngine = mock(SeedingEngine.class);
+
+    // Stub seeding to succeed by default (non-fatal, returns true)
+    when(seedingEngine.seedSandbox(any(SandboxInstance.class)))
+        .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(true));
 
     platformOutputsFile = Files.createTempFile("platform-outputs", ".json");
     Files.writeString(platformOutputsFile, PLATFORM_OUTPUTS, StandardCharsets.UTF_8);
@@ -116,7 +122,7 @@ public class TerraformSandboxServiceTest {
   }
 
   private TerraformSandboxService newService() {
-    return new TerraformSandboxService(repository, config, terraform);
+    return new TerraformSandboxService(repository, config, terraform, seedingEngine);
   }
 
   private CreateSandboxRequest request() {
@@ -750,7 +756,7 @@ public class TerraformSandboxServiceTest {
         "{\"base_domain\": \"sandbox.civiform.dev\", \"rds_endpoint\": \"rds.inline.internal\"}");
 
     TerraformSandboxService service =
-        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform, seedingEngine);
 
     SandboxInstance created = service.createSandbox(request()).toCompletableFuture().get();
     assertThat(created.getUrl()).isEqualTo("https://burlington-vt.sandbox.civiform.dev");
@@ -764,7 +770,7 @@ public class TerraformSandboxServiceTest {
 
     // Better to refuse to start than to accept a sandbox creation and fail it
     // minutes later inside an apply.
-    assertThatThrownBy(() -> new TerraformSandboxService(repository, missing, terraform))
+    assertThatThrownBy(() -> new TerraformSandboxService(repository, missing, terraform, seedingEngine))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("terraform -chdir=terraform output -json");
   }
@@ -775,7 +781,7 @@ public class TerraformSandboxServiceTest {
     Files.writeString(partial, "{\"vpc_id\": {\"value\": \"vpc-123\"}}", StandardCharsets.UTF_8);
 
     TerraformSandboxService service =
-        new TerraformSandboxService(repository, config(partial), terraform);
+        new TerraformSandboxService(repository, config(partial), terraform, seedingEngine);
 
     // base_domain is read while building the sandbox URL, before any async work,
     // so an incomplete outputs file surfaces at creation rather than mid-apply.
@@ -797,7 +803,7 @@ public class TerraformSandboxServiceTest {
   public void rdsUrl_honoursAdminHostAndPortOverride() {
     TerraformSandboxService service =
         new TerraformSandboxService(
-            repository, configWithAdminOverride("host.docker.internal", 15432), terraform);
+            repository, configWithAdminOverride("host.docker.internal", 15432), terraform, seedingEngine);
 
     // The local-development case: an SSM port-forward standing in for RDS.
     assertThat(service.rdsUrl("sb_a1b2c3d4"))
@@ -809,7 +815,7 @@ public class TerraformSandboxServiceTest {
   public void adminHostOverride_doesNotChangeTheSandboxesOwnDatabaseHost() throws Exception {
     TerraformSandboxService service =
         new TerraformSandboxService(
-            repository, configWithAdminOverride("host.docker.internal", 15432), terraform);
+            repository, configWithAdminOverride("host.docker.internal", 15432), terraform, seedingEngine);
 
     // The whole reason this override exists rather than editing rds_endpoint in
     // the platform outputs file. rds_endpoint is also passed to the sandbox stack
@@ -875,7 +881,7 @@ public class TerraformSandboxServiceTest {
     values.put("sandbox.terraform.readinessTimeoutMinutes", 0);
 
     TerraformSandboxService service =
-        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform);
+        new TerraformSandboxService(repository, ConfigFactory.parseMap(values), terraform, seedingEngine);
     when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(live("123456")));
 
     assertThatThrownBy(
