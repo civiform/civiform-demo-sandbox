@@ -112,7 +112,7 @@ cf-sandbox-builder/
     │   └── views/              # Thymeleaf HTML templates + Java view models
     │       ├── layout/         # MainLayout, LoginLayout, Header, Footer
     │       ├── auth/           # LoginView
-    │       └── sandboxes/      # SandboxListView, SandboxDetailsView, PinGateView
+    │       └── sandboxes/      # SandboxListView, PinGateView
     └── test/
         ├── services/           # DockerSandboxServiceTest (25), TerraformSandboxServiceTest (37),
         │                       # SandboxRepositoryTest (21), SandboxRepositoryIntegrationTest (18),
@@ -180,7 +180,6 @@ GET  /logout                     AuthController.logout         (clear session �
 GET  /                           SandboxController.index       (redirects to /sandboxes)
 GET  /sandboxes                  SandboxController.index       (dashboard — sandbox list)
 POST /sandboxes                  SandboxController.create      (form POST → 303 to dashboard)
-GET  /sandboxes/:id              SandboxController.show        (sandbox detail page)
 GET  /sandboxes/:id/status       SandboxController.statusFragment  (HTMX polling fragment)
 POST /sandboxes/:id/delete       SandboxController.delete
 POST /sandboxes/:id/extend       SandboxController.extend      (extend expiry by N days)

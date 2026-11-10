@@ -728,54 +728,17 @@
 
             <!-- Google Analytics ID -->
             <div class="mb-6">
-              <label class="block text-sm font-bold text-gray-900 mb-1">Google Analytics ID</label>
-              <div id="info-ga-section">
-                <!-- GA configured: show ID + View in GA button + Edit in AWS link -->
-                <div id="info-ga-configured" class="hidden">
-                  <div class="flex gap-2 mb-2">
-                    <input
-                      id="info-ga-id"
-                      type="text"
-                      readonly
-                      class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-                      aria-label="Google Analytics tracking ID"
-                    />
-                    <a
-                      id="info-ga-link"
-                      href="https://analytics.google.com/"
-                      target="_blank"
-                      rel="noopener"
-                      class="usa-button whitespace-nowrap inline-flex items-center gap-1"
-                    >
-                      View in GA
-                      <svg class="usa-icon" style="width:16px;height:16px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                    </a>
-                  </div>
-                  <a
-                    id="info-ga-aws-edit-link"
-                    href="#"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
-                  >
-                    Edit in AWS
-                    <svg class="usa-icon" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                  </a>
-                </div>
-                <!-- GA not configured: show Add in AWS button -->
-                <div id="info-ga-not-configured">
-                  <a
-                    id="info-ga-aws-add-link"
-                    href="#"
-                    target="_blank"
-                    rel="noopener"
-                    class="usa-button inline-flex items-center gap-1"
-                  >
-                    Add in AWS
-                    <svg class="usa-icon" style="width:16px;height:16px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                  </a>
-                </div>
-              </div>
+              <label class="block text-sm font-bold text-gray-900 mb-1"
+                >Google Analytics ID</label
+              >
+              <input
+                id="info-ga-id"
+                type="text"
+                readonly
+                placeholder="Not configured"
+                class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
+                aria-label="Google Analytics tracking ID"
+              />
             </div>
 
             <!-- Copy All -->
@@ -1246,29 +1209,8 @@
       document.getElementById('info-url').value = url
       document.getElementById('info-pin').value = pin
       document.getElementById('info-pin').type = 'password'
-      
-      // AWS ECS console link for this sandbox's environment variables
-      var awsUrl = 'https://console.aws.amazon.com/ecs/v2/clusters'
-
-      // Google Analytics section
-      var gaConfigured = document.getElementById('info-ga-configured')
-      var gaNotConfigured = document.getElementById('info-ga-not-configured')
-      var gaInput = document.getElementById('info-ga-id')
-      if (gaId && gaId.trim() !== '') {
-        gaInput.value = gaId
-        gaConfigured.classList.remove('hidden')
-        gaNotConfigured.classList.add('hidden')
-        // Set View in GA link
-        document.getElementById('info-ga-link').href =
-          'https://analytics.google.com/analytics/web/#/?params=' + encodeURIComponent(gaId)
-        // Set Edit in AWS link
-        document.getElementById('info-ga-aws-edit-link').href = awsUrl
-      } else {
-        gaConfigured.classList.add('hidden')
-        gaNotConfigured.classList.remove('hidden')
-        // Set Add in AWS link
-        document.getElementById('info-ga-aws-add-link').href = awsUrl
-      }
+      document.getElementById('info-ga-id').value =
+        gaId && gaId.trim() !== '' ? gaId : ''
 
       openModal('info-modal')
     }
