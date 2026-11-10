@@ -1143,8 +1143,9 @@
                 role="status"
                 aria-live="polite"
                 class="hidden mt-2 mb-1 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900"
+                th:text="#{sandboxes.edit.pastExpirationWarning(${model.autodeletionGraceDays})}"
               >
-                Warning: This expiration date is in the past. Saving will mark the sandbox as expired and eligible for automatic deletion.
+                Warning: This expiration date is in the past. Saving will mark the sandbox as expired, and it will be automatically deleted 7 days after its expiration date.
               </div>
 
               <label class="usa-label" for="edit-adminEmail">

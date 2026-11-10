@@ -27,3 +27,4 @@ devtools.jobs.flash.runningInBackground=Triggered durable job: {0} (still runnin
 sandbox.edit.versionHint.prefix=Enter a version number from the
 sandbox.edit.versionHint.releasesLink=CiviForm releases list
 sandbox.edit.versionHint.suffix=or use "latest".
+sandboxes.edit.pastExpirationWarning=Warning: This expiration date is in the past. Saving will mark the sandbox as expired, and it will be automatically deleted {0,choice,0#immediately after|1#1 day after|1<{0,number,integer} days after} its expiration date.

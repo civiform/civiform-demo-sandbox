@@ -1,6 +1,7 @@
 package durablejobs.jobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.CompletableFuture;
@@ -29,11 +31,11 @@ import services.SlackAlertClient;
 /** Unit tests for {@link DestroyExpiredSandboxesJob}. */
 public class DestroyExpiredSandboxesJobTest {
 
-  // Today is 2026-08-15 UTC; startOfToday cutoff must be 2026-08-15T00:00:00Z so any sandbox
-  // that expired yesterday (2026-08-14) or earlier is selected.
+  // Today is 2026-08-15 UTC; with the default 7-day grace period, cutoff must be
+  // 2026-08-08T00:00:00Z so only sandboxes that expired on 2026-08-07 or earlier are selected.
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-08-15T02:00:00Z"), ZoneOffset.UTC);
-  private static final Instant EXPECTED_CUTOFF = Instant.parse("2026-08-15T00:00:00Z");
+  private static final Instant EXPECTED_CUTOFF = Instant.parse("2026-08-08T00:00:00Z");
 
   private SandboxRepository sandboxRepository;
   private SandboxService sandboxService;
@@ -62,13 +64,13 @@ public class DestroyExpiredSandboxesJobTest {
         .subdomain("burlington-" + id)
         .databaseName("sb_" + id.replace("-", "_"))
         .status(status)
-        .expiresAt(Instant.parse("2026-08-14T18:00:00Z"))
+        .expiresAt(Instant.parse("2026-08-07T18:00:00Z"))
         .destroyAttempts(attempts)
         .build();
   }
 
   @Test
-  public void run_usesStartOfTodayCutoffAndMaxThreeAttempts() {
+  public void run_usesDefaultSevenDayGraceCutoffAndMaxThreeAttempts() {
     when(sandboxRepository.findExpiredForDestruction(any(), anyInt()))
         .thenReturn(ImmutableList.of());
 
@@ -80,6 +82,56 @@ public class DestroyExpiredSandboxesJobTest {
     verify(sandboxService, never()).destroyExpiredSandbox(anyString(), any());
     verify(slackAlertClient, never())
         .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
+  }
+
+  @Test
+  public void run_respectsCustomAutodeletionGraceDays() {
+    when(sandboxRepository.findExpiredForDestruction(any(), anyInt()))
+        .thenReturn(ImmutableList.of());
+
+    DestroyExpiredSandboxesJob zeroDayGraceJob =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT,
+            0L);
+    zeroDayGraceJob.run();
+    verify(sandboxRepository)
+        .findExpiredForDestruction(
+            Instant.parse("2026-08-15T00:00:00Z"), DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+
+    DestroyExpiredSandboxesJob fourteenDayGraceJob =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT,
+            14L);
+    fourteenDayGraceJob.run();
+    verify(sandboxRepository)
+        .findExpiredForDestruction(
+            Instant.parse("2026-08-01T00:00:00Z"), DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+  }
+
+  @Test
+  public void constructor_rejectsNegativeAutodeletionGraceDays() {
+    assertThatThrownBy(
+            () ->
+                new DestroyExpiredSandboxesJob(
+                    FIXED_CLOCK,
+                    sandboxRepository,
+                    sandboxService,
+                    slackAlertClient,
+                    jobModel,
+                    Duration.ofMinutes(20),
+                    -1L))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("autodeletionGraceDays");
   }
 
   @Test
@@ -184,7 +236,7 @@ public class DestroyExpiredSandboxesJobTest {
             sandboxService,
             slackAlertClient,
             jobModel,
-            java.time.Duration.ofMillis(40));
+            Duration.ofMillis(40));
 
     jobWithShortTimeout.run();
 

@@ -86,6 +86,7 @@ public class TerraformSandboxService implements SandboxService {
   private final SandboxRepository repository;
   private final TerraformCli terraform;
   private final Config config;
+  private final SeedingEngine seedingEngine;
 
   private final Path moduleDir;
   private final String stateBucket;
@@ -107,21 +108,23 @@ public class TerraformSandboxService implements SandboxService {
       new ConcurrentHashMap<>();
 
   @Inject
-  public TerraformSandboxService(SandboxRepository repository, Config config) {
+  public TerraformSandboxService(SandboxRepository repository, Config config, SeedingEngine seedingEngine) {
     this(
         repository,
         config,
         new TerraformCli(
             config.getString("sandbox.terraform.binary"),
-            Duration.ofMinutes(config.getInt("sandbox.terraform.timeoutMinutes"))));
+            Duration.ofMinutes(config.getInt("sandbox.terraform.timeoutMinutes"))),
+        seedingEngine);
   }
 
   /** Test seam: accepts a stubbed {@link TerraformCli} so no Terraform binary is required. */
   protected TerraformSandboxService(
-      SandboxRepository repository, Config config, TerraformCli terraform) {
+      SandboxRepository repository, Config config, TerraformCli terraform, SeedingEngine seedingEngine) {
     this.repository = checkNotNull(repository);
     this.config = checkNotNull(config);
     this.terraform = checkNotNull(terraform);
+    this.seedingEngine = checkNotNull(seedingEngine);
 
     this.moduleDir = Path.of(config.getString("sandbox.terraform.moduleDir"));
     this.stateBucket = config.getString("sandbox.terraform.stateBucket");
@@ -270,6 +273,30 @@ public class TerraformSandboxService implements SandboxService {
           provisionDatabase(instance.getDatabaseName(), dbUser, dbPassword);
           log.info("[{}] Database created", instance.getId());
         });
+
+    // Seed demo programs only on initial creation (not reprovision/extend).
+    // CiviForm's seedProgramsInternal does not check for existing programs, so
+    // re-seeding would create duplicates.
+    String id = instance.getId();
+    if (!isDeleting(id)) {
+      try {
+        SandboxInstance readyInstance = repository.findById(id).orElse(instance);
+        boolean seeded = seedingEngine.seedSandbox(readyInstance).toCompletableFuture().get();
+        if (seeded) {
+          log.info("[{}] Demo programs seeded successfully", id);
+        } else {
+          log.warn("[{}] Seeding returned false; sandbox will run without demo programs", id);
+        }
+      } catch (Exception e) {
+        log.warn("[{}] Seeding failed (non-fatal): {}", id, e.getMessage());
+      }
+      // SeedingEngine sets SEEDING but leaves the final status to the caller.
+      // Set RUNNING so the UI status poll terminates — but only if a delete was
+      // not requested while the seed was running (mirrors applyInfrastructure).
+      if (!isDeleting(id)) {
+        repository.updateStatus(id, models.SandboxStatus.RUNNING);
+      }
+    }
   }
 
   /**

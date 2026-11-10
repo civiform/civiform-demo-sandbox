@@ -24,6 +24,7 @@ import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.PinAttemptLimiter;
+import services.SandboxLifecycleConfig;
 import services.SandboxService;
 import services.UpdateSandboxRequest;
 import views.sandboxes.PinGateView;
@@ -43,6 +44,8 @@ public class SandboxController extends Controller {
   private final PinAttemptLimiter pinAttemptLimiter;
   /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
   private final String sandboxBaseDomain;
+  /** Days after expiry before DestroyExpiredSandboxesJob automatically deletes a sandbox. */
+  private final long autodeletionGraceDays;
 
   @Inject
   public SandboxController(
@@ -52,7 +55,8 @@ public class SandboxController extends Controller {
       PinGateView pinGateView,
       FormFactory formFactory,
       PinAttemptLimiter pinAttemptLimiter,
-      Config config) {
+      Config config,
+      SandboxLifecycleConfig sandboxLifecycleConfig) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
     this.detailsView = checkNotNull(detailsView);
@@ -60,6 +64,8 @@ public class SandboxController extends Controller {
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
     this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
+    this.autodeletionGraceDays =
+        checkNotNull(sandboxLifecycleConfig).getAutodeletionGraceDays();
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). */
@@ -73,7 +79,7 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
-      SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
+      SandboxListViewModel model = SandboxListViewModel.of(sandboxes, autodeletionGraceDays);
       Result result = ok(listView.render(request, model)).as("text/html");
 
       if (readyId != null && !readyId.isEmpty()) {
@@ -215,13 +221,17 @@ public class SandboxController extends Controller {
       SandboxInstance sandbox = maybeSandbox.get();
       String status = sandbox.getStatus().name();
       boolean isRunning = "RUNNING".equals(status);
+      boolean isSeeding = "SEEDING".equals(status);
       boolean isFailed  = "FAILED".equals(status) || "DELETE_FAILED".equals(status);
       boolean isDeleted = "DELETED".equals(status);
       boolean isDone    = isRunning || isFailed || isDeleted;
 
       String badgeClass = isRunning ? "cf-badge-active"
           : isFailed ? "cf-badge-error"
+          : isSeeding ? "cf-badge-seeding"
           : "cf-badge-pending";
+
+      String displayStatus = isSeeding ? "Loading demo programs..." : status;
 
       // When still provisioning, HTMX will replace this element every 3s
       String hxAttrs = isDone ? "" :
@@ -235,7 +245,7 @@ public class SandboxController extends Controller {
           : "";
 
       String html = "<span class=\"" + badgeClass + "\"" + hxAttrs + ">"
-          + status + "</span>" + redirectScript;
+          + displayStatus + "</span>" + redirectScript;
 
       return ok(html).as("text/html");
     });
