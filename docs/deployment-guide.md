@@ -431,6 +431,7 @@ A healthy rollout shows:
 | `AUTH0_CLIENT_ID` | *(empty)* | For prod | Auth0 client ID |
 | `AUTH0_CLIENT_SECRET` | *(empty)* | For prod | Auth0 client secret |
 | `PIN_GATE_MAX_ATTEMPTS` | `5` | No | Failed PIN attempts before rate limit |
+| `AUTODELETION_GRACE_DAYS` | `7` | No | Grace period (in days) after expiration before `DestroyExpiredSandboxesJob` automatically deletes a sandbox (`sandbox.autodeletionGraceDays`) |
 
 ### Terraform Runtime (only when `SANDBOX_RUNTIME=terraform`)
 
@@ -504,6 +505,19 @@ POST /sandboxes/:id/delete
    b. DROP DATABASE IF EXISTS <db> WITH (FORCE)
    c. DROP USER IF EXISTS <db>
    d. softDelete(): status = DELETED, scrub PIN + accessToken + adminEmail
+```
+
+### Automatic Expiration & Grace-Period Deletion
+
+```
+Daily 02:00 UTC — DestroyExpiredSandboxesJob
+    │
+    ▼
+1. Compute cutoff = startOfToday - AUTODELETION_GRACE_DAYS (default: 7 days)
+2. Find RUNNING / FAILED / DELETE_FAILED sandboxes where expires_at < cutoff
+   and destroy_attempts < 3
+3. Destroy infrastructure + drop DB + mark DELETED (scrubbing PIN/token/email)
+4. On failure, mark DELETE_FAILED and alert #civiform-sre-alerts on attempt 3
 ```
 
 ### Re-Provisioning Flow

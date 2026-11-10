@@ -27,10 +27,14 @@ public class SandboxListViewModel implements BaseViewModel {
   /** Number of sandboxes expiring in ≤ 5 days (but not yet expired). */
   int expiringCount;
 
+  /** Days after expiration before a sandbox is automatically deleted. */
+  long autodeletionGraceDays;
+
   /** Convenience factory — builds from a raw sandbox list. */
-  public static SandboxListViewModel of(ImmutableList<SandboxInstance> instances) {
+  public static SandboxListViewModel of(
+      ImmutableList<SandboxInstance> instances, long autodeletionGraceDays) {
     ImmutableList<SandboxRowViewModel> rows = instances.stream()
-        .map(SandboxRowViewModel::of)
+        .map(instance -> SandboxRowViewModel.of(instance, autodeletionGraceDays))
         .collect(ImmutableList.toImmutableList());
 
     int total    = rows.size();
@@ -50,6 +54,7 @@ public class SandboxListViewModel implements BaseViewModel {
         .totalCount(total)
         .activeCount(active)
         .expiringCount(expiring)
+        .autodeletionGraceDays(autodeletionGraceDays)
         .build();
   }
 }

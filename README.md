@@ -261,6 +261,7 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | Base domain for sandbox subdomains and cookie scoping |
 | `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
 | `PIN_GATE_MAX_ATTEMPTS` | `5` | Max failed PIN guesses before rate limiting (10-min window) |
+| `AUTODELETION_GRACE_DAYS` | `7` | Grace period (in days) after sandbox expiration before `DestroyExpiredSandboxesJob` automatically deletes it (`sandbox.autodeletionGraceDays`) |
 | `AUTH0_DOMAIN` | *(empty)* | Auth0 tenant domain (e.g. `civiform-sandbox-builder.us.auth0.com`) |
 | `AUTH0_CLIENT_ID` | *(empty)* | Auth0 application Client ID |
 | `AUTH0_CLIENT_SECRET` | *(empty)* | Auth0 application Client Secret |

@@ -1098,6 +1098,89 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
   }
 
+  @Test
+  public void index_expiredRow_rendersConfiguredAutodeletionGraceDays() {
+    SandboxService customSandboxService = mock(SandboxService.class);
+    SandboxInstance expiredThreeDaysAgo =
+        makeSandbox("sb-exp1", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.now().minus(Duration.ofDays(3)).minus(Duration.ofHours(2)))
+            .build();
+    when(customSandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(expiredThreeDaysAgo)));
+
+    Application customApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", 14)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(customSandboxService);
+                  }
+                })
+            .build();
+
+    Helpers.running(
+        customApp,
+        () -> {
+          Http.RequestBuilder request =
+              Helpers.fakeRequest()
+                  .method("GET")
+                  .uri("/sandboxes")
+                  .session(AuthController.SESSION_KEY, "true");
+
+          Result result = Helpers.route(customApp, request);
+
+          assertThat(result.status()).isEqualTo(OK);
+          String body = contentAsString(result);
+          assertThat(body).contains("Autodeletion in 11 days");
+          assertThat(body).contains("automatically deleted 14 days after its expiration date");
+        });
+  }
+
+  @Test
+  public void index_editWarning_usesDefaultGracePeriod() {
+    SandboxInstance running = makeSandbox("sb-run1", SandboxStatus.RUNNING);
+    when(sandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(running)));
+
+    Result result =
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("GET")
+                .uri("/sandboxes")
+                .session(AuthController.SESSION_KEY, "true"));
+
+    assertThat(contentAsString(result))
+        .contains("automatically deleted 7 days after its expiration date");
+  }
+
+  @Test
+  public void negativeAutodeletionGraceDays_failsApplicationStartup() {
+    // Mock SandboxService like the rest of this class: the real DockerSandboxService is an eager
+    // singleton that connects to Postgres, which would fail first in CI (no database) and mask
+    // the config validation this test is about.
+    SandboxService mockService = mock(SandboxService.class);
+    Application badApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", -3)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(mockService);
+                  }
+                })
+            .build();
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            // Constructing the controller requires SandboxLifecycleConfig, which validates.
+            () -> badApp.injector().instanceOf(SandboxController.class))
+        .hasRootCauseInstanceOf(com.typesafe.config.ConfigException.BadValue.class)
+        .hasStackTraceContaining("sandbox.autodeletionGraceDays");
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────
 
   private SandboxInstance makeSandbox(String id, SandboxStatus status) {
