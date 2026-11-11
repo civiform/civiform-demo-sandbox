@@ -190,6 +190,10 @@ POST /sandboxes/:id/access       SandboxController.validateAccess  (PIN → cook
 
 GET  /health                     HealthCheckController.health
 GET  /ready                      HealthCheckController.ready
+
+GET  /dev                        DevToolsController.index          (dev tools — when DEV_TOOLS_ENABLED=true)
+POST /dev/runDurableJob          DevToolsController.runDurableJob
+POST /dev/resetInMemorySandboxes DevToolsController.resetInMemorySandboxes (inmemory runtime only)
 ```
 
 ---
@@ -256,7 +260,7 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `DB_USER` | `postgres` | Builder DB user |
 | `DB_PASSWORD` | `example` | Builder DB password |
 | `DEV_TOOLS_ENABLED` | *(empty)* | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
-| `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local) or `terraform` (AWS) |
+| `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local), `terraform` (AWS), or `inmemory` (in-memory only, non-production) |
 | `FIXED_CLOCK_INSTANT` | *(empty)* | ISO-8601 instant to freeze the application `Clock` in non-production modes (`clock.fixedInstant`, e.g. `2026-10-01T12:00:00Z` for deterministic test dates) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | Base domain for sandbox subdomains and cookie scoping |
 | `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
@@ -315,9 +319,9 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `SandboxRepositoryTest` | 21 | DB CRUD, stale state reconciliation |
 | `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via `docker compose` (`bin/run-dev`); excluded from default `sbt test` |
 | `PinAttemptLimiterTest` | 9 | Rate limiting logic |
-| `InMemorySandboxServiceTest` | 6 | In-memory stub |
+| `InMemorySandboxServiceTest` | 9 | In-memory runtime, sorting, clock timestamps, seed reset |
+| `MainModuleTest` | 7 | Runtime selector, fixed clock binding, prod guards |
 | `AuthFilterTest` | 5 | Route protection |
-| `MainModuleTest` | 4 | Fixed clock binding and prod guard |
 
 Unit tests use a testable subclass of `DockerSandboxService` that injects a Mockito mock —
 no real Docker socket required in CI.
