@@ -49,7 +49,6 @@ public final class DurableJobModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(Clock.class).toInstance(Clock.systemUTC());
     bind(DurableJobRunnerScheduler.class).asEagerSingleton();
   }
 

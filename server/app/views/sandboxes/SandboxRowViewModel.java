@@ -50,10 +50,6 @@ public class SandboxRowViewModel {
   /** Days until autodeletion (only meaningful when expired). 0 = imminent. */
   long autoDeletionDays;
 
-  public static SandboxRowViewModel of(SandboxInstance sandbox, long autodeletionGraceDays) {
-    return of(sandbox, autodeletionGraceDays, Instant.now());
-  }
-
   public static SandboxRowViewModel of(
       SandboxInstance sandbox, long autodeletionGraceDays, Instant now) {
     long clampedGraceDays = Math.max(0L, autodeletionGraceDays);
