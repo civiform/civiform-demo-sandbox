@@ -1,6 +1,10 @@
 <style>
   /* Remove default USWDS table top margin so it sits flush in the card */
   .usa-table { margin-top: 0; }
+  /* Disable modal opacity fade transition so axe-core audits see full contrast immediately */
+  .usa-modal-wrapper { transition: none !important; }
+  /* WCAG AA gray badge background (7.56:1 with white text) */
+  .bg-gray-600 { background-color: rgb(75 85 99); }
 </style>
 <div th:fragment="content" class="grid-container py-8">
   <!-- Page Header -->
@@ -106,7 +110,7 @@
     <!-- Empty state -->
     <div
       th:if="${model.sandboxes.isEmpty()}"
-      class="text-center py-16 text-gray-400"
+      class="text-center py-16 text-gray-600"
     >
       <p class="text-5xl mb-4">🏛️</p>
       <p class="text-lg font-medium text-gray-600">No demos yet</p>
@@ -131,7 +135,6 @@
       <tbody>
         <tr
           th:each="sb : ${model.sandboxes}"
-          th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
           th:id="|sandbox-row-${sb.sandbox.id}|"
           th:attr="
             hx-get=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '/sandboxes' : null},
@@ -142,8 +145,7 @@
         >
           <!-- Civic entity name -->
           <td
-            class="text-gray-900"
-            th:classappend="${sb.deleted} ? '' : 'font-semibold'"
+            th:classappend="${sb.deleted} ? 'text-gray-600' : 'text-gray-900 font-semibold'"
             th:data-sort-value="${sb.cityName}"
             th:text="${sb.cityName}"
           >
@@ -153,7 +155,7 @@
           <!-- Status badge -->
           <td
             th:data-sort-value="${sb.sandbox.status.name() != 'RUNNING' ? sb.sandbox.status.name() : (sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : 'RUNNING'))}"
-            data-status
+            th:data-status="${sb.sandbox.status.name()}"
             >
             <span
               th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
@@ -182,7 +184,7 @@
             </span>
             <span
               th:if="${sb.deleted}"
-              class="usa-tag bg-gray-400 text-white"
+              class="usa-tag bg-gray-600 text-white"
             >
               DELETED
             </span>
@@ -202,20 +204,20 @@
               </div>
             </div>
             <div th:if="${sb.daysRemaining <= 0 and !sb.deleted}">
-              <span class="font-medium text-gray-400">0 days</span>
+              <span class="font-medium text-gray-600">0 days</span>
               <div
-                class="text-xs text-gray-400 mt-0.5"
+                class="text-xs text-gray-600 mt-0.5"
                 th:text="'Expired ' + ${sb.expiryFormatted}"
               >
                 Expired Aug 18, 2026
               </div>
-              <div class="text-xs text-red-600 font-medium mt-1"
+              <div class="text-xs text-red-700 font-medium mt-1"
                    th:text="${sb.autoDeletionDays > 0} ? 'Autodeletion in ' + ${sb.autoDeletionDays} + ' days' : 'Autodeletion imminent'">
                 Autodeletion in 7 days
               </div>
             </div>
             <div th:if="${sb.deleted}">
-              <span class="font-medium text-gray-400"
+              <span class="font-medium text-gray-600"
                     th:text="'Deleted ' + ${sb.deletedFormatted}">Deleted Oct 1, 2026</span>
             </div>
           </td>
@@ -305,6 +307,8 @@
                 th:if="${sb.sandbox.status.name() != 'DELETED' and sb.sandbox.status.name() != 'DELETING'}"
                 th:data-id="${sb.sandbox.id}"
                 th:data-city-name="${sb.cityName}"
+                aria-label="Delete sandbox"
+                th:aria-label="|Delete ${sb.cityName}|"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
                 class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600"
                 th:disabled="${sb.provisioning}"
@@ -320,7 +324,7 @@
                 </svg>
               </button>
             </div>
-            <span th:if="${sb.deleted}" class="text-xs text-gray-400 italic">—</span>
+            <span th:if="${sb.deleted}" class="text-xs text-gray-600 italic">—</span>
           </td>
         </tr>
       </tbody>
@@ -364,14 +368,14 @@
             </li>
           </ol>
           <div class="usa-step-indicator__header">
-            <h4 class="usa-step-indicator__heading usa-modal__heading" id="create-modal-title">
+            <h2 class="usa-step-indicator__heading usa-modal__heading" id="create-modal-title">
               <span class="usa-step-indicator__heading-counter">
                 <span class="usa-sr-only">Step</span>
                 <span id="step-indicator-current-step" class="usa-step-indicator__current-step">1</span>
                 <span class="usa-step-indicator__total-steps">of 2</span>
               </span>
               <span id="step-indicator-heading-text" class="usa-step-indicator__heading-text">CiviForm setup</span>
-            </h4>
+            </h2>
           </div>
         </div>
 
@@ -539,7 +543,7 @@
                   >*</span
                 >
               </label>
-              <p class="text-xs text-gray-500 mt-0.5 mb-1">
+              <p class="text-xs text-gray-600 mt-0.5 mb-1">
                 Auto-filled from city name — editable.
               </p>
               <div class="flex items-center gap-0">
@@ -553,7 +557,7 @@
                   aria-required="true"
                 />
                 <span
-                  class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap"
+                  class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-600 text-sm rounded-r whitespace-nowrap"
                   >.sandbox.civiform.dev</span
                 >
               </div>
@@ -592,7 +596,7 @@
                 class="block text-sm font-bold text-gray-900 mb-1"
               >
                 Google Analytics ID
-                <span class="text-gray-400 font-normal">(optional)</span>
+                <span class="text-gray-600 font-normal">(optional)</span>
               </label>
               <input
                 id="googleAnalyticsId"
@@ -743,7 +747,7 @@
             </div>
 
             <!-- Copy All -->
-            <button id="copy-all-btn" onclick="copyAll()" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-0 py-2">
+            <button id="copy-all-btn" onclick="copyAll()" class="w-full text-center text-sm font-medium text-blue-700 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-0 py-2">
               Copy All
             </button>
           </div>
@@ -785,7 +789,7 @@
               <p>
                 Specify the number of days you want to extend this sandbox demo by.
               </p>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-gray-700">
                 Note: Extending a sandbox will make it unavailable for ~15 minutes.
               </p>
             </div>
@@ -1053,7 +1057,7 @@
               <p>
                 Modify settings for this sandbox demo.
               </p>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-gray-700">
                 Note: Updating settings will trigger a sandbox re-provisioning and make it unavailable for ~15 minutes.
               </p>
             </div>
@@ -1127,13 +1131,13 @@
               <label class="usa-label" for="edit-civiformVersion">
                 CiviForm version<span class="text-red-600" aria-hidden="true">*</span>
               </label>
-              <div id="edit-civiformVersion-hint" class="usa-hint text-xs text-gray-600 mt-1">
+              <div id="edit-civiformVersion-hint" class="usa-hint text-xs text-gray-700 mt-1">
                 <span th:text="#{sandbox.edit.versionHint.prefix}">Enter a version number from the</span>
                 <a
                   href="https://github.com/civiform/civiform/releases"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="usa-link text-blue-600 hover:underline"
+                  class="usa-link text-blue-700 hover:underline"
                   th:text="#{sandbox.edit.versionHint.releasesLink}"
                 >CiviForm releases list</a>
                 <span th:text="#{sandbox.edit.versionHint.suffix}">or use "latest".</span>
