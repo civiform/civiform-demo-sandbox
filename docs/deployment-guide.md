@@ -426,6 +426,7 @@ A healthy rollout shows:
 | `DB_PASSWORD` | `example` | **Yes** | Builder DB password |
 | `DEV_TOOLS_ENABLED` | *(empty)* | No | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
 | `SANDBOX_RUNTIME` | `docker` | **Yes (prod)** | `docker` (local) or `terraform` (AWS) |
+| `FIXED_CLOCK_INSTANT` | *(empty)* | No | ISO-8601 instant to freeze the application `Clock` in non-production modes (`clock.fixedInstant`) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | No | Base domain for sandboxes |
 | `AUTH0_DOMAIN` | *(empty)* | For prod | Auth0 tenant domain |
 | `AUTH0_CLIENT_ID` | *(empty)* | For prod | Auth0 client ID |
