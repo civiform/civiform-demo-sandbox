@@ -309,8 +309,8 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | Test Class | Count | Notes |
 |---|---|---|
 | `SandboxControllerTest` | 41 | All controller actions, validation, auth, clock injection |
-| `TerraformSandboxServiceTest` | 37 | Terraform provisioning, deletion, readiness |
-| `DockerSandboxServiceTest` | 25 | Docker socket provisioning |
+| `TerraformSandboxServiceTest` | 38 | Terraform provisioning, deletion, readiness |
+| `DockerSandboxServiceTest` | 26 | Docker socket provisioning |
 | `AuthControllerTest` | 22 | Auth0 OIDC + password fallback |
 | `SandboxRepositoryTest` | 21 | DB CRUD, stale state reconciliation |
 | `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via `docker compose` (`bin/run-dev`); excluded from default `sbt test` |

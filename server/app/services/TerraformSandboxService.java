@@ -25,6 +25,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -87,6 +88,7 @@ public class TerraformSandboxService implements SandboxService {
   private final TerraformCli terraform;
   private final Config config;
   private final SeedingEngine seedingEngine;
+  private final Clock clock;
 
   private final Path moduleDir;
   private final String stateBucket;
@@ -108,23 +110,35 @@ public class TerraformSandboxService implements SandboxService {
       new ConcurrentHashMap<>();
 
   @Inject
-  public TerraformSandboxService(SandboxRepository repository, Config config, SeedingEngine seedingEngine) {
+  public TerraformSandboxService(
+      SandboxRepository repository, Config config, SeedingEngine seedingEngine, Clock clock) {
     this(
         repository,
         config,
         new TerraformCli(
             config.getString("sandbox.terraform.binary"),
             Duration.ofMinutes(config.getInt("sandbox.terraform.timeoutMinutes"))),
-        seedingEngine);
+        seedingEngine,
+        clock);
   }
 
   /** Test seam: accepts a stubbed {@link TerraformCli} so no Terraform binary is required. */
   protected TerraformSandboxService(
       SandboxRepository repository, Config config, TerraformCli terraform, SeedingEngine seedingEngine) {
+    this(repository, config, terraform, seedingEngine, Clock.systemUTC());
+  }
+
+  protected TerraformSandboxService(
+      SandboxRepository repository,
+      Config config,
+      TerraformCli terraform,
+      SeedingEngine seedingEngine,
+      Clock clock) {
     this.repository = checkNotNull(repository);
     this.config = checkNotNull(config);
     this.terraform = checkNotNull(terraform);
     this.seedingEngine = checkNotNull(seedingEngine);
+    this.clock = checkNotNull(clock);
 
     this.moduleDir = Path.of(config.getString("sandbox.terraform.moduleDir"));
     this.stateBucket = config.getString("sandbox.terraform.stateBucket");
@@ -174,6 +188,7 @@ public class TerraformSandboxService implements SandboxService {
 
     String baseDomain = platformOutput("base_domain").asText();
     String url = "https://" + request.getSubdomain() + "." + baseDomain;
+    Instant now = clock.instant();
 
     SandboxInstance instance =
         SandboxInstance.builder()
@@ -190,8 +205,8 @@ public class TerraformSandboxService implements SandboxService {
             .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .databaseName(databaseName)
             .listenerPriority(listenerPriority)
-            .createdAt(Instant.now())
-            .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
+            .createdAt(now)
+            .expiresAt(now.plus(Duration.ofDays(request.getExpirationDays())))
             .build();
 
     // Persisted before any async work so the PIN and URL are shown to the sales rep
@@ -522,7 +537,7 @@ public class TerraformSandboxService implements SandboxService {
       return;
     }
 
-    repository.softDelete(id, Instant.now());
+    repository.softDelete(id, clock.instant());
   }
 
   /**
@@ -565,7 +580,7 @@ public class TerraformSandboxService implements SandboxService {
           e);
     }
 
-    repository.softDelete(id, Instant.now());
+    repository.softDelete(id, clock.instant());
   }
 
   /**
@@ -611,7 +626,7 @@ public class TerraformSandboxService implements SandboxService {
               || existing.getStatus() == SandboxStatus.DELETED) {
             return Optional.empty();
           }
-          Instant now = Instant.now();
+          Instant now = clock.instant();
           Instant base = existing.getExpiresAt().isBefore(now) ? now : existing.getExpiresAt();
           Instant extended = base.plus(Duration.ofDays(days));
 
@@ -670,7 +685,7 @@ public class TerraformSandboxService implements SandboxService {
           // An expired or torn-down sandbox must not be reachable even with the right PIN.
           if (sandbox.getStatus() == SandboxStatus.DELETED
               || sandbox.getStatus() == SandboxStatus.DELETING
-              || sandbox.getExpiresAt().isBefore(Instant.now())) {
+              || sandbox.getExpiresAt().isBefore(clock.instant())) {
             return Optional.<SandboxInstance>empty();
           }
 

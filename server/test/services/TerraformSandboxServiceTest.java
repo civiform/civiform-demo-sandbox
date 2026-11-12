@@ -16,7 +16,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -218,6 +220,25 @@ public class TerraformSandboxServiceTest {
 
     long days = ChronoUnit.DAYS.between(created.getCreatedAt(), created.getExpiresAt());
     assertThat(days).isEqualTo(30);
+  }
+
+  @Test
+  public void fixedClock_anchorsCreatedAtExpiresAtAndPinExpiry() throws Exception {
+    Instant frozenNow = Instant.parse("2026-10-01T12:00:00Z");
+    Clock fixedClock = Clock.fixed(frozenNow, ZoneOffset.UTC);
+    TerraformSandboxService clockedService =
+        new TerraformSandboxService(repository, config, terraform, seedingEngine, fixedClock);
+
+    SandboxInstance created = clockedService.createSandbox(request()).toCompletableFuture().get();
+
+    assertThat(created.getCreatedAt()).isEqualTo(frozenNow);
+    assertThat(created.getExpiresAt()).isEqualTo(frozenNow.plus(30, ChronoUnit.DAYS));
+
+    SandboxInstance expiredAtFrozenClock =
+        live("123456").toBuilder().expiresAt(frozenNow.minus(1, ChronoUnit.SECONDS)).build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(expiredAtFrozenClock));
+    assertThat(clockedService.validatePin("sb-abcd1234", "123456").toCompletableFuture().get())
+        .isEmpty();
   }
 
   // ── validatePin ─────────────────────────────────────────────────────────────

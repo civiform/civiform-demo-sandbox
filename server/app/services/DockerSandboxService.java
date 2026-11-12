@@ -18,6 +18,7 @@ import java.net.URI;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Statement;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -64,17 +65,24 @@ public class DockerSandboxService implements SandboxService {
   private final String civiformImage;
   private final String dbHost;
   private final SeedingEngine seedingEngine;
+  private final Clock clock;
 
   /** Background thread pool for async provisioning (separate from Play HTTP pool). */
   private final Executor provisioningPool = Executors.newCachedThreadPool();
 
   @Inject
   public DockerSandboxService(
-      SandboxRepository repository, Database db, WSClient ws, Config config, SeedingEngine seedingEngine) {
+      SandboxRepository repository,
+      Database db,
+      WSClient ws,
+      Config config,
+      SeedingEngine seedingEngine,
+      Clock clock) {
     this.repository = checkNotNull(repository);
     this.db = checkNotNull(db);
     this.ws = checkNotNull(ws);
     this.seedingEngine = checkNotNull(seedingEngine);
+    this.clock = checkNotNull(clock);
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = buildDockerClient(config.getString("docker.socketPath"));
@@ -95,10 +103,22 @@ public class DockerSandboxService implements SandboxService {
       Config config,
       DockerClient dockerClient,
       SeedingEngine seedingEngine) {
+    this(repository, db, ws, config, dockerClient, seedingEngine, Clock.systemUTC());
+  }
+
+  protected DockerSandboxService(
+      SandboxRepository repository,
+      Database db,
+      WSClient ws,
+      Config config,
+      DockerClient dockerClient,
+      SeedingEngine seedingEngine,
+      Clock clock) {
     this.repository = checkNotNull(repository);
     this.db = checkNotNull(db);
     this.ws = checkNotNull(ws);
     this.seedingEngine = checkNotNull(seedingEngine);
+    this.clock = checkNotNull(clock);
     this.civiformImage = config.getString("sandbox.civiformImage");
     this.dbHost = config.getString("sandbox.dbHost");
     this.dockerClient = checkNotNull(dockerClient);
@@ -163,6 +183,7 @@ public class DockerSandboxService implements SandboxService {
 
     // Allocate port atomically via Postgres sequence (thread-safe)
     int hostPort = repository.nextPort();
+    Instant now = clock.instant();
 
     SandboxInstance instance =
         SandboxInstance.builder()
@@ -179,8 +200,8 @@ public class DockerSandboxService implements SandboxService {
             .googleAnalyticsUrl(request.getGoogleAnalyticsUrl())
             .hostPort(hostPort)
             .databaseName(databaseName)
-            .createdAt(Instant.now())
-            .expiresAt(Instant.now().plus(Duration.ofDays(request.getExpirationDays())))
+            .createdAt(now)
+            .expiresAt(now.plus(Duration.ofDays(request.getExpirationDays())))
             .build();
 
     // Persist before async work — PIN is visible immediately
@@ -302,7 +323,7 @@ public class DockerSandboxService implements SandboxService {
           // Keep the row as a scrubbed tombstone rather than deleting it: it is the audit
           // record of the demo and the only place the database name survives for
           // orphaned-resource tracking. PIN and admin email are cleared in the same update.
-          return repository.softDelete(id, Instant.now());
+          return repository.softDelete(id, clock.instant());
         },
         provisioningPool);
   }
@@ -360,7 +381,7 @@ public class DockerSandboxService implements SandboxService {
                 e);
           }
 
-          repository.softDelete(id, Instant.now());
+          repository.softDelete(id, clock.instant());
           return true;
         },
         provisioningPool);
@@ -402,7 +423,7 @@ public class DockerSandboxService implements SandboxService {
               || existing.getStatus() == SandboxStatus.DELETED) {
             return Optional.empty();
           }
-          Instant now = Instant.now();
+          Instant now = clock.instant();
           Instant base = existing.getExpiresAt().isBefore(now) ? now : existing.getExpiresAt();
           SandboxInstance extended =
               existing.toBuilder()
