@@ -22,8 +22,10 @@ import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +88,17 @@ public class DockerSandboxServiceTest {
         DockerClient injectedDockerClient,
         SeedingEngine seedingEngine) {
       super(repository, db, ws, config, injectedDockerClient, seedingEngine);
+    }
+
+    DockerSandboxServiceTestable(
+        SandboxRepository repository,
+        Database db,
+        WSClient ws,
+        Config config,
+        DockerClient injectedDockerClient,
+        SeedingEngine seedingEngine,
+        Clock clock) {
+      super(repository, db, ws, config, injectedDockerClient, seedingEngine, clock);
     }
   }
 
@@ -244,6 +257,31 @@ public class DockerSandboxServiceTest {
 
     Duration lifetime = Duration.between(result.getCreatedAt(), result.getExpiresAt());
     assertThat(lifetime.toDays()).isEqualTo(14);
+  }
+
+  @Test
+  public void fixedClock_anchorsCreatedAtExpiresAtAndDeleteTimestamp()
+      throws ExecutionException, InterruptedException {
+    Instant frozenNow = Instant.parse("2026-10-01T12:00:00Z");
+    Clock fixedClock = Clock.fixed(frozenNow, ZoneOffset.UTC);
+    DockerSandboxServiceTestable clockedService =
+        new DockerSandboxServiceTestable(
+            repository, db, ws, config, dockerClient, seedingEngine, fixedClock);
+    stubSuccessfulContainerLaunch("container-clock");
+
+    SandboxInstance created =
+        clockedService.createSandbox(makeRequest("Burlington, VT")).toCompletableFuture().get();
+
+    assertThat(created.getCreatedAt()).isEqualTo(frozenNow);
+    assertThat(created.getExpiresAt()).isEqualTo(frozenNow.plus(Duration.ofDays(30)));
+
+    SandboxInstance toDelete = makeSandboxWithContainer("sb-clock-del", "container-clock");
+    when(repository.findById("sb-clock-del")).thenReturn(Optional.of(toDelete));
+    when(repository.softDelete("sb-clock-del", frozenNow)).thenReturn(true);
+    stubDockerStop("container-clock");
+
+    assertThat(clockedService.deleteSandbox("sb-clock-del").toCompletableFuture().get()).isTrue();
+    verify(repository).softDelete("sb-clock-del", frozenNow);
   }
 
   // ── concurrent port allocation (thread-safety) ────────────────────────────

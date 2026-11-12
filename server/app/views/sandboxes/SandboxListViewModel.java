@@ -1,6 +1,7 @@
 package views.sandboxes;
 
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Value;
 import models.SandboxInstance;
@@ -30,11 +31,11 @@ public class SandboxListViewModel implements BaseViewModel {
   /** Days after expiration before a sandbox is automatically deleted. */
   long autodeletionGraceDays;
 
-  /** Convenience factory — builds from a raw sandbox list. */
+  /** Convenience factory — builds from a raw sandbox list at the given instant. */
   public static SandboxListViewModel of(
-      ImmutableList<SandboxInstance> instances, long autodeletionGraceDays) {
+      ImmutableList<SandboxInstance> instances, long autodeletionGraceDays, Instant now) {
     ImmutableList<SandboxRowViewModel> rows = instances.stream()
-        .map(instance -> SandboxRowViewModel.of(instance, autodeletionGraceDays))
+        .map(instance -> SandboxRowViewModel.of(instance, autodeletionGraceDays, now))
         .collect(ImmutableList.toImmutableList());
 
     int total    = rows.size();

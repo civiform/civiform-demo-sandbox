@@ -115,4 +115,19 @@ public class PinAttemptLimiterTest {
   public void rejectsANonPositiveWindow() {
     new PinAttemptLimiter(3, Duration.ZERO, new MutableClock());
   }
+
+  @Test
+  public void injectConstructor_usesProvidedClockForWindowAgeing() {
+    MutableClock clock = new MutableClock();
+    com.typesafe.config.Config config =
+        com.typesafe.config.ConfigFactory.parseString(
+            "sandbox.pinGate.maxAttempts = 1\nsandbox.pinGate.window = 10 minutes\n");
+    PinAttemptLimiter limiter = new PinAttemptLimiter(config, clock);
+
+    assertThat(limiter.tryAttempt("sb-1")).isEmpty();
+    assertThat(limiter.tryAttempt("sb-1")).contains(Duration.ofMinutes(10));
+
+    clock.advance(Duration.ofMinutes(10));
+    assertThat(limiter.tryAttempt("sb-1")).isEmpty();
+  }
 }

@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
 import com.typesafe.config.Config;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ public class SandboxController extends Controller {
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
   private final PinAttemptLimiter pinAttemptLimiter;
+  private final Clock clock;
   /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
   private final String sandboxBaseDomain;
   /** Days after expiry before DestroyExpiredSandboxesJob automatically deletes a sandbox. */
@@ -51,6 +53,7 @@ public class SandboxController extends Controller {
       PinGateView pinGateView,
       FormFactory formFactory,
       PinAttemptLimiter pinAttemptLimiter,
+      Clock clock,
       Config config,
       SandboxLifecycleConfig sandboxLifecycleConfig) {
     this.sandboxService = checkNotNull(sandboxService);
@@ -58,6 +61,7 @@ public class SandboxController extends Controller {
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
+    this.clock = checkNotNull(clock);
     this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
     this.autodeletionGraceDays =
         checkNotNull(sandboxLifecycleConfig).getAutodeletionGraceDays();
@@ -74,7 +78,8 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
-      SandboxListViewModel model = SandboxListViewModel.of(sandboxes, autodeletionGraceDays);
+      SandboxListViewModel model =
+          SandboxListViewModel.of(sandboxes, autodeletionGraceDays, clock.instant());
       Result result = ok(listView.render(request, model)).as("text/html");
 
       if (readyId != null && !readyId.isEmpty()) {

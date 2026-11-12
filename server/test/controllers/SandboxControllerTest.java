@@ -1116,6 +1116,50 @@ public class SandboxControllerTest extends WithApplication {
   }
 
   @Test
+  public void index_computesDaysRemainingUsingInjectedClock() {
+    java.time.Clock fixedClock =
+        java.time.Clock.fixed(
+            Instant.parse("2030-05-01T12:00:00Z"), java.time.ZoneOffset.UTC);
+    SandboxService mockService = mock(SandboxService.class);
+    SandboxInstance sandbox =
+        makeSandbox("sb-clock001", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.parse("2030-05-13T12:00:00Z"))
+            .build();
+    when(mockService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(sandbox)));
+
+    Application clockApp =
+        new GuiceApplicationBuilder()
+            .configure("durable_jobs.enabled", false)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(mockService);
+                    bind(java.time.Clock.class).toInstance(fixedClock);
+                  }
+                })
+            .build();
+
+    try {
+      Result result =
+          Helpers.route(
+              clockApp,
+              Helpers.fakeRequest()
+                  .method("GET")
+                  .uri("/sandboxes")
+                  .session(AuthController.SESSION_KEY, "true"));
+
+      assertThat(result.status()).isEqualTo(OK);
+      assertThat(contentAsString(result))
+          .contains("data-sort-value=\"12\"")
+          .contains(">12 days<");
+    } finally {
+      Helpers.stop(clockApp);
+    }
+  }
+
+  @Test
   public void negativeAutodeletionGraceDays_failsApplicationStartup() {
     // Mock SandboxService like the rest of this class: the real DockerSandboxService is an eager
     // singleton that connects to Postgres, which would fail first in CI (no database) and mask

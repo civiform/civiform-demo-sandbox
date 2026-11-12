@@ -257,6 +257,7 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `DB_PASSWORD` | `example` | Builder DB password |
 | `DEV_TOOLS_ENABLED` | *(empty)* | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
 | `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local) or `terraform` (AWS) |
+| `FIXED_CLOCK_INSTANT` | *(empty)* | ISO-8601 instant to freeze the application `Clock` in non-production modes (`clock.fixedInstant`, e.g. `2026-10-01T12:00:00Z` for deterministic test dates) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | Base domain for sandbox subdomains and cookie scoping |
 | `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
 | `PIN_GATE_MAX_ATTEMPTS` | `5` | Max failed PIN guesses before rate limiting (10-min window) |
@@ -307,15 +308,16 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 
 | Test Class | Count | Notes |
 |---|---|---|
-| `SandboxControllerTest` | 40 | All controller actions, validation, auth |
-| `TerraformSandboxServiceTest` | 37 | Terraform provisioning, deletion, readiness |
-| `DockerSandboxServiceTest` | 25 | Docker socket provisioning |
+| `SandboxControllerTest` | 41 | All controller actions, validation, auth, clock injection |
+| `TerraformSandboxServiceTest` | 38 | Terraform provisioning, deletion, readiness |
+| `DockerSandboxServiceTest` | 26 | Docker socket provisioning |
 | `AuthControllerTest` | 22 | Auth0 OIDC + password fallback |
 | `SandboxRepositoryTest` | 21 | DB CRUD, stale state reconciliation |
 | `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via `docker compose` (`bin/run-dev`); excluded from default `sbt test` |
-| `PinAttemptLimiterTest` | 8 | Rate limiting logic |
+| `PinAttemptLimiterTest` | 9 | Rate limiting logic |
 | `InMemorySandboxServiceTest` | 6 | In-memory stub |
 | `AuthFilterTest` | 5 | Route protection |
+| `MainModuleTest` | 4 | Fixed clock binding and prod guard |
 
 Unit tests use a testable subclass of `DockerSandboxService` that injects a Mockito mock —
 no real Docker socket required in CI.

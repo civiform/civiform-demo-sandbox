@@ -46,6 +46,7 @@ services:
       - SLACK_SRE_ALERTS_CHANNEL
       - DEV_TOOLS_ENABLED
       - AUTODELETION_GRACE_DAYS
+      - FIXED_CLOCK_INSTANT
       # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
       # In AWS these are set on the ECS task definition, with the RDS admin
       # password sourced from Secrets Manager rather than plain env.
