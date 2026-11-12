@@ -1458,36 +1458,6 @@
         showCopyAlert('URL and password copied to clipboard')
       })
     }
-
-    // ── Column sort ──────────────────────────────────────────────────
-    ;(function () {
-      var table = document.querySelector('table.usa-table')
-      if (!table) return
-      var headers = table.querySelectorAll('th[data-sortable]')
-      headers.forEach(function (th, colIdx) {
-        th.style.cursor = 'pointer'
-        th.setAttribute('aria-sort', 'none')
-        th.addEventListener('click', function () {
-          var tbody = table.querySelector('tbody')
-          var rows = Array.from(tbody.querySelectorAll('tr'))
-          var asc = th.getAttribute('aria-sort') !== 'ascending'
-          // Reset all headers
-          headers.forEach(function (h) { h.setAttribute('aria-sort', 'none') })
-          th.setAttribute('aria-sort', asc ? 'ascending' : 'descending')
-          rows.sort(function (a, b) {
-            var aVal = a.children[colIdx].getAttribute('data-sort-value') || a.children[colIdx].textContent.trim()
-            var bVal = b.children[colIdx].getAttribute('data-sort-value') || b.children[colIdx].textContent.trim()
-            // Try numeric comparison
-            var aNum = parseFloat(aVal), bNum = parseFloat(bVal)
-            if (!isNaN(aNum) && !isNaN(bNum)) {
-              return asc ? aNum - bNum : bNum - aNum
-            }
-            return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-          })
-          rows.forEach(function (row) { tbody.appendChild(row) })
-        })
-      })
-    })()
   </script>
 
   <!-- ── Create Wizard JS ────────────────────────────────────────────────── -->
