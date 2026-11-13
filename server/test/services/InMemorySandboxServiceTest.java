@@ -2,6 +2,10 @@ package services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.ExecutionException;
 import models.SandboxInstance;
 import models.SandboxStatus;
@@ -10,11 +14,14 @@ import org.junit.Test;
 
 public class InMemorySandboxServiceTest {
 
+  private static final Instant FIXED_NOW = Instant.parse("2026-10-01T12:00:00Z");
+  private static final Clock FIXED_CLOCK = Clock.fixed(FIXED_NOW, ZoneOffset.UTC);
+
   private InMemorySandboxService service;
 
   @Before
   public void setUp() {
-    service = new InMemorySandboxService();
+    service = new InMemorySandboxService(FIXED_CLOCK);
   }
 
   private static CreateSandboxRequest makeRequest(String cityName, String subdomain, String pin) {
@@ -28,16 +35,34 @@ public class InMemorySandboxServiceTest {
   }
 
   @Test
-  public void listSandboxes_returnsInitialDemoSandbox() throws ExecutionException, InterruptedException {
+  public void listSandboxes_returnsInitialSeededSandboxesSortedNewestFirst()
+      throws ExecutionException, InterruptedException {
     var sandboxes = service.listSandboxes().toCompletableFuture().get();
-    assertThat(sandboxes).isNotEmpty();
-    assertThat(sandboxes.get(0).getId()).isEqualTo("sb-demo0001");
-    assertThat(sandboxes.get(0).getCityName()).isEqualTo("Burlington, VT");
-    assertThat(sandboxes.get(0).getStatus()).isEqualTo(SandboxStatus.RUNNING);
+    assertThat(sandboxes).hasSize(2);
+
+    SandboxInstance running = sandboxes.get(0);
+    assertThat(running.getId()).isEqualTo("sb-demo0001");
+    assertThat(running.getCityName()).isEqualTo("Burlington, VT");
+    assertThat(running.getStatus()).isEqualTo(SandboxStatus.RUNNING);
+    assertThat(running.getCreatedAt()).isEqualTo(FIXED_NOW.minus(Duration.ofHours(2)));
+    assertThat(running.getExpiresAt()).isEqualTo(FIXED_NOW.plus(Duration.ofDays(30)));
+
+    SandboxInstance tombstone = sandboxes.get(1);
+    assertThat(tombstone.getId()).isEqualTo("sb-demo0002");
+    assertThat(tombstone.getCityName()).isEqualTo("Springfield, IL");
+    assertThat(tombstone.getStatus()).isEqualTo(SandboxStatus.DELETED);
+    assertThat(tombstone.getPin()).isEmpty();
+    assertThat(tombstone.getAccessToken()).isEmpty();
+    assertThat(tombstone.getAdminEmail()).isEmpty();
+    assertThat(tombstone.getCreatedAt()).isEqualTo(FIXED_NOW.minus(Duration.ofDays(45)));
+    assertThat(tombstone.getExpiresAt()).isEqualTo(FIXED_NOW.minus(Duration.ofDays(15)));
+    assertThat(tombstone.getDeletedAt()).isEqualTo(FIXED_NOW.minus(Duration.ofDays(8)));
+    assertThat(service.validatePin("sb-demo0002", "").toCompletableFuture().get()).isEmpty();
   }
 
   @Test
-  public void createSandbox_createsAndRetrievesInstance() throws ExecutionException, InterruptedException {
+  public void createSandbox_createsAndRetrievesInstanceUsingInjectedClock()
+      throws ExecutionException, InterruptedException {
     SandboxInstance created = service.createSandbox(
         makeRequest("Test Sandbox", "test-sandbox", "482917")
     ).toCompletableFuture().get();
@@ -46,14 +71,21 @@ public class InMemorySandboxServiceTest {
     assertThat(created.getCityName()).isEqualTo("Test Sandbox");
     assertThat(created.getSubdomain()).isEqualTo("test-sandbox");
     assertThat(created.getPin()).isEqualTo("482917");
+    assertThat(created.getCreatedAt()).isEqualTo(FIXED_NOW);
+    assertThat(created.getExpiresAt()).isEqualTo(FIXED_NOW.plus(Duration.ofDays(30)));
 
     var retrieved = service.getSandbox(created.getId()).toCompletableFuture().get();
     assertThat(retrieved).isPresent();
     assertThat(retrieved.get().getCityName()).isEqualTo("Test Sandbox");
+
+    // Newly created sandbox (createdAt = FIXED_NOW) sorts ahead of seeded rows.
+    var all = service.listSandboxes().toCompletableFuture().get();
+    assertThat(all.get(0).getId()).isEqualTo(created.getId());
   }
 
   @Test
-  public void deleteSandbox_softDeletesInstance() throws ExecutionException, InterruptedException {
+  public void deleteSandbox_softDeletesInstanceWithClockTimestamp()
+      throws ExecutionException, InterruptedException {
     SandboxInstance created = service.createSandbox(
         makeRequest("To Delete", "to-delete", "000000")
     ).toCompletableFuture().get();
@@ -61,11 +93,11 @@ public class InMemorySandboxServiceTest {
     Boolean deleted = service.deleteSandbox(created.getId()).toCompletableFuture().get();
     assertThat(deleted).isTrue();
 
-    // Soft-delete: sandbox still exists but has DELETED status and a deletedAt timestamp
+    // Soft-delete: sandbox still exists but has DELETED status and the clock's deletedAt timestamp
     var retrieved = service.getSandbox(created.getId()).toCompletableFuture().get();
     assertThat(retrieved).isPresent();
     assertThat(retrieved.get().getStatus()).isEqualTo(SandboxStatus.DELETED);
-    assertThat(retrieved.get().getDeletedAt()).isNotNull();
+    assertThat(retrieved.get().getDeletedAt()).isEqualTo(FIXED_NOW);
 
     // The tombstone is scrubbed: no PIN or admin email retained.
     assertThat(retrieved.get().getPin()).isEmpty();
@@ -74,6 +106,26 @@ public class InMemorySandboxServiceTest {
     // Deleting a tombstone again is a no-op.
     Boolean deletedAgain = service.deleteSandbox(created.getId()).toCompletableFuture().get();
     assertThat(deletedAgain).isFalse();
+  }
+
+  @Test
+  public void resetToSeedState_removesCreatedSandboxesAndRestoresMutatedSeedRow()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance created =
+        service
+            .createSandbox(makeRequest("Ephemeral City", "ephemeral-city", "123456"))
+            .toCompletableFuture()
+            .get();
+    service.deleteSandbox("sb-demo0001").toCompletableFuture().get();
+
+    service.resetToSeedState();
+
+    assertThat(service.getSandbox(created.getId()).toCompletableFuture().get()).isEmpty();
+    SandboxInstance restored =
+        service.getSandbox("sb-demo0001").toCompletableFuture().get().orElseThrow();
+    assertThat(restored.getStatus()).isEqualTo(SandboxStatus.RUNNING);
+    assertThat(restored.getPin()).isEqualTo("482917");
+    assertThat(service.listSandboxes().toCompletableFuture().get()).hasSize(2);
   }
 
   @Test

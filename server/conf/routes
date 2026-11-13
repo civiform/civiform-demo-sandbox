@@ -34,6 +34,7 @@ POST    /sandboxes/:id/access       controllers.SandboxController.validateAccess
 # Dev Tools
 GET     /dev                        controllers.DevToolsController.index(request: Request)
 POST    /dev/runDurableJob          controllers.DevToolsController.runDurableJob(request: Request)
+POST    /dev/resetInMemorySandboxes controllers.DevToolsController.resetInMemorySandboxes(request: Request)
 
 # Trailing slash handler
 GET     /*path/                     controllers.UntrailingController.untrail(path: String)

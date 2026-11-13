@@ -12,6 +12,7 @@ import play.Environment;
 import play.Logger;
 import play.Logger.ALogger;
 import services.DockerSandboxService;
+import services.InMemorySandboxService;
 import services.SandboxRepository;
 import services.SandboxService;
 import services.SeedingEngine;
@@ -35,7 +36,7 @@ public class MainModule extends AbstractModule {
     bind(Clock.class).toInstance(clockFor(environment, config));
     bind(SandboxRepository.class).asEagerSingleton();
     bind(SeedingEngine.class).asEagerSingleton();
-    bind(SandboxService.class).to(sandboxServiceClass()).asEagerSingleton();
+    bind(SandboxService.class).to(sandboxServiceClass(environment, config)).asEagerSingleton();
   }
 
   /**
@@ -73,17 +74,21 @@ public class MainModule extends AbstractModule {
   /**
    * Selects the sandbox runtime from {@code sandbox.runtime}.
    *
-   * <p>Both implementations satisfy the same interface, so nothing above this line — controllers,
+   * <p>All implementations satisfy the same interface, so nothing above this line — controllers,
    * views, the repository — is aware of which one is bound.
    *
    * <ul>
-   *   <li>{@code docker} — launches containers through the local Docker socket. The only runtime
-   *       that works without AWS, so it remains what local development and the test suite use.
+   *   <li>{@code docker} — launches containers through the local Docker socket. The only real
+   *       runtime that works without AWS, so it remains what local development uses.
    *   <li>{@code terraform} — runs the {@code terraform/sandbox} root module per sandbox against
    *       shared AWS infrastructure.
+   *   <li>{@code inmemory} — keeps sandbox metadata in memory without launching containers or
+   *       creating per-sandbox databases. Used by browser tests; refused in Play {@code PROD} mode.
    * </ul>
    */
-  private Class<? extends SandboxService> sandboxServiceClass() {
+  @VisibleForTesting
+  static Class<? extends SandboxService> sandboxServiceClass(
+      Environment environment, Config config) {
     String runtime = config.getString("sandbox.runtime");
 
     return switch (runtime) {
@@ -95,12 +100,23 @@ public class MainModule extends AbstractModule {
         log.info("Sandbox runtime: terraform (AWS)");
         yield TerraformSandboxService.class;
       }
+      case "inmemory" -> {
+        if (environment.isProd()) {
+          throw new IllegalStateException(
+              "sandbox.runtime \"inmemory\" must not be used in production: sandbox metadata is"
+                  + " lost on restart and no infrastructure is provisioned.");
+        }
+        log.warn("Sandbox runtime: inmemory (no containers, state lost on restart)");
+        yield InMemorySandboxService.class;
+      }
       // Fail at startup rather than defaulting. A typo in SANDBOX_RUNTIME that
       // silently fell back to docker would be discovered only when a sales rep
       // created a sandbox that came up on localhost and was unreachable.
       default ->
           throw new IllegalStateException(
-              "Unknown sandbox.runtime '" + runtime + "'. Expected \"docker\" or \"terraform\".");
+              "Unknown sandbox.runtime '"
+                  + runtime
+                  + "'. Expected \"docker\", \"terraform\", or \"inmemory\".");
     };
   }
 }

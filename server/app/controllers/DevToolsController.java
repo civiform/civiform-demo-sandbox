@@ -37,7 +37,9 @@ import play.libs.Json;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import services.InMemorySandboxService;
 import services.PersistedDurableJobRepository;
+import services.SandboxService;
 import views.dev.DevToolsView;
 import views.dev.DevToolsViewModel;
 
@@ -61,6 +63,7 @@ public final class DevToolsController extends Controller {
   private final DurableJobRegistry durableJobRegistry;
   private final PersistedDurableJobRepository persistedDurableJobRepository;
   private final RecurringDurableJobRunner recurringDurableJobRunner;
+  private final SandboxService sandboxService;
   private final Clock clock;
   private final FormFactory formFactory;
   private final MessagesApi messagesApi;
@@ -86,6 +89,7 @@ public final class DevToolsController extends Controller {
       @RecurringJobsProviderName DurableJobRegistry durableJobRegistry,
       PersistedDurableJobRepository persistedDurableJobRepository,
       RecurringDurableJobRunner recurringDurableJobRunner,
+      SandboxService sandboxService,
       Clock clock,
       FormFactory formFactory,
       MessagesApi messagesApi,
@@ -95,6 +99,7 @@ public final class DevToolsController extends Controller {
     this.durableJobRegistry = checkNotNull(durableJobRegistry);
     this.persistedDurableJobRepository = checkNotNull(persistedDurableJobRepository);
     this.recurringDurableJobRunner = checkNotNull(recurringDurableJobRunner);
+    this.sandboxService = checkNotNull(sandboxService);
     this.clock = checkNotNull(clock);
     this.formFactory = checkNotNull(formFactory);
     this.messagesApi = checkNotNull(messagesApi);
@@ -207,6 +212,23 @@ public final class DevToolsController extends Controller {
             backgroundRunningResult(request, messages, resolvedJobName),
             syncWaitMillis,
             TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * POST /dev/resetInMemorySandboxes — restores {@link InMemorySandboxService} to its seeded state.
+   * Used by the browser tests between suites.
+   *
+   * <p>Returns 404 unless dev tools are enabled and the in-memory runtime is bound, so it can never
+   * touch sandboxes managed by the Docker or Terraform runtimes.
+   */
+  @RequireCSRFCheck
+  public CompletionStage<Result> resetInMemorySandboxes(Http.Request request) {
+    if (!isDevToolsEnabled(environment, config)
+        || !(sandboxService instanceof InMemorySandboxService inMemorySandboxService)) {
+      return CompletableFuture.completedFuture(notFound());
+    }
+    inMemorySandboxService.resetToSeedState();
+    return CompletableFuture.completedFuture(ok(Json.newObject().put("status", "RESET")));
   }
 
   private Result executeDurableJobNow(
