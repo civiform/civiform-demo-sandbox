@@ -15,11 +15,20 @@
  * - validateAccessibility() for axe-core
  */
 
-import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility, loginAsAdmin} from '../support'
+import {expect} from '@playwright/test'
+import {
+  test,
+  validateScreenshot,
+  validateAccessibility,
+  loginAsAdmin,
+  resetTestState,
+} from '../support'
 import {PORTAL_EMAIL, PORTAL_PASSWORD} from '../support/config'
 
 test.describe('Login Page', () => {
+  test.beforeAll(async () => {
+    await resetTestState()
+  })
 
   test.beforeEach(async ({page}) => {
     // Start each test unauthenticated

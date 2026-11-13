@@ -7,6 +7,7 @@
  */
 
 import {request} from '@playwright/test'
+import {resetTestState} from '../support'
 import {BASE_URL} from '../support/config'
 
 export default async function globalSetup(): Promise<void> {
@@ -17,6 +18,7 @@ export default async function globalSetup(): Promise<void> {
 
   console.log(`[global-setup] Waiting for server at ${healthUrl}...`)
 
+  let ready = false
   while (Date.now() - start < maxWaitMs) {
     try {
       const ctx = await request.newContext()
@@ -24,7 +26,8 @@ export default async function globalSetup(): Promise<void> {
       await ctx.dispose()
       if (response.ok()) {
         console.log(`[global-setup] Server ready (${Date.now() - start}ms)`)
-        return
+        ready = true
+        break
       }
     } catch {
       // Server not up yet — keep polling
@@ -32,8 +35,13 @@ export default async function globalSetup(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
   }
 
-  throw new Error(
-    `[global-setup] Server at ${healthUrl} did not respond within ${maxWaitMs}ms.\n` +
-      'Run ./bin/run-dev before running browser tests.',
-  )
+  if (!ready) {
+    throw new Error(
+      `[global-setup] Server at ${healthUrl} did not respond within ${maxWaitMs}ms.\n` +
+        'Run ./bin/run-browser-tests to automatically start the isolated test server.',
+    )
+  }
+
+  await resetTestState()
+  console.log('[global-setup] In-memory sandboxes reset to baseline state')
 }
