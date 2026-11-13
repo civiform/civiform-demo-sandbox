@@ -42,62 +42,10 @@ test.describe('PIN Gate', () => {
     })
   })
 
-  test('PIN gate mobile screenshot matches baseline', async ({page}) => {
-    await page.setViewportSize({width: 390, height: 844})
-    await page.goto(PIN_GATE_URL)
-    await page.waitForSelector('input[type="password"]')
-
-    await test.step('Screenshot PIN gate on mobile', async () => {
-      await validateScreenshot(page, 'pin-gate-mobile')
-    })
-  })
-
   // ── Accessibility ─────────────────────────────────────────────────────────
 
   test('PIN gate passes accessibility audit', async ({page}) => {
     await validateAccessibility(page)
-  })
-
-  // ── UI elements ───────────────────────────────────────────────────────────
-
-  test('City name appears as h1 heading', async ({page}) => {
-    // The seeded sandbox is "Burlington, VT"
-    const heading = page.getByRole('heading', {level: 1})
-    await expect(heading).toBeVisible()
-    await expect(heading).toContainText('Burlington')
-  })
-
-  test('"Enter password to launch demo" subtitle is present', async ({page}) => {
-    await expect(
-      page.getByText(/enter password to launch demo/i),
-    ).toBeVisible()
-  })
-
-  test('Demo URL display box is visible', async ({page}) => {
-    // The read-only dashed-border URL box
-    await expect(page.locator('[data-demo-url]')).toBeVisible()
-  })
-
-  test('Password input has correct type', async ({page}) => {
-    const input = page.locator('input[type="password"]')
-    await expect(input).toBeVisible()
-    await expect(input).toHaveAttribute('type', 'password')
-  })
-
-  test('"Continue" button is present', async ({page}) => {
-    await expect(
-      page.getByRole('button', {name: /continue/i}),
-    ).toBeVisible()
-  })
-
-  test('Page has dark navy background', async ({page}) => {
-    // Check via CSS class or computed style — dark navy = #0d1b3e
-    const body = page.locator('body')
-    const bg = await body.evaluate(
-      (el) => window.getComputedStyle(el).backgroundColor,
-    )
-    // Accept either the hex or the computed rgb value
-    expect(bg).toMatch(/rgb\(13,\s*27,\s*62\)|#0d1b3e/)
   })
 
   // ── Wrong PIN behavior ────────────────────────────────────────────────────

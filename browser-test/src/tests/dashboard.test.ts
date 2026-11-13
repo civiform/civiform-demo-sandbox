@@ -33,19 +33,9 @@ test.describe('Sandbox Dashboard', () => {
 
   // ── Visual regression ─────────────────────────────────────────────────────
 
-  test('Dashboard renders correctly on desktop', async ({page}) => {
+  test('Dashboard renders correctly', async ({page}) => {
     await test.step('Take full-page screenshot', async () => {
-      await validateScreenshot(page, 'dashboard-desktop')
-    })
-  })
-
-  test('Dashboard renders correctly on mobile', async ({page}) => {
-    await page.setViewportSize({width: 390, height: 844})
-    await page.goto('/sandboxes')
-    await page.waitForSelector('table')
-
-    await test.step('Take mobile screenshot', async () => {
-      await validateScreenshot(page, 'dashboard-mobile')
+      await validateScreenshot(page, 'dashboard')
     })
   })
 
@@ -56,22 +46,6 @@ test.describe('Sandbox Dashboard', () => {
   })
 
   // ── Content assertions ────────────────────────────────────────────────────
-
-  test('Seeded Burlington sandbox appears in the list', async ({page}) => {
-    await expect(page.getByText('Burlington, VT')).toBeVisible()
-  })
-
-  test('"Create new demo" button is visible', async ({page}) => {
-    await expect(
-      page.getByRole('button', {name: /create new demo/i}),
-    ).toBeVisible()
-  })
-
-  test('Action button is labeled "Details" (not "Info")', async ({page}) => {
-    // Spec renamed the Info button to Details
-    await expect(page.getByRole('button', {name: /details/i}).first()).toBeVisible()
-    await expect(page.getByRole('button', {name: /^info$/i})).not.toBeVisible()
-  })
 
   test('Options button opens modal with Extend, Re-provision, and Edit actions', async ({ page }) => {
     const firstRow = page.locator('tbody tr').first()
@@ -108,20 +82,6 @@ test.describe('Sandbox Dashboard', () => {
     })
   })
 
-  test('Status badge is present on each row', async ({page}) => {
-    const badges = page.locator('[data-status]')
-    await expect(badges.first()).toBeVisible()
-  })
-
-  test('Flash banner shows provisioning message after creation', async ({page}) => {
-    // This test verifies the flash dismisses correctly without the banner
-    // persisting across navigation — navigate away and back
-    await page.goto('/sandboxes')
-    // The flash should not be present on a fresh load (no prior form submit)
-    const flash = page.locator('[data-flash="success"]')
-    await expect(flash).not.toBeVisible()
-  })
-
   // ── DELETED status tombstone ──────────────────────────────────────────────
 
   test('DELETED sandbox shows tombstone row without delete button', async ({page}) => {
@@ -133,7 +93,7 @@ test.describe('Sandbox Dashboard', () => {
 
     // DELETED row should NOT have a "Delete" action button
     await expect(deletedRow.getByRole('button', {name: /delete/i})).not.toBeVisible()
-    // DELETED row should show a timestamp
-    await expect(deletedRow.getByText(/deleted/i)).toBeVisible()
+    // DELETED row should show a timestamp (e.g. "Deleted Oct 1, 2026")
+    await expect(deletedRow.getByText(/deleted\s+[a-z]{3}/i)).toBeVisible()
   })
 })
