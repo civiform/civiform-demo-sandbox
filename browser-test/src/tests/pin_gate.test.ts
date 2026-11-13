@@ -13,13 +13,22 @@
  * Mirrors CiviForm's security.test.ts conventions for auth-gated pages.
  */
 
-import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility} from '../support'
+import {expect} from '@playwright/test'
+import {
+  test,
+  validateScreenshot,
+  validateAccessibility,
+  resetTestState,
+} from '../support'
 import {SEEDED_SANDBOX_ID, SEEDED_SANDBOX_PIN} from '../support/config'
 
 const PIN_GATE_URL = `/sandboxes/${SEEDED_SANDBOX_ID}/access`
 
 test.describe('PIN Gate', () => {
+  test.beforeAll(async () => {
+    await resetTestState()
+  })
+
   test.beforeEach(async ({page}) => {
     await page.goto(PIN_GATE_URL)
     await page.waitForSelector('input[type="password"]')
