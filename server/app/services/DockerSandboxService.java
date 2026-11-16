@@ -706,7 +706,7 @@ public class DockerSandboxService implements SandboxService {
                 "APPLICANT_OIDC_CLIENT_SECRET=bar",
                 "APPLICANT_OIDC_CLIENT_ID=generic-fake-oidc-client",
                 "WHITELABEL_CIVIC_ENTITY_SHORT_NAME=" + cityName,
-                "WHITELABEL_CIVIC_ENTITY_LONG_NAME=" + cityName,
+                "WHITELABEL_CIVIC_ENTITY_FULL_NAME=" + cityName,
                 "BANNER_TYPE=demo",
                 "DEMO_BANNER_EXPIRATION_DATE=" + expirationDate,
                 "STAGING_ADMIN_LIST=" + (adminEmail != null ? adminEmail : ""),

@@ -325,7 +325,7 @@ public class EcsFargateSandboxService implements SandboxService {
                     "https://dev-oidc.sandbox.civiform.dev/.well-known/openid-configuration"),
                 // City branding — shows city name in CiviForm header
                 envVar("WHITELABEL_CIVIC_ENTITY_SHORT_NAME", instance.getCityName()),
-                envVar("WHITELABEL_CIVIC_ENTITY_LONG_NAME", instance.getCityName()),
+                envVar("WHITELABEL_CIVIC_ENTITY_FULL_NAME", instance.getCityName()),
                 // Per-sandbox URL — each sandbox has its own subdomain
                 envVar("BASE_URL", sandboxUrl),
                 envVar("STAGING_HOSTNAME", sandboxUrl.replace("https://", "")),
