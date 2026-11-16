@@ -338,7 +338,7 @@
     <div class="usa-modal-overlay" onclick="closeModal('create-modal')">
       <div
         class="bg-white rounded-xl shadow-xl max-w-lg relative inline-flex flex-col align-middle text-left"
-        style="max-height: 85vh; overflow-y: auto; width: calc(100% - 0.5rem)"
+        style="max-height: 85vh; overflow: visible; width: calc(100% - 0.5rem)"
         onclick="event.stopPropagation()"
       >
       <!-- Close X -->
@@ -354,7 +354,7 @@
 
       <div class="usa-modal__main px-6 pt-6 pb-6">
         <!-- Step Indicator -->
-        <div class="usa-step-indicator usa-step-indicator--counters-sm mb-5" aria-label="progress">
+        <div class="usa-step-indicator mb-5" aria-label="progress">
           <ol class="usa-step-indicator__segments">
             <li id="step-indicator-1" class="usa-step-indicator__segment usa-step-indicator__segment--current">
               <span class="usa-step-indicator__segment-label">CiviForm setup</span>
@@ -375,13 +375,17 @@
           </div>
         </div>
 
-        <!-- Inline validation error -->
+        <!-- Inline validation error (USWDS slim error alert) -->
         <div
           id="create-wizard-error"
+          class="usa-alert usa-alert--error usa-alert--slim hidden mb-4"
           role="alert"
           aria-live="polite"
-          class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
-        ></div>
+        >
+          <div class="usa-alert__body">
+            <p class="usa-alert__text" id="create-wizard-error-text"></p>
+          </div>
+        </div>
 
         <!-- Wizard Form -->
         <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
@@ -399,10 +403,10 @@
             </p>
 
             <!-- Civic entity -->
-            <div class="mb-5" id="fg-cityName">
+            <div class="usa-form-group mb-5" id="fg-cityName">
               <label
                 for="cityName"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Civic entity<span class="text-red-600" aria-hidden="true"
                   >*</span
@@ -412,56 +416,18 @@
                 id="cityName"
                 name="cityName"
                 type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                class="usa-input"
                 placeholder="e.g. Bloomington"
                 autocomplete="off"
                 aria-required="true"
               />
             </div>
 
-            <!-- Logo / seal -->
-            <div class="mb-5">
-              <p class="text-sm font-bold text-gray-900 mb-2">
-                Logo / seal<span class="text-red-600" aria-hidden="true"
-                  >*</span
-                >
-              </p>
-              <div class="flex flex-col gap-2">
-                <label
-                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="logoType"
-                    value="default"
-                    checked
-                    class="accent-blue-700"
-                  />
-                  Default (Preview:
-                  <span
-                    class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold"
-                    >C</span
-                  >)
-                </label>
-                <label
-                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="logoType"
-                    value="custom"
-                    class="accent-blue-700"
-                  />
-                  Custom
-                </label>
-              </div>
-            </div>
-
             <!-- Expiration limit (days) -->
-            <div class="mb-6" id="fg-expirationDays">
+            <div class="usa-form-group mb-6" id="fg-expirationDays">
               <label
                 for="expirationDays"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Expiration limit (days)<span
                   class="text-red-600"
@@ -473,7 +439,7 @@
                 id="expirationDays"
                 name="expirationDays"
                 type="number"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                class="usa-input"
                 value="30"
                 min="1"
                 max="365"
@@ -505,10 +471,10 @@
             </p>
 
             <!-- Admin Notification Email -->
-            <div class="mb-5" id="fg-adminEmail">
+            <div class="usa-form-group mb-5" id="fg-adminEmail">
               <label
                 for="adminEmail"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Admin notification email<span
                   class="text-red-600"
@@ -520,7 +486,7 @@
                 id="adminEmail"
                 name="adminEmail"
                 type="email"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                class="usa-input"
                 placeholder="e.g. civiform-dev@exygy.com"
                 autocomplete="email"
                 aria-required="true"
@@ -528,10 +494,10 @@
             </div>
 
             <!-- Subdomain -->
-            <div class="mb-5" id="fg-subdomain">
+            <div class="usa-form-group mb-5" id="fg-subdomain">
               <label
                 for="subdomain"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Demo instance subdomain<span
                   class="text-red-600"
@@ -539,18 +505,19 @@
                   >*</span
                 >
               </label>
-              <p class="text-xs text-gray-500 mt-0.5 mb-1">
+              <span class="usa-hint" id="subdomain-hint">
                 Auto-filled from city name — editable.
-              </p>
+              </span>
               <div class="flex items-center gap-0">
                 <input
                   id="subdomain"
                   name="subdomain"
                   type="text"
-                  class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm"
+                  class="usa-input flex-1 rounded-l rounded-r-none"
                   placeholder="e.g. bloomington"
                   autocomplete="off"
                   aria-required="true"
+                  aria-describedby="subdomain-hint"
                 />
                 <span
                   class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap"
@@ -560,10 +527,10 @@
             </div>
 
             <!-- PIN -->
-            <div class="mb-5" id="fg-pin">
+            <div class="usa-form-group mb-5" id="fg-pin">
               <label
                 for="pin"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Demo instance access PIN<span
                   class="text-red-600"
@@ -571,6 +538,9 @@
                   >*</span
                 >
               </label>
+              <span class="usa-hint" id="pin-hint">
+                Enter a six-digit numerical code to secure the instance.
+              </span>
               <input
                 id="pin"
                 name="pin"
@@ -578,18 +548,19 @@
                 inputmode="numeric"
                 maxlength="6"
                 pattern="[0-9]{6}"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                class="usa-input"
                 placeholder="e.g. 123456"
                 autocomplete="off"
                 aria-required="true"
+                aria-describedby="pin-hint"
               />
             </div>
 
             <!-- Google Analytics ID (optional) -->
-            <div class="mb-6" id="fg-googleAnalyticsId">
+            <div class="usa-form-group mb-6" id="fg-googleAnalyticsId">
               <label
                 for="googleAnalyticsId"
-                class="block text-sm font-bold text-gray-900 mb-1"
+                class="usa-label"
               >
                 Google Analytics ID
                 <span class="text-gray-400 font-normal">(optional)</span>
@@ -598,7 +569,7 @@
                 id="googleAnalyticsId"
                 name="googleAnalyticsId"
                 type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                class="usa-input"
                 placeholder="G-ABC123XYZ"
                 autocomplete="off"
               />
@@ -1514,14 +1485,22 @@
 
       function showError(msg) {
         var el = document.getElementById('create-wizard-error')
-        el.textContent = msg
+        var textEl = document.getElementById('create-wizard-error-text')
+        if (textEl) textEl.textContent = msg
         el.classList.remove('hidden')
       }
 
       function clearError() {
         var el = document.getElementById('create-wizard-error')
-        el.textContent = ''
+        var textEl = document.getElementById('create-wizard-error-text')
+        if (textEl) textEl.textContent = ''
         el.classList.add('hidden')
+      }
+
+      function clearAllFieldErrors() {
+        ;['cityName', 'expirationDays', 'adminEmail', 'subdomain', 'pin'].forEach(function (id) {
+          markFieldError(id, false)
+        })
       }
 
       function markFieldError(fieldId, hasError) {
@@ -1549,12 +1528,12 @@
         var daysOk = !isNaN(daysVal) && daysVal > 0
         markFieldError('cityName', !cityOk)
         markFieldError('expirationDays', !daysOk)
-        if (!cityOk) {
-          showError('City / Civic entity name is required.')
-          return false
-        }
-        if (!daysOk) {
-          showError('Expiration must be at least 1 day.')
+
+        var errors = []
+        if (!cityOk) errors.push('City / Civic entity name is required.')
+        if (!daysOk) errors.push('Expiration must be at least 1 day.')
+        if (errors.length > 0) {
+          showError(errors.join(' '))
           return false
         }
         return true
@@ -1577,20 +1556,18 @@
         markFieldError('subdomain', !subOk)
         markFieldError('pin', !pinOk)
 
+        var errors = []
         if (!emailOk) {
-          showError(
+          errors.push(
             emailVal.length === 0
               ? 'Admin Notification Email is required.'
               : 'Please enter a valid email address.',
           )
-          return false
         }
-        if (!subOk) {
-          showError('Demo instance subdomain is required.')
-          return false
-        }
-        if (!pinOk) {
-          showError('Access PIN must be exactly 6 digits.')
+        if (!subOk) errors.push('Demo instance subdomain is required.')
+        if (!pinOk) errors.push('Access PIN must be exactly 6 digits.')
+        if (errors.length > 0) {
+          showError(errors.join(' '))
           return false
         }
         return true
@@ -1637,6 +1614,7 @@
       window.createWizardReset = function () {
         subdomainDirty = false
         clearError()
+        clearAllFieldErrors()
         // Re-enable all panels' inputs before clearing
         for (var i = 1; i <= TOTAL_STEPS; i++) {
           setStepInputsDisabled(i, false)
