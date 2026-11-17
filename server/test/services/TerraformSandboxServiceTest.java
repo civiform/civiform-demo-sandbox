@@ -314,6 +314,15 @@ public class TerraformSandboxServiceTest {
         .isEmpty();
   }
 
+  @Test
+  public void validatePin_stoppedSandboxRejected() throws Exception {
+    SandboxInstance stopped = live("123456").toBuilder().status(SandboxStatus.STOPPED).build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(stopped));
+
+    assertThat(newService().validatePin("sb-abcd1234", "123456").toCompletableFuture().get())
+        .isEmpty();
+  }
+
   // ── deleteSandbox ───────────────────────────────────────────────────────────
 
   @Test
@@ -394,6 +403,148 @@ public class TerraformSandboxServiceTest {
     // operator must be able to tear down any partially-created resources.
     assertThat(newService().deleteSandbox("sb-abcd1234").toCompletableFuture().get()).isTrue();
     verify(repository).updateStatus("sb-abcd1234", SandboxStatus.DELETING);
+  }
+
+  @Test
+  public void disableExpiredSandbox_removesAlbListenerRulesAndMarksStopped() throws Exception {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    SandboxInstance expiredRunning =
+        live("123456").toBuilder()
+            .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
+            .adminEmail("bd-lead@exygy.com")
+            .accessToken("tok-1")
+            .listenerPriority(1000)
+            .civiformVersion("latest")
+            .databaseName("sb_abcd1234")
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(expiredRunning));
+
+    boolean disabled =
+        newService()
+            .disableExpiredSandbox("sb-abcd1234", cutoff)
+            .toCompletableFuture()
+            .get();
+
+    assertThat(disabled).isTrue();
+    verify(terraform)
+        .init(
+            any(),
+            eq("civiform-sandbox-tfstate"),
+            eq("sandboxes/sb-abcd1234/terraform.tfstate"),
+            eq("us-east-1"));
+    verify(terraform)
+        .destroyTargets(
+            any(),
+            any(),
+            eq(TerraformSandboxService.ALB_LISTENER_RULE_TARGETS),
+            any());
+    verify(terraform, never()).destroy(any(), any(), any());
+    verify(repository).markStopped("sb-abcd1234");
+    verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
+  public void disableExpiredSandbox_skipsNonRunningOrUnexpiredOrExtendedMidQueue()
+      throws Exception {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.DAYS);
+
+    when(repository.findById("sb-missing")).thenReturn(Optional.empty());
+    assertThat(
+            newService()
+                .disableExpiredSandbox("sb-missing", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Already STOPPED -> skipped
+    SandboxInstance stopped =
+        live("123456").toBuilder()
+            .status(SandboxStatus.STOPPED)
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-stopped")).thenReturn(Optional.of(stopped));
+    assertThat(
+            newService()
+                .disableExpiredSandbox("sb-stopped", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // RUNNING but expiresAt >= cutoff -> skipped
+    SandboxInstance unexpired =
+        live("123456").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff)
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-unexpired")).thenReturn(Optional.of(unexpired));
+    assertThat(
+            newService()
+                .disableExpiredSandbox("sb-unexpired", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // Extended while waiting in the per-sandbox queue
+    SandboxInstance initiallyExpired =
+        live("123456").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    SandboxInstance extendedMidRun =
+        live("123456").toBuilder()
+            .status(SandboxStatus.PROVISIONING)
+            .expiresAt(cutoff.plus(30, ChronoUnit.DAYS))
+            .databaseName("sb_abcd1234")
+            .build();
+    when(repository.findById("sb-queued-race"))
+        .thenReturn(Optional.of(initiallyExpired))
+        .thenReturn(Optional.of(extendedMidRun));
+    assertThat(
+            newService()
+                .disableExpiredSandbox("sb-queued-race", cutoff)
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    verify(terraform, never()).destroyTargets(any(), any(), any(), any());
+    verify(repository, never()).markStopped(anyString());
+  }
+
+  @Test
+  public void disableExpiredSandbox_terraformFailureCompletesExceptionallyAndKeepsRunning() {
+    Instant cutoff = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    SandboxInstance expired =
+        live("123456").toBuilder()
+            .cityName("Burlington, VT")
+            .subdomain("burlington-vt")
+            .adminEmail("bd-lead@exygy.com")
+            .accessToken("tok-1")
+            .listenerPriority(1000)
+            .civiformVersion("latest")
+            .databaseName("sb_abcd1234")
+            .expiresAt(cutoff.minus(1, ChronoUnit.DAYS))
+            .build();
+    when(repository.findById("sb-abcd1234")).thenReturn(Optional.of(expired));
+    org.mockito.Mockito.doThrow(new RuntimeException("S3 backend unreachable"))
+        .when(terraform)
+        .destroyTargets(any(), any(), any(), any());
+
+    assertThatThrownBy(
+            () ->
+                newService()
+                    .disableExpiredSandbox("sb-abcd1234", cutoff)
+                    .toCompletableFuture()
+                    .join())
+        .hasCauseInstanceOf(RuntimeException.class)
+        .hasStackTraceContaining("S3 backend unreachable");
+
+    verify(repository, never()).markStopped(anyString());
+    verify(repository, never()).updateStatus(anyString(), any());
   }
 
   @Test

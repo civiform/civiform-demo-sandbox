@@ -4,6 +4,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Ports;
@@ -294,15 +296,7 @@ public class DockerSandboxService implements SandboxService {
           }
 
           // Stop and remove container
-          if (sandbox.getContainerId() != null) {
-            try {
-              dockerClient.stopContainerCmd(sandbox.getContainerId()).withTimeout(10).exec();
-              dockerClient.removeContainerCmd(sandbox.getContainerId()).withForce(true).exec();
-              log.info("[{}] Container stopped and removed", id);
-            } catch (Exception e) {
-              log.warn("[{}] Could not stop container: {}", id, e.getMessage());
-            }
-          }
+          stopAndRemoveContainer(id, sandbox.getContainerId());
 
           // Drop the per-sandbox database. On failure, keep the metadata row: it is the only
           // record of the database name, and deleting it would orphan a database that still
@@ -329,6 +323,53 @@ public class DockerSandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Boolean> disableExpiredSandbox(String id, Instant expiredBefore) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return false;
+          }
+          SandboxInstance sandbox = maybeSandbox.get();
+          if (sandbox.getStatus() != SandboxStatus.RUNNING
+              || sandbox.getExpiresAt() == null
+              || !sandbox.getExpiresAt().isBefore(expiredBefore)) {
+            log.info(
+                "[{}] Skipping expired-sandbox disable: status={}, expiresAt={}, cutoff={}",
+                id,
+                sandbox.getStatus(),
+                sandbox.getExpiresAt(),
+                expiredBefore);
+            return false;
+          }
+
+          if (sandbox.getContainerId() != null) {
+            try {
+              dockerClient.stopContainerCmd(sandbox.getContainerId()).withTimeout(10).exec();
+              log.info("[{}] Container stopped during expiry disable", id);
+            } catch (NotModifiedException e) {
+              log.info("[{}] Container already stopped during expiry disable", id);
+            } catch (NotFoundException e) {
+              log.info("[{}] Container already absent during expiry disable", id);
+            } catch (Exception e) {
+              throw new RuntimeException(
+                  "Could not stop container "
+                      + sandbox.getContainerId()
+                      + " for sandbox "
+                      + id
+                      + ": "
+                      + e.getMessage(),
+                  e);
+            }
+          }
+
+          repository.markStopped(id);
+          return true;
+        },
+        provisioningPool);
+  }
+
+  @Override
   public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -338,6 +379,7 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
           if ((sandbox.getStatus() != SandboxStatus.RUNNING
+                  && sandbox.getStatus() != SandboxStatus.STOPPED
                   && sandbox.getStatus() != SandboxStatus.FAILED
                   && sandbox.getStatus() != SandboxStatus.DELETE_FAILED)
               || sandbox.getExpiresAt() == null
@@ -353,19 +395,7 @@ public class DockerSandboxService implements SandboxService {
 
           repository.updateStatus(id, SandboxStatus.DELETING);
 
-          if (sandbox.getContainerId() != null) {
-            try {
-              dockerClient.stopContainerCmd(sandbox.getContainerId()).withTimeout(10).exec();
-            } catch (Exception e) {
-              log.warn("[{}] Could not stop container during expiry teardown: {}", id, e.getMessage());
-            }
-            try {
-              dockerClient.removeContainerCmd(sandbox.getContainerId()).withForce(true).exec();
-              log.info("[{}] Container removed during expiry teardown", id);
-            } catch (Exception e) {
-              log.warn("[{}] Could not remove container during expiry teardown: {}", id, e.getMessage());
-            }
-          }
+          stopAndRemoveContainer(id, sandbox.getContainerId());
 
           try {
             dropDatabase(sandbox.getDatabaseName());
@@ -397,7 +427,10 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
           if (sandbox.getStatus() == SandboxStatus.DELETED
-              || sandbox.getStatus() == SandboxStatus.DELETING) {
+              || sandbox.getStatus() == SandboxStatus.DELETING
+              || sandbox.getStatus() == SandboxStatus.STOPPED
+              || (sandbox.getExpiresAt() != null
+                  && sandbox.getExpiresAt().isBefore(clock.instant()))) {
             return Optional.empty();
           }
 
@@ -523,14 +556,7 @@ public class DockerSandboxService implements SandboxService {
           try {
             log.info("[{}] Re-provisioning started (port={}, database={})", id, hostPort, databaseName);
 
-            if (updated.getContainerId() != null) {
-              try {
-                dockerClient.stopContainerCmd(updated.getContainerId()).withTimeout(10).exec();
-                dockerClient.removeContainerCmd(updated.getContainerId()).withForce(true).exec();
-              } catch (Exception e) {
-                log.warn("[{}] Could not stop old container during re-provision: {}", id, e.getMessage());
-              }
-            }
+            stopAndRemoveContainer(id, updated.getContainerId());
 
             db.withConnection(
                 conn -> {
@@ -578,6 +604,40 @@ public class DockerSandboxService implements SandboxService {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Stops (if running) and force-removes a sandbox's Docker container.
+   *
+   * <p>Docker returns HTTP 304 ({@link NotModifiedException}) when stopping an already-stopped
+   * container — e.g. a {@link SandboxStatus#STOPPED} sandbox disabled on expiration day. Stopping
+   * and removing run in separate {@code try} blocks so a 304 or other stop error never skips
+   * {@code removeContainerCmd}; otherwise {@link #launchContainer} fails with HTTP 409 Conflict on
+   * the reused container name {@code civiform-sandbox-<id>}.
+   */
+  private void stopAndRemoveContainer(String sandboxId, String containerId) {
+    if (containerId == null) {
+      return;
+    }
+    try {
+      dockerClient.stopContainerCmd(containerId).withTimeout(10).exec();
+    } catch (NotModifiedException e) {
+      log.debug("[{}] Container {} already stopped", sandboxId, containerId);
+    } catch (NotFoundException e) {
+      log.debug("[{}] Container {} already removed", sandboxId, containerId);
+      return;
+    } catch (Exception e) {
+      log.warn("[{}] Could not stop container {}: {}", sandboxId, containerId, e.getMessage());
+    }
+
+    try {
+      dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+      log.info("[{}] Container removed", sandboxId);
+    } catch (NotFoundException e) {
+      log.debug("[{}] Container {} already removed", sandboxId, containerId);
+    } catch (Exception e) {
+      log.warn("[{}] Could not remove container {}: {}", sandboxId, containerId, e.getMessage());
+    }
+  }
 
   /**
    * Provisions a dedicated Postgres database and user for a sandbox.
