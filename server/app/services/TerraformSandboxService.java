@@ -34,11 +34,14 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -82,6 +85,8 @@ public class TerraformSandboxService implements SandboxService {
    * only the contents of a secret version that is itself being deleted. It participates in no
    * resource name, address, or identity.
    */
+  private static final String DESTROY_PLACEHOLDER_PASSWORD = "unused-during-destroy";
+
   /**
    * Per-sandbox ALB listener rule resource addresses in {@code terraform/sandbox/main.tf} removed
    * when disabling an expired sandbox.
@@ -90,8 +95,6 @@ public class TerraformSandboxService implements SandboxService {
   static final ImmutableList<String> ALB_LISTENER_RULE_TARGETS =
       ImmutableList.of(
           "aws_lb_listener_rule.sandbox_allow", "aws_lb_listener_rule.sandbox_redirect");
-
-  private static final String DESTROY_PLACEHOLDER_PASSWORD = "unused-during-destroy";
 
   private final SandboxRepository repository;
   private final TerraformCli terraform;
@@ -444,12 +447,9 @@ public class TerraformSandboxService implements SandboxService {
       return CompletableFuture.completedFuture(false);
     }
 
-    java.util.concurrent.atomic.AtomicBoolean disabled =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicBoolean cancelled =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicReference<Thread> workerThread =
-        new java.util.concurrent.atomic.AtomicReference<>();
+    AtomicBoolean disabled = new AtomicBoolean(false);
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<Thread> workerThread = new AtomicReference<>();
     CompletableFuture<Boolean> result =
         enqueueForSandbox(
                 id,
@@ -488,7 +488,7 @@ public class TerraformSandboxService implements SandboxService {
             .thenApply(ignored -> disabled.get());
     result.whenComplete(
         (ignored, ex) -> {
-          if (ex instanceof java.util.concurrent.CancellationException) {
+          if (ex instanceof CancellationException) {
             cancelled.set(true);
             Thread running = workerThread.get();
             if (running != null) {
@@ -553,12 +553,9 @@ public class TerraformSandboxService implements SandboxService {
       return CompletableFuture.completedFuture(false);
     }
 
-    java.util.concurrent.atomic.AtomicBoolean destroyed =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicBoolean cancelled =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicReference<Thread> workerThread =
-        new java.util.concurrent.atomic.AtomicReference<>();
+    AtomicBoolean destroyed = new AtomicBoolean(false);
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<Thread> workerThread = new AtomicReference<>();
     CompletableFuture<Boolean> result =
         enqueueForSandbox(
                 id,
@@ -598,7 +595,7 @@ public class TerraformSandboxService implements SandboxService {
             .thenApply(ignored -> destroyed.get());
     result.whenComplete(
         (ignored, ex) -> {
-          if (ex instanceof java.util.concurrent.CancellationException) {
+          if (ex instanceof CancellationException) {
             cancelled.set(true);
             Thread running = workerThread.get();
             if (running != null) {

@@ -5,8 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +19,7 @@ import com.github.dockerjava.api.command.PullImageCmd;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
+import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.core.command.PullImageResultCallback;
@@ -650,6 +653,86 @@ public class DockerSandboxServiceTest {
     verify(dockerClient, never()).removeContainerCmd(anyString());
     verify(repository).markStopped("sb-dis-docker");
     verify(repository, never()).softDelete(anyString(), any());
+  }
+
+  @Test
+  public void disableExpiredSandbox_whenContainerAlreadyStopped_marksStopped()
+      throws ExecutionException, InterruptedException {
+    Instant cutoff = Instant.now();
+    SandboxInstance expiredRunning =
+        makeSandboxWithContainer("sb-dis-304", "container-already-stopped").toBuilder()
+            .status(SandboxStatus.RUNNING)
+            .expiresAt(cutoff.minus(Duration.ofDays(1)))
+            .build();
+    when(repository.findById("sb-dis-304")).thenReturn(Optional.of(expiredRunning));
+
+    StopContainerCmd stopCmd = mock(StopContainerCmd.class);
+    when(stopCmd.withTimeout(any(Integer.class))).thenReturn(stopCmd);
+    doThrow(new NotModifiedException("Status 304: ")).when(stopCmd).exec();
+    when(dockerClient.stopContainerCmd("container-already-stopped")).thenReturn(stopCmd);
+
+    boolean disabled =
+        service.disableExpiredSandbox("sb-dis-304", cutoff).toCompletableFuture().get();
+
+    assertThat(disabled).isTrue();
+    verify(repository).markStopped("sb-dis-304");
+  }
+
+  @Test
+  public void extendSandbox_stoppedSandboxWhenStopThrowsNotModified_stillRemovesOldContainerAndLaunchesNewOne()
+      throws ExecutionException, InterruptedException {
+    Instant pastExpiry = Instant.now().minus(Duration.ofDays(2));
+    SandboxInstance stopped =
+        makeSandboxWithContainer("sb-ext-stopped", "container-stopped").toBuilder()
+            .status(SandboxStatus.STOPPED)
+            .expiresAt(pastExpiry)
+            .accessToken("existing-token")
+            .build();
+    when(repository.findById("sb-ext-stopped")).thenReturn(Optional.of(stopped));
+
+    StopContainerCmd stopCmd = mock(StopContainerCmd.class);
+    when(stopCmd.withTimeout(any(Integer.class))).thenReturn(stopCmd);
+    doThrow(new NotModifiedException("Status 304: ")).when(stopCmd).exec();
+    when(dockerClient.stopContainerCmd("container-stopped")).thenReturn(stopCmd);
+
+    RemoveContainerCmd removeCmd = mock(RemoveContainerCmd.class);
+    when(removeCmd.withForce(true)).thenReturn(removeCmd);
+    when(dockerClient.removeContainerCmd("container-stopped")).thenReturn(removeCmd);
+
+    stubSuccessfulContainerLaunch("container-reactivated");
+
+    Optional<SandboxInstance> result =
+        service.extendSandbox("sb-ext-stopped", 7).toCompletableFuture().get();
+
+    assertThat(result).isPresent();
+    verify(removeCmd, timeout(2000)).exec();
+    verify(repository, timeout(2000)).updateContainerId("sb-ext-stopped", "container-reactivated");
+  }
+
+  @Test
+  public void deleteSandbox_stoppedSandboxWhenStopThrowsNotModified_stillRemovesContainer()
+      throws ExecutionException, InterruptedException {
+    SandboxInstance stopped =
+        makeSandboxWithContainer("sb-del-stopped", "container-stopped").toBuilder()
+            .status(SandboxStatus.STOPPED)
+            .build();
+    when(repository.findById("sb-del-stopped")).thenReturn(Optional.of(stopped));
+    when(repository.softDelete(anyString(), any(Instant.class))).thenReturn(true);
+
+    StopContainerCmd stopCmd = mock(StopContainerCmd.class);
+    when(stopCmd.withTimeout(any(Integer.class))).thenReturn(stopCmd);
+    doThrow(new NotModifiedException("Status 304: ")).when(stopCmd).exec();
+    when(dockerClient.stopContainerCmd("container-stopped")).thenReturn(stopCmd);
+
+    RemoveContainerCmd removeCmd = mock(RemoveContainerCmd.class);
+    when(removeCmd.withForce(true)).thenReturn(removeCmd);
+    when(dockerClient.removeContainerCmd("container-stopped")).thenReturn(removeCmd);
+
+    Boolean deleted = service.deleteSandbox("sb-del-stopped").toCompletableFuture().get();
+
+    assertThat(deleted).isTrue();
+    verify(removeCmd).exec();
+    verify(repository).softDelete(eq("sb-del-stopped"), any(Instant.class));
   }
 
   @Test
