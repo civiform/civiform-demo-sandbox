@@ -478,8 +478,23 @@ public class SandboxRepositoryIntegrationTest {
     assertThat(repo.findExpiredForDestruction(cutoff, 3))
         .anyMatch(s -> s.getId().equals(testId));
 
-    // RUNNING sandboxes are also eligible.
+    // RUNNING sandboxes are also eligible for both disabling and destruction.
     repo.updateStatus(testId, SandboxStatus.RUNNING);
+    assertThat(repo.findExpiredForDisabling(cutoff))
+        .anyMatch(s -> s.getId().equals(testId));
+    assertThat(repo.findExpiredForDestruction(cutoff, 3))
+        .anyMatch(s -> s.getId().equals(testId));
+
+    // Once disabled via markStopped, it is no longer eligible for disabling,
+    // has listener_rule_arn cleared, and remains eligible for destruction 7 days later.
+    repo.updateTerraformOutputs(
+        testId, "https://test.dev", "arn:tg", "arn:rule", "arn:task");
+    repo.markStopped(testId);
+    SandboxInstance stopped = repo.findById(testId).orElseThrow();
+    assertThat(stopped.getStatus()).isEqualTo(SandboxStatus.STOPPED);
+    assertThat(stopped.getListenerRuleArn()).isNull();
+    assertThat(repo.findExpiredForDisabling(cutoff))
+        .noneMatch(s -> s.getId().equals(testId));
     assertThat(repo.findExpiredForDestruction(cutoff, 3))
         .anyMatch(s -> s.getId().equals(testId));
 

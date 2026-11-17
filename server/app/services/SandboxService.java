@@ -20,15 +20,27 @@ public interface SandboxService {
   CompletionStage<Boolean> deleteSandbox(String id);
 
   /**
+   * Synchronously (as an awaitable stage) disables an expired sandbox on its expiration date so it
+   * is no longer accessible (e.g. by removing its ALB listener rules in Terraform or stopping its
+   * Docker container), then marks its database record {@link models.SandboxStatus#STOPPED}.
+   *
+   * <p>Re-reads the row at execution time and skips disabling (completing with {@code false})
+   * unless the sandbox is still {@link models.SandboxStatus#RUNNING} and its {@code expiresAt} is
+   * strictly before {@code expiredBefore}. Completes with {@code true} when disabled, or
+   * exceptionally if disabling fails.
+   */
+  CompletionStage<Boolean> disableExpiredSandbox(String id, Instant expiredBefore);
+
+  /**
    * Synchronously (as an awaitable stage) destroys an expired sandbox's infrastructure and
    * per-sandbox database, then marks its database record {@link models.SandboxStatus#DELETED}.
    *
    * <p>Re-reads the row at execution time and skips destruction (completing with {@code false})
    * unless the sandbox is still {@link models.SandboxStatus#RUNNING}, {@link
-   * models.SandboxStatus#FAILED}, or {@link models.SandboxStatus#DELETE_FAILED} and its {@code
-   * expiresAt} is strictly before {@code expiredBefore}. Completes with {@code true} when
-   * destroyed, or exceptionally if teardown fails so scheduled jobs can track retry counts and
-   * alert SRE.
+   * models.SandboxStatus#STOPPED}, {@link models.SandboxStatus#FAILED}, or {@link
+   * models.SandboxStatus#DELETE_FAILED} and its {@code expiresAt} is strictly before {@code
+   * expiredBefore}. Completes with {@code true} when destroyed, or exceptionally if teardown fails
+   * so scheduled jobs can track retry counts and alert SRE.
    */
   CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore);
 

@@ -347,17 +347,56 @@ public class SandboxRepository {
   }
 
   /**
+   * Marks an expired sandbox {@link SandboxStatus#STOPPED} and clears {@code listener_rule_arn}
+   * once its ALB listener rules (or container) have been disabled.
+   */
+  public void markStopped(String id) {
+    db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "UPDATE sandbox_instances SET status = ?, listener_rule_arn = NULL WHERE id = ?")) {
+        ps.setString(1, SandboxStatus.STOPPED.name());
+        ps.setString(2, id);
+        ps.executeUpdate();
+      }
+      return null;
+    });
+  }
+
+  /**
+   * Finds all sandboxes eligible to be disabled on expiration: those currently {@link
+   * SandboxStatus#RUNNING} whose {@code expires_at} is strictly before {@code expiredBefore}.
+   */
+  public ImmutableList<SandboxInstance> findExpiredForDisabling(Instant expiredBefore) {
+    return db.withConnection(conn -> {
+      try (PreparedStatement ps = conn.prepareStatement(
+          "SELECT * FROM sandbox_instances "
+              + "WHERE status = 'RUNNING' "
+              + "  AND expires_at < ? "
+              + "ORDER BY expires_at ASC")) {
+        ps.setTimestamp(1, Timestamp.from(expiredBefore));
+        try (ResultSet rs = ps.executeQuery()) {
+          List<SandboxInstance> result = new ArrayList<>();
+          while (rs.next()) {
+            result.add(mapRow(rs));
+          }
+          return ImmutableList.copyOf(result);
+        }
+      }
+    });
+  }
+
+  /**
    * Finds all sandboxes eligible for scheduled destruction: those currently {@link
-   * SandboxStatus#RUNNING}, {@link SandboxStatus#FAILED}, or {@link SandboxStatus#DELETE_FAILED}
-   * whose {@code expires_at} is strictly before {@code expiredBefore} and that have fewer than
-   * {@code maxAttempts} failed destruction attempts.
+   * SandboxStatus#RUNNING}, {@link SandboxStatus#STOPPED}, {@link SandboxStatus#FAILED}, or {@link
+   * SandboxStatus#DELETE_FAILED} whose {@code expires_at} is strictly before {@code expiredBefore}
+   * and that have fewer than {@code maxAttempts} failed destruction attempts.
    */
   public ImmutableList<SandboxInstance> findExpiredForDestruction(
       Instant expiredBefore, int maxAttempts) {
     return db.withConnection(conn -> {
       try (PreparedStatement ps = conn.prepareStatement(
           "SELECT * FROM sandbox_instances "
-              + "WHERE status IN ('RUNNING', 'FAILED', 'DELETE_FAILED') "
+              + "WHERE status IN ('RUNNING', 'STOPPED', 'FAILED', 'DELETE_FAILED') "
               + "  AND expires_at < ? "
               + "  AND destroy_attempts < ? "
               + "ORDER BY expires_at ASC")) {

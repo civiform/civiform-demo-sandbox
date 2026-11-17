@@ -155,6 +155,8 @@ public class DurableJobModuleTest {
     SandboxRepository sandboxRepository = mock(SandboxRepository.class);
     when(sandboxRepository.findExpiredForDestruction(any(), org.mockito.ArgumentMatchers.anyInt()))
         .thenReturn(com.google.common.collect.ImmutableList.of());
+    when(sandboxRepository.findExpiredForDisabling(any()))
+        .thenReturn(com.google.common.collect.ImmutableList.of());
     services.SandboxService sandboxService = mock(services.SandboxService.class);
     services.PersistedDurableJobRepository jobRepo =
         mock(services.PersistedDurableJobRepository.class);
@@ -185,5 +187,7 @@ public class DurableJobModuleTest {
         .findExpiredForDestruction(
             java.time.Instant.parse("2026-08-10T00:00:00Z"),
             durablejobs.jobs.DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+    verify(sandboxRepository)
+        .findExpiredForDisabling(java.time.Instant.parse("2026-08-20T00:00:00Z"));
   }
 }

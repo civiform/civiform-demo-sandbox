@@ -226,7 +226,33 @@ public class InMemorySandboxServiceTest {
                 .get())
         .isFalse();
 
-    // Seeded RUNNING sandbox destroyed when its expiresAt is strictly before cutoff
+    // Seeded RUNNING sandbox disabled on expiration date, then destroyed 7 days later
+    assertThat(
+            service
+                .disableExpiredSandbox("sb-demo0001", demo.getExpiresAt())
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+    assertThat(
+            service
+                .disableExpiredSandbox("sb-demo0001", demo.getExpiresAt().plusSeconds(1))
+                .toCompletableFuture()
+                .get())
+        .isTrue();
+
+    SandboxInstance stopped =
+        service.getSandbox("sb-demo0001").toCompletableFuture().get().orElseThrow();
+    assertThat(stopped.getStatus()).isEqualTo(SandboxStatus.STOPPED);
+    assertThat(service.validatePin("sb-demo0001", "482917").toCompletableFuture().get()).isEmpty();
+    // Already STOPPED sandbox is skipped by a second disable pass
+    assertThat(
+            service
+                .disableExpiredSandbox("sb-demo0001", demo.getExpiresAt().plusSeconds(1))
+                .toCompletableFuture()
+                .get())
+        .isFalse();
+
+    // STOPPED sandbox destroyed when its expiresAt is strictly before cutoff
     assertThat(
             service
                 .destroyExpiredSandbox(

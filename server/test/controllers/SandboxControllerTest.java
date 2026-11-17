@@ -915,6 +915,29 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
 
+  @Test
+  public void pinGate_stoppedOrExpiredSandbox_returns404() {
+    SandboxInstance stopped = makeSandbox("sb-stopped", SandboxStatus.STOPPED);
+    when(sandboxService.getSandbox("sb-stopped"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(stopped)));
+
+    Result stoppedResult =
+        Helpers.route(
+            app, Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-stopped/access"));
+    assertThat(stoppedResult.status()).isEqualTo(NOT_FOUND);
+
+    SandboxInstance expired =
+        makeSandbox("sb-exp", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.now().minus(Duration.ofDays(1)))
+            .build();
+    when(sandboxService.getSandbox("sb-exp"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(expired)));
+
+    Result expiredResult =
+        Helpers.route(app, Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-exp/access"));
+    assertThat(expiredResult.status()).isEqualTo(NOT_FOUND);
+  }
+
   // ── GET /sandboxes — list ─────────────────────────────────────────────────
 
   @Test

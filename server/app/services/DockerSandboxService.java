@@ -329,6 +329,49 @@ public class DockerSandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Boolean> disableExpiredSandbox(String id, Instant expiredBefore) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+          if (maybeSandbox.isEmpty()) {
+            return false;
+          }
+          SandboxInstance sandbox = maybeSandbox.get();
+          if (sandbox.getStatus() != SandboxStatus.RUNNING
+              || sandbox.getExpiresAt() == null
+              || !sandbox.getExpiresAt().isBefore(expiredBefore)) {
+            log.info(
+                "[{}] Skipping expired-sandbox disable: status={}, expiresAt={}, cutoff={}",
+                id,
+                sandbox.getStatus(),
+                sandbox.getExpiresAt(),
+                expiredBefore);
+            return false;
+          }
+
+          if (sandbox.getContainerId() != null) {
+            try {
+              dockerClient.stopContainerCmd(sandbox.getContainerId()).withTimeout(10).exec();
+              log.info("[{}] Container stopped during expiry disable", id);
+            } catch (Exception e) {
+              throw new RuntimeException(
+                  "Could not stop container "
+                      + sandbox.getContainerId()
+                      + " for sandbox "
+                      + id
+                      + ": "
+                      + e.getMessage(),
+                  e);
+            }
+          }
+
+          repository.markStopped(id);
+          return true;
+        },
+        provisioningPool);
+  }
+
+  @Override
   public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
     return CompletableFuture.supplyAsync(
         () -> {
@@ -338,6 +381,7 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
           if ((sandbox.getStatus() != SandboxStatus.RUNNING
+                  && sandbox.getStatus() != SandboxStatus.STOPPED
                   && sandbox.getStatus() != SandboxStatus.FAILED
                   && sandbox.getStatus() != SandboxStatus.DELETE_FAILED)
               || sandbox.getExpiresAt() == null
@@ -397,7 +441,10 @@ public class DockerSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
           if (sandbox.getStatus() == SandboxStatus.DELETED
-              || sandbox.getStatus() == SandboxStatus.DELETING) {
+              || sandbox.getStatus() == SandboxStatus.DELETING
+              || sandbox.getStatus() == SandboxStatus.STOPPED
+              || (sandbox.getExpiresAt() != null
+                  && sandbox.getExpiresAt().isBefore(clock.instant()))) {
             return Optional.empty();
           }
 
