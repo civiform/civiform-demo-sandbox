@@ -88,8 +88,6 @@ test.describe('Sandbox Dashboard', () => {
     // This test requires a DELETED sandbox in the list.
     // Skip if no DELETED row is present (seed data may not include one).
     const deletedRow = page.locator('tr:has([data-status="DELETED"])')
-    const count = await deletedRow.count()
-    test.skip(count === 0, 'No DELETED sandbox in seed data — skipping tombstone test')
 
     // DELETED row should NOT have a "Delete" action button
     await expect(deletedRow.getByRole('button', {name: /delete/i})).not.toBeVisible()
