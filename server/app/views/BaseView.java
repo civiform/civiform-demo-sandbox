@@ -36,7 +36,7 @@ public abstract class BaseView<TModel extends BaseViewModel> {
   }
 
   protected String pageTitle(TModel model, Messages messages) {
-    return "CiviForm Sandbox Builder";
+    return "CiviForm Demo Sandbox Manager";
   }
 
   protected String pageHeading(TModel model, Messages messages) {

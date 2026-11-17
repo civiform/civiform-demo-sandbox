@@ -56,3 +56,20 @@
   background-color: #005ea2;
   color: #ffffff;
 }
+
+/* ── Modal centering ─────────────────────────────────────────────────
+   USWDS 3.x centers modals via text-align:center + an inline-block
+   ::before pseudo-element on the overlay. That technique can fail when
+   the dialog uses inline-flex or when other layout context interferes.
+   Override with flexbox centering, which is robust and predictable.
+   ──────────────────────────────────────────────────────────────────── */
+.usa-modal-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usa-modal-overlay::before {
+  /* Disable the USWDS inline-block centering shim — flexbox handles it */
+  display: none;
+}
