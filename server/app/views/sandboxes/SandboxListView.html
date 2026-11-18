@@ -8,7 +8,7 @@
     class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
   >
     <div>
-      <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
+      <h1 class="text-3xl font-bold text-gray-900">CiviForm Demo Sandbox Manager</h1>
     </div>
     <div class="flex items-center gap-3">
       <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
@@ -252,8 +252,7 @@
                     th:data-city-name="${sb.cityName}"
                     th:data-url="${sb.sandbox.url}"
                     th:data-pin="${sb.sandbox.pin}"
-                    th:data-ga-id="${sb.sandbox.googleAnalyticsId}"
-                    th:onclick="openDetailsModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'), this.getAttribute('data-ga-id'))"
+                    th:onclick="openDetailsModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'), this.getAttribute('data-url'), this.getAttribute('data-pin'))"
                     class="usa-button usa-button--outline"
                   >
                     Details
@@ -646,17 +645,17 @@
         <div class="usa-modal__content">
           <div class="usa-modal__main">
             <h2 class="usa-modal__heading" id="info-modal-title">
-              Sandbox Details: <span id="info-city-name"></span>
+              Demo Details: <span id="info-city-name"></span>
             </h2>
-            <div class="usa-prose">
+            <div class="usa-prose mb-4">
               <p>
-                View and copy the URL and credentials for this CiviForm sandbox demo.
+                View and copy the URL and credentials for this demo sandbox.
               </p>
             </div>
 
             <!-- Demo URL -->
             <div class="mb-4">
-              <label class="block text-sm font-bold text-gray-900 mb-1"
+              <label class="usa-label"
                 >Demo URL</label
               >
               <div class="flex gap-2">
@@ -664,7 +663,7 @@
                   id="info-url"
                   type="text"
                   readonly
-                  class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
+                  class="usa-input flex-1 bg-gray-50 font-mono truncate"
                   aria-label="Demo URL"
                 />
                 <button
@@ -678,7 +677,7 @@
 
             <!-- Password (PIN) -->
             <div class="mb-6">
-              <label class="block text-sm font-bold text-gray-900 mb-1"
+              <label class="usa-label"
                 >Password</label
               >
               <div class="flex gap-2">
@@ -686,7 +685,7 @@
                   <input
                     id="info-pin"
                     type="password"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono"
+                    class="usa-input w-full bg-gray-50 font-mono"
                     readonly
                     aria-label="Sandbox password (PIN)"
                   />
@@ -727,24 +726,9 @@
               </div>
             </div>
 
-            <!-- Google Analytics ID -->
-            <div class="mb-6">
-              <label class="block text-sm font-bold text-gray-900 mb-1"
-                >Google Analytics ID</label
-              >
-              <input
-                id="info-ga-id"
-                type="text"
-                readonly
-                placeholder="Not configured"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-                aria-label="Google Analytics tracking ID"
-              />
-            </div>
-
-            <!-- Copy All -->
-            <button id="copy-all-btn" onclick="copyAll()" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-0 py-2">
-              Copy All
+            <!-- Copy All (USWDS unstyled button) -->
+            <button id="copy-all-btn" onclick="copyAll()" class="usa-button usa-button--unstyled w-full text-center py-2">
+              Copy all
             </button>
           </div>
           <button
@@ -1180,13 +1164,16 @@
     </div>
   </div>
 
-  <!-- ── Copy success alert (USWDS Alert component, success variant) ──── -->
+  <!-- ── Screen reader live region (always in DOM, visually hidden) ──── -->
+  <div id="copy-announcer" class="usa-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ── Copy success alert (visual only — above modal scrim) ────────── -->
   <div
     id="copy-alert"
     class="usa-alert usa-alert--success usa-alert--slim"
-    role="alert"
+    aria-hidden="true"
     hidden
-    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100000; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
   >
     <div class="usa-alert__body">
       <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
@@ -1198,20 +1185,24 @@
     var currentOptionsSandbox = null
 
     function showCopyAlert(message) {
+      var msg = message || 'Copied to clipboard'
+      // Visual alert (sighted users)
       var alert = document.getElementById('copy-alert')
       var text = document.getElementById('copy-alert-text')
-      text.textContent = message || 'Copied to clipboard'
+      text.textContent = msg
       alert.hidden = false
       setTimeout(function () { alert.hidden = true }, 2000)
+      // Screen reader announcement via persistent live region
+      var announcer = document.getElementById('copy-announcer')
+      announcer.textContent = ''
+      setTimeout(function () { announcer.textContent = msg }, 50)
     }
 
-    function openDetailsModal(id, cityName, url, pin, gaId) {
+    function openDetailsModal(id, cityName, url, pin) {
       document.getElementById('info-city-name').textContent = cityName
       document.getElementById('info-url').value = url
       document.getElementById('info-pin').value = pin
       document.getElementById('info-pin').type = 'password'
-      document.getElementById('info-ga-id').value =
-        gaId && gaId.trim() !== '' ? gaId : ''
 
       openModal('info-modal')
     }
