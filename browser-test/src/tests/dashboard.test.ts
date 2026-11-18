@@ -89,7 +89,6 @@ test.describe('Sandbox Dashboard', () => {
     // Skip if no DELETED row is present (seed data may not include one).
     const deletedRow = page.locator('tr:has([data-status="DELETED"])')
     await expect(deletedRow).toHaveCount(1)
-
     // DELETED row should NOT have a "Delete" action button
     await expect(deletedRow.getByRole('button', {name: /delete/i})).not.toBeVisible()
     // DELETED row should show a timestamp (e.g. "Deleted Oct 1, 2026")
