@@ -683,8 +683,8 @@ export RDS_ADMIN_PORT=15432
 ### Running Tests
 
 ```bash
-./bin/sbt test              # 36+ unit tests (no Docker/AWS needed)
-./bin/run-browser-tests     # Playwright E2E tests
+./bin/sbt test              # Unit tests (no Docker/AWS needed)
+./bin/run-browser-tests     # Playwright E2E tests (isolated server on TEST_PORT=9002, TEST_DB_NAME=sandbox_builder_test, SANDBOX_RUNTIME=inmemory, FIXED_CLOCK_INSTANT=2026-10-01T12:00:00Z)
 ```
 
 ### CI

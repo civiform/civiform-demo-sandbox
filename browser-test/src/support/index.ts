@@ -9,9 +9,64 @@
  *   import { validateScreenshot, validateAccessibility } from '../support'
  */
 
-import {expect, Page} from '@playwright/test'
+import {test as base, expect, Page, request} from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import {PORTAL_EMAIL, PORTAL_PASSWORD} from './config'
+import {
+  BASE_URL,
+  FIXED_CLOCK_INSTANT,
+  PORTAL_EMAIL,
+  PORTAL_PASSWORD,
+} from './config'
+
+/**
+ * Shared Playwright test fixture that freezes the browser's `Date` clock to
+ * `FIXED_CLOCK_INSTANT` (matching the server's injected `java.time.Clock`)
+ * without pausing timers.
+ */
+export const test = base.extend<{frozenBrowserClock: void}>({
+  frozenBrowserClock: [
+    async ({context}, use) => {
+      await context.clock.setFixedTime(new Date(FIXED_CLOCK_INSTANT))
+      await use()
+    },
+    {auto: true},
+  ],
+})
+
+function extractCsrfToken(html: string): string {
+  const match = html.match(/name="csrfToken"\s+value="([^"]+)"/)
+  if (!match) {
+    throw new Error('Could not find csrfToken input in HTML response')
+  }
+  return match[1]
+}
+
+/**
+ * Restores the server's in-memory sandboxes to their seeded baseline state via
+ * `POST /dev/resetInMemorySandboxes`.
+ */
+export async function resetTestState(): Promise<void> {
+  const ctx = await request.newContext({baseURL: BASE_URL})
+  try {
+    const loginPage = await ctx.get('/login')
+    const login = await ctx.post('/login', {
+      form: {
+        csrfToken: extractCsrfToken(await loginPage.text()),
+        email: PORTAL_EMAIL,
+        password: PORTAL_PASSWORD,
+      },
+    })
+    expect(login.ok(), 'portal login for state reset').toBeTruthy()
+
+    const devPage = await ctx.get('/dev')
+    const reset = await ctx.post('/dev/resetInMemorySandboxes', {
+      form: {csrfToken: extractCsrfToken(await devPage.text())},
+    })
+    expect(reset.status(), 'reset in-memory sandboxes').toBe(200)
+  } finally {
+    await ctx.dispose()
+  }
+}
 
 /**
  * Takes a screenshot of the full page (or a specific locator) and compares it

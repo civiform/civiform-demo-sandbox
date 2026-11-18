@@ -11,10 +11,25 @@
  * - Feature-off tests: wizard absent when button absent
  */
 
-import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility, openCreateModal, loginAsAdmin} from '../support'
+import {expect} from '@playwright/test'
+import {
+  test,
+  validateScreenshot,
+  validateAccessibility,
+  openCreateModal,
+  loginAsAdmin,
+  resetTestState,
+} from '../support'
 
 test.describe('Create Sandbox Wizard (modal)', () => {
+  test.beforeAll(async () => {
+    await resetTestState()
+  })
+
+  test.afterAll(async () => {
+    await resetTestState()
+  })
+
   test.beforeEach(async ({page}) => {
     await loginAsAdmin(page)
     await page.goto('/sandboxes')
