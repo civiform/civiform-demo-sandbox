@@ -1,6 +1,7 @@
 package views.sandboxes;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -53,7 +54,13 @@ public class SandboxRowViewModel {
   public static SandboxRowViewModel of(
       SandboxInstance sandbox, long autodeletionGraceDays, Instant now) {
     long clampedGraceDays = Math.max(0L, autodeletionGraceDays);
-    long days = ChronoUnit.DAYS.between(now, sandbox.getExpiresAt());
+    // Use America/Los_Angeles for "today" to match CiviForm's demo banner, which
+    // calls LocalDate.now(clock) using civiform_time_zone_id (defaults to
+    // America/Los_Angeles). The expiry date stays in UTC because the builder
+    // formats DEMO_BANNER_EXPIRATION_DATE as a UTC date string.
+    LocalDate today = now.atZone(ZoneId.of("America/Los_Angeles")).toLocalDate();
+    LocalDate expiryDate = sandbox.getExpiresAt().atZone(ZoneOffset.UTC).toLocalDate();
+    long days = ChronoUnit.DAYS.between(today, expiryDate);
     boolean isDeleted = sandbox.getStatus() == SandboxStatus.DELETED;
     String deletedFmt = isDeleted && sandbox.getDeletedAt() != null
         ? DISPLAY_FMT.format(sandbox.getDeletedAt())

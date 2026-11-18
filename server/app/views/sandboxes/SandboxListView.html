@@ -131,7 +131,7 @@
       <tbody>
         <tr
           th:each="sb : ${model.sandboxes}"
-          th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
+          th:classappend="${sb.deleted} ? 'opacity-40' : ''"
           th:id="|sandbox-row-${sb.sandbox.id}|"
           th:attr="
             hx-get=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '/sandboxes' : null},
@@ -202,9 +202,9 @@
               </div>
             </div>
             <div th:if="${sb.daysRemaining <= 0 and !sb.deleted}">
-              <span class="font-medium text-gray-400">0 days</span>
+              <span class="font-medium text-gray-700">0 days</span>
               <div
-                class="text-xs text-gray-400 mt-0.5"
+                class="text-xs text-gray-700 mt-0.5"
                 th:text="'Expired ' + ${sb.expiryFormatted}"
               >
                 Expired Aug 18, 2026
@@ -223,12 +223,12 @@
           <!-- Action buttons -->
           <td>
             <div th:if="${!sb.deleted}" class="flex items-center gap-2 flex-wrap">
-              <!-- Launch → opens CiviForm in new tab -->
+              <!-- Launch → opens CiviForm in new tab (link when launchable, disabled button otherwise) -->
               <a
-                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? ${sb.sandbox.url} : '#'"
+                th:if="${sb.sandbox.status.name() == 'RUNNING' and sb.daysRemaining > 0}"
+                th:href="${sb.sandbox.url}"
                 target="_blank"
                 rel="noopener"
-                th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
                 class="usa-button inline-flex items-center gap-1 no-underline"
               >
                 Launch
@@ -241,6 +241,22 @@
                   <use href="/assets/dist/img/sprite.svg#launch"></use>
                 </svg>
               </a>
+              <button
+                th:if="${sb.sandbox.status.name() != 'RUNNING' or sb.daysRemaining <= 0}"
+                type="button"
+                disabled
+                class="usa-button inline-flex items-center gap-1"
+              >
+                Launch
+                <svg
+                  class="usa-icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                >
+                  <use href="/assets/dist/img/sprite.svg#launch"></use>
+                </svg>
+              </button>
 
               <!-- Details, Options, AWS button group -->
               <ul class="usa-button-group usa-button-group--segmented">
