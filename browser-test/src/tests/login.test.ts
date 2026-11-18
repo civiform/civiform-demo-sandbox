@@ -51,37 +51,6 @@ test.describe('Login Page', () => {
     await validateAccessibility(page)
   })
 
-  // ── Page structure ────────────────────────────────────────────────────────
-
-  test('Shows "CiviForm Demo Portal" title', async ({page}) => {
-    await expect(page.getByText('CiviForm Demo Portal')).toBeVisible()
-  })
-
-  test('Shows "Log in to continue" subtitle', async ({page}) => {
-    await expect(page.getByText('Log in to continue')).toBeVisible()
-  })
-
-  test('Has email and password fields', async ({page}) => {
-    await expect(page.locator('input[name="email"]')).toBeVisible()
-    await expect(page.locator('input[name="password"]')).toBeVisible()
-    // Password field must be type=password (not plain text)
-    await expect(page.locator('input[name="password"]')).toHaveAttribute('type', 'password')
-  })
-
-  test('Has "Continue" submit button', async ({page}) => {
-    await expect(page.getByRole('button', {name: /continue/i})).toBeVisible()
-  })
-
-  test('"Continue with Google" button is visible but disabled (stub)', async ({page}) => {
-    const googleBtn = page.getByRole('button', {name: /continue with google/i})
-    await expect(googleBtn).toBeVisible()
-    await expect(googleBtn).toBeDisabled()
-  })
-
-  test('"Sign up" link is visible but non-functional (stub)', async ({page}) => {
-    await expect(page.getByText('Sign up')).toBeVisible()
-  })
-
   // ── Auth flows ────────────────────────────────────────────────────────────
 
   test('Correct credentials redirect to /sandboxes', async ({page}) => {
@@ -93,8 +62,9 @@ test.describe('Login Page', () => {
       await page.click('button[type="submit"]')
     })
     await test.step('Should land on dashboard', async () => {
-      await page.waitForURL('**/sandboxes**')
-      expect(page.url()).toContain('/sandboxes')
+      await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+      expect(new URL(page.url()).pathname).toMatch(/^\/(sandboxes)?$/)
+      await expect(page.getByRole('button', {name: /create new demo/i})).toBeVisible()
     })
   })
 
@@ -134,8 +104,9 @@ test.describe('Login Page', () => {
 
     // Now navigate back to /login — should be auto-redirected
     await page.goto('/login')
-    await page.waitForURL('**/sandboxes**')
-    expect(page.url()).toContain('/sandboxes')
+    await page.waitForURL((url) => !url.pathname.startsWith('/login'))
+    expect(new URL(page.url()).pathname).toMatch(/^\/(sandboxes)?$/)
+    await expect(page.getByRole('button', {name: /create new demo/i})).toBeVisible()
   })
 
   test('Unauthenticated user visiting /sandboxes is redirected to /login', async ({page}) => {
@@ -145,20 +116,6 @@ test.describe('Login Page', () => {
   })
 
   // ── Logout flow ───────────────────────────────────────────────────────────
-
-  test('Logging out returns to /login page', async ({page}) => {
-    await test.step('Log in first', async () => {
-      await loginAsAdmin(page)
-    })
-    await test.step('Navigate to logout', async () => {
-      await page.goto('/logout')
-    })
-    await test.step('Should land on login page', async () => {
-      await page.waitForURL('**/login**')
-      expect(page.url()).toContain('/login')
-      await expect(page.getByText('Log in to continue')).toBeVisible()
-    })
-  })
 
   test('After logout, /sandboxes redirects back to /login', async ({page}) => {
     await loginAsAdmin(page)

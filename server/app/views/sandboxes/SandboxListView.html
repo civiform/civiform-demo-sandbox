@@ -153,7 +153,7 @@
           <!-- Status badge -->
           <td
             th:data-sort-value="${sb.sandbox.status.name() != 'RUNNING' ? sb.sandbox.status.name() : (sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : 'RUNNING'))}"
-            data-status
+            th:data-status="${sb.sandbox.status.name()}"
             >
             <span
               th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
