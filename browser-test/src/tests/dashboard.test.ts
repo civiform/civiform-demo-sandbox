@@ -10,20 +10,10 @@
  * - page.waitForSelector() — never page.waitForTimeout()
  */
 
-import {expect} from '@playwright/test'
-import {
-  test,
-  validateScreenshot,
-  validateAccessibility,
-  loginAsAdmin,
-  resetTestState,
-} from '../support'
+import {test, expect} from '@playwright/test'
+import {validateScreenshot, validateAccessibility, loginAsAdmin} from '../support'
 
 test.describe('Sandbox Dashboard', () => {
-  test.beforeAll(async () => {
-    await resetTestState()
-  })
-
   test.beforeEach(async ({page}) => {
     await loginAsAdmin(page)
     await page.goto('/sandboxes')
