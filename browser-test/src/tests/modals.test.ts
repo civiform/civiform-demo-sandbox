@@ -1,6 +1,11 @@
 /**
  * Browser tests for Dashboard Modals.
  *
+ * These tests require SANDBOX_RUNTIME=inmemory so that InMemorySandboxService
+ * seeds demo rows (e.g. "Burlington, VT") at startup. They will fail against a
+ * normal dev database (docker runtime) which starts empty.
+ * See bin/run-browser-tests which sets the env var automatically.
+ *
  * Covers:
  * 1. Details Modal (#info-modal)
  *    - Open via Details button on Burlington row

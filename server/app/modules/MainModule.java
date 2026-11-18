@@ -7,6 +7,7 @@ import play.Environment;
 import play.Logger;
 import play.Logger.ALogger;
 import services.DockerSandboxService;
+import services.InMemorySandboxService;
 import services.SandboxRepository;
 import services.SandboxService;
 import services.SeedingEngine;
@@ -41,6 +42,9 @@ public class MainModule extends AbstractModule {
    *       that works without AWS, so it remains what local development and the test suite use.
    *   <li>{@code terraform} — runs the {@code terraform/sandbox} root module per sandbox against
    *       shared AWS infrastructure.
+   *   <li>{@code inmemory} — no real containers; holds sandboxes in a {@code ConcurrentHashMap}
+   *       with pre-seeded demo data (e.g. "Burlington, VT"). Used by browser tests so they can
+   *       exercise modals and UI without Docker or AWS.
    * </ul>
    */
   private Class<? extends SandboxService> sandboxServiceClass() {
@@ -55,12 +59,16 @@ public class MainModule extends AbstractModule {
         log.info("Sandbox runtime: terraform (AWS)");
         yield TerraformSandboxService.class;
       }
+      case "inmemory" -> {
+        log.info("Sandbox runtime: inmemory (seeded demo data, no containers)");
+        yield InMemorySandboxService.class;
+      }
       // Fail at startup rather than defaulting. A typo in SANDBOX_RUNTIME that
       // silently fell back to docker would be discovered only when a sales rep
       // created a sandbox that came up on localhost and was unreachable.
       default ->
           throw new IllegalStateException(
-              "Unknown sandbox.runtime '" + runtime + "'. Expected \"docker\" or \"terraform\".");
+              "Unknown sandbox.runtime '" + runtime + "'. Expected \"docker\", \"terraform\", or \"inmemory\".");
     };
   }
 }
