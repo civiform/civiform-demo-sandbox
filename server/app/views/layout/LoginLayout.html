@@ -72,7 +72,9 @@
   </head>
   <!-- Full-page dark navy background — no USWDS banner, header, or footer -->
   <body style="background-color: #162e51; margin: 0;">
-    <th:block th:insert="~{${layoutParams.pageTemplate()} :: content}"></th:block>
+    <main>
+      <th:block th:insert="~{${layoutParams.pageTemplate()} :: content}"></th:block>
+    </main>
 
     <!-- Body Scripts -->
     <script
