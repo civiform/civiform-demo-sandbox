@@ -176,6 +176,30 @@
         color: #1b1b1b !important;
       }
 
+      /* Native <dialog> modals */
+      dialog.cf-modal {
+        border: 0;
+        padding: 0;
+        margin: auto;
+        background: transparent;
+        width: calc(100% - 3.5rem);
+        max-width: 30rem;
+        max-height: none;
+        overflow: visible;
+      }
+      dialog.cf-modal--wizard {
+        max-width: 32rem;
+      }
+      dialog.cf-modal::backdrop {
+        background: rgba(0, 0, 0, 0.7);
+      }
+      dialog.cf-modal .usa-modal__content {
+        flex-direction: column;
+      }
+      #create-modal .usa-modal__close {
+        margin: 0.5rem 0.5rem 0.25rem auto;
+      }
+
       /* USWDS Step Indicator Overrides */
       #create-modal .usa-step-indicator { box-shadow: none; }
       #create-modal .usa-step-indicator__heading {

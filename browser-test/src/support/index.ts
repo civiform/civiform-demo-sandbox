@@ -166,5 +166,42 @@ export async function fillCreateWizard(
  */
 export async function openCreateModal(page: Page): Promise<void> {
   await page.click('button:has-text("Create new demo")')
-  await page.waitForSelector('#create-modal.is-visible .usa-modal__main')
+  await page.waitForSelector('#create-modal[open] .usa-modal__main')
+}
+
+/**
+ * Advances keyboard focus by one step within a native <dialog>.
+ * When Tab/Shift+Tab crosses the dialog boundary in Chromium, focus briefly
+ * steps to the browser chrome slot (document.body) without ever entering the
+ * inert background document; one additional press re-enters the dialog.
+ */
+export async function tabWithinDialog(
+  page: Page,
+  modalSelector: string,
+  key: 'Tab' | 'Shift+Tab' = 'Tab',
+): Promise<void> {
+  await page.keyboard.press(key)
+  const landedOnBody = await page.evaluate((sel) => {
+    const modal = document.querySelector(sel)
+    const active = document.activeElement
+    if (modal && active && modal.contains(active)) {
+      return false
+    }
+    if (active === document.body || active === null) {
+      return true
+    }
+    throw new Error(
+      `Focus escaped modal to background element: ${active.outerHTML}`,
+    )
+  }, modalSelector)
+  if (landedOnBody) {
+    await page.keyboard.press(key)
+  }
+  const inside = await page.evaluate((sel) => {
+    const modal = document.querySelector(sel)
+    return Boolean(
+      modal && document.activeElement && modal.contains(document.activeElement),
+    )
+  }, modalSelector)
+  expect(inside).toBe(true)
 }
