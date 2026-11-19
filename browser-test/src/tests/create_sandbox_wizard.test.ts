@@ -110,10 +110,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
   test('Step 1 screenshot matches baseline', async ({page}) => {
     await openCreateModal(page)
     await test.step('Screenshot Step 1', async () => {
-      await validateScreenshot(
-        page.locator('#create-modal .usa-modal__main'),
-        'wizard-step-1',
-      )
+      await validateScreenshot(page.locator('#create-modal'), 'wizard-step-1')
     })
   })
 
@@ -141,10 +138,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     await page.waitForSelector('[name="subdomain"]')
 
     await test.step('Screenshot Step 2', async () => {
-      await validateScreenshot(
-        page.locator('#create-modal .usa-modal__main'),
-        'wizard-step-2',
-      )
+      await validateScreenshot(page.locator('#create-modal'), 'wizard-step-2')
     })
   })
 
