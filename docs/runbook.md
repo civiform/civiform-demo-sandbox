@@ -34,7 +34,7 @@ The owner watches `#civiform-sre-alerts` for this service, reads the spend alert
 
 ## Deploy
 
-1. Refresh AWS credentials from SSO. The `Deploy to Production` workflow reads temporary credentials from the repository secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`, which expire within hours.
+1. Copy fresh temporary credentials from your AWS SSO login into the repository secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`. The `Deploy to Production` workflow reads them, and they expire within hours.
 2. Run the `Deploy to Production` workflow from GitHub Actions. To deploy from your machine instead, run `./bin/deploy-prod`.
 3. Check that the service is stable and healthy:
 
@@ -47,6 +47,8 @@ The owner watches `#civiform-sre-alerts` for this service, reads the spend alert
 Every deploy rebuilds the `latest` image, so there is no tag to roll back to. To roll back, run the workflow from a branch or tag at the last good commit.
 
 Changes under `terraform/` are not part of the workflow. Run `terraform plan` and read it before `terraform apply`, using the state key above and the commands in [Platform Infrastructure](deployment-guide.md#platform-infrastructure-terraform). A new task definition only takes effect through that apply. `--force-new-deployment` restarts the service on its current task definition.
+
+Always pass `-var="auth0_client_id=<client ID>"` to `terraform plan` and `terraform apply`, using the `AUTH0_CLIENT_ID` value from the builder's current task definition. The variable defaults to empty, and an empty client ID turns off Auth0 sign-in to the portal.
 
 ## The daily sweeper
 
@@ -75,7 +77,7 @@ A different alert, "CiviForm Sandbox DurableJob failure", means the job itself c
 The builder posts alerts only if the `SLACK_SRE_ALERTS_WEBHOOK_URL` secret is set. Without it, alerts are written to the builder log at `ERROR` and nobody is notified. Terraform defines the secret `civiform-sandbox/slack-sre-webhook-url` and passes it to the builder task. To set it up:
 
 1. Create an incoming webhook for `#civiform-sre-alerts` in Slack.
-2. Run `terraform plan` and then `terraform apply` in `terraform/`. This creates the secret with a placeholder value, registers a new task definition and updates the service.
+2. Run `terraform plan` and then `terraform apply` in `terraform/`, with `auth0_client_id` set as described under [Deploy](#deploy). This creates the secret with a placeholder value, registers a new task definition and updates the service.
 3. Store the webhook URL in the secret:
 
     ```bash
@@ -97,10 +99,11 @@ The builder posts alerts only if the `SLACK_SRE_ALERTS_WEBHOOK_URL` secret is se
 
 Each running sandbox is its own Fargate service, and ECS is the largest cost in the account. A sandbox that is stuck, or expired but still inside its grace period, keeps costing money.
 
-`terraform/budget.tf` defines a monthly budget for the whole account. It emails the addresses in `budget_alert_emails` at 80 percent of `monthly_budget_usd` spent and when the forecast passes 100 percent. No budget is created until `budget_alert_emails` is set, so set it when you apply, to a shared address that the owner reads. For example:
+`terraform/budget.tf` defines a monthly budget for the whole account. It emails the addresses in `budget_alert_emails` at 80 percent of `monthly_budget_usd` spent and when the forecast passes 100 percent. No budget is created until `budget_alert_emails` is set to a shared address that the owner reads. Pass it on every apply, like `auth0_client_id`, because an apply without it deletes the budget. For example:
 
 ```bash
-terraform apply -var='budget_alert_emails=["team-alias@example.com"]'
+terraform apply -var="auth0_client_id=<client ID>" \
+  -var='budget_alert_emails=["team-alias@example.com"]'
 ```
 
-When an alert fires, compare the dashboard with `aws ecs list-services --cluster civiform-sandbox-cluster`. A `sb-<id>-civiform-service` with no matching running or `STOPPED` row is a leftover.
+When an alert fires, compare the dashboard with `aws ecs list-services --cluster civiform-sandbox-cluster`. A `sb-<id>-civiform-service` whose sandbox shows as deleted, or isn't on the dashboard at all, is a leftover.
