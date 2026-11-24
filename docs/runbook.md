@@ -9,7 +9,7 @@ How to run the sandbox builder in AWS: who owns it, how to get access, how to de
 | Owner | (name) |
 | Backup | (name) |
 
-The owner watches `#civiform-sre-alerts` for this service, reads the spend alerts, and approves access requests for AWS, Auth0 and GitHub. Update this table when ownership changes.
+The owner watches this service's alerts in the private `#eng-alerts` channel, reads the spend alerts, and approves access requests for AWS, Auth0 and GitHub. Update this table when ownership changes.
 
 ## What lives where
 
@@ -63,7 +63,7 @@ The job's normal log lines don't reach CloudWatch, because the builder logs at `
 
 ## When the alert fires
 
-The alert is posted to `#civiform-sre-alerts` with the title "CiviForm Sandbox automated teardown failed 3 times". It lists the sandbox ID, city, subdomain, database and the last error.
+The alert is posted to `#eng-alerts` with the title "CiviForm Sandbox automated teardown failed 3 times". It lists the sandbox ID, city, subdomain, database and the last error.
 
 1. Find the sandbox's errors in `/ecs/civiform-sandbox-builder` by searching for its ID.
 2. Click Delete on its row in the dashboard. This retries the teardown, which sometimes succeeds after a transient failure.
@@ -76,7 +76,7 @@ A different alert, "CiviForm Sandbox DurableJob failure", means the job itself c
 
 The builder posts alerts only if the `SLACK_SRE_ALERTS_WEBHOOK_URL` secret is set. Without it, alerts are written to the builder log at `ERROR` and nobody is notified. Terraform defines the secret `civiform-sandbox/slack-sre-webhook-url` and passes it to the builder task. To set it up:
 
-1. Create an incoming webhook for `#civiform-sre-alerts` in Slack.
+1. Create a Slack incoming webhook for the private `#eng-alerts` channel. The webhook decides where alerts go, and Terraform also sets `SLACK_SRE_ALERTS_CHANNEL` to `#eng-alerts` so the message names the same channel.
 2. Run `terraform plan` and then `terraform apply` in `terraform/`, with `auth0_client_id` set as described under [Deploy](#deploy). This creates the secret with a placeholder value, registers a new task definition and updates the service.
 3. Store the webhook URL in the secret:
 
