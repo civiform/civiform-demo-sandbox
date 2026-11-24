@@ -6,6 +6,7 @@ shareable with prospects via a 6-digit PIN and a branded subdomain.
 
 **Cloud**: AWS ECS Fargate + RDS Postgres.
 **Status**: Core provisioning and AWS infrastructure complete. Seeding engine and CiviForm demo enhancements in progress.
+**Operations**: [Runbook](docs/runbook.md) for owners, access, deploys, alerts and spending; [deployment guide](docs/deployment-guide.md) for architecture and full deploy steps.
 
 ---
 

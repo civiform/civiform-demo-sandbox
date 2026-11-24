@@ -93,3 +93,25 @@ variable "auth0_client_id" {
 }
 
 
+
+variable "budget_alert_emails" {
+  description = "Email addresses to notify about monthly AWS spend. Leave empty to skip creating the budget."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for email in var.budget_alert_emails : can(regex("^[^@\\s]+@[^@\\s]+$", email))])
+    error_message = "Each entry in budget_alert_emails must be an email address."
+  }
+}
+
+variable "monthly_budget_usd" {
+  description = "Monthly spend limit in US dollars for the whole account. Alerts fire at 80 percent spent and when the forecast passes 100 percent. Ignored when budget_alert_emails is empty."
+  type        = number
+  default     = 450
+
+  validation {
+    condition     = var.monthly_budget_usd > 0
+    error_message = "monthly_budget_usd must be greater than zero."
+  }
+}
