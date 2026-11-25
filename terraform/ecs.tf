@@ -507,13 +507,13 @@ resource "aws_secretsmanager_secret_version" "auth0_client_secret" {
   }
 }
 
-# Slack incoming webhook URL for #civiform-sre-alerts (SLACK_SRE_ALERTS_WEBHOOK_URL).
+# Slack incoming webhook URL for the private #eng-alerts channel (SLACK_SRE_ALERTS_WEBHOOK_URL).
 # Created with a non-empty placeholder so the builder ECS task starts cleanly before
 # the webhook URL is populated via AWS CLI / console; `ignore_changes` prevents a
 # subsequent `terraform apply` from overwriting the real webhook secret.
 resource "aws_secretsmanager_secret" "slack_sre_webhook_url" {
   name                    = "civiform-sandbox/slack-sre-webhook-url"
-  description             = "Slack incoming webhook URL for #civiform-sre-alerts"
+  description             = "Slack incoming webhook URL for #eng-alerts"
   kms_key_id              = aws_kms_key.sandbox_secrets.arn
   recovery_window_in_days = 0
   tags                    = { Name = "civiform-sandbox-slack-sre-webhook-url" }
@@ -634,6 +634,7 @@ resource "aws_ecs_task_definition" "builder" {
         { name = "AUTH0_DOMAIN", value = var.auth0_domain },
         { name = "AUTH0_CLIENT_ID", value = var.auth0_client_id },
         { name = "PLATFORM_OUTPUTS_JSON", value = local.builder_platform_outputs_json },
+        { name = "SLACK_SRE_ALERTS_CHANNEL", value = "#eng-alerts" },
       ]
 
       secrets = [
@@ -745,7 +746,7 @@ output "auth0_client_secret_arn" {
 }
 
 output "slack_sre_webhook_url_secret_arn" {
-  description = "Secrets Manager ARN where the #civiform-sre-alerts Slack webhook URL should be stored"
+  description = "Secrets Manager ARN where the #eng-alerts Slack webhook URL should be stored"
   value       = aws_secretsmanager_secret.slack_sre_webhook_url.arn
 }
 

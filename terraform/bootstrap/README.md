@@ -14,7 +14,7 @@ One bucket, one state file per stack:
 
 ```
 civiform-sandbox-tfstate/
-├── platform/terraform.tfstate          # terraform/        — VPC, RDS, ALB, ECS cluster, KMS
+├── sandbox/terraform.tfstate           # terraform/        — VPC, RDS, ALB, ECS cluster, KMS
 └── sandboxes/
     ├── sb-burlington-vt-a1b2/terraform.tfstate
     ├── sb-providence-ri-c3d4/terraform.tfstate
@@ -26,7 +26,7 @@ Initialise a root against it with:
 ```bash
 terraform -chdir=terraform init \
   -backend-config="bucket=civiform-sandbox-tfstate" \
-  -backend-config="key=platform/terraform.tfstate" \
+  -backend-config="key=sandbox/terraform.tfstate" \
   -backend-config="region=us-east-1" \
   -backend-config="use_lockfile=true"
 ```

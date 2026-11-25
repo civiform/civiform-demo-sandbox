@@ -25,7 +25,7 @@ terraform {
   #
   #   terraform init \
   #     -backend-config="bucket=civiform-sandbox-tfstate" \
-  #     -backend-config="key=platform/terraform.tfstate" \
+  #     -backend-config="key=sandbox/terraform.tfstate" \
   #     -backend-config="region=us-east-1" \
   #     -backend-config="use_lockfile=true"
   #
