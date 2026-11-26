@@ -730,6 +730,22 @@
             <button id="copy-all-btn" onclick="copyAll()" class="usa-button usa-button--unstyled w-full text-center py-2">
               Copy all
             </button>
+
+            <!-- ── Screen reader live region (inside dialog so aria-modal doesn't hide it) ──── -->
+            <div id="copy-announcer" class="usa-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+            <!-- ── Copy success alert (visual only — above modal scrim) ────────── -->
+            <div
+              id="copy-alert"
+              class="usa-alert usa-alert--success usa-alert--slim"
+              aria-hidden="true"
+              hidden
+              style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100000; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+            >
+              <div class="usa-alert__body">
+                <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
+              </div>
+            </div>
           </div>
           <button
             type="button"
@@ -1161,22 +1177,6 @@
           </button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ── Screen reader live region (always in DOM, visually hidden) ──── -->
-  <div id="copy-announcer" class="usa-sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-
-  <!-- ── Copy success alert (visual only — above modal scrim) ────────── -->
-  <div
-    id="copy-alert"
-    class="usa-alert usa-alert--success usa-alert--slim"
-    aria-hidden="true"
-    hidden
-    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100000; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
-  >
-    <div class="usa-alert__body">
-      <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
     </div>
   </div>
 
