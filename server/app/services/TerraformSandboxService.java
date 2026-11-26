@@ -34,11 +34,14 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -83,6 +86,15 @@ public class TerraformSandboxService implements SandboxService {
    * resource name, address, or identity.
    */
   private static final String DESTROY_PLACEHOLDER_PASSWORD = "unused-during-destroy";
+
+  /**
+   * Per-sandbox ALB listener rule resource addresses in {@code terraform/sandbox/main.tf} removed
+   * when disabling an expired sandbox.
+   */
+  @VisibleForTesting
+  static final ImmutableList<String> ALB_LISTENER_RULE_TARGETS =
+      ImmutableList.of(
+          "aws_lb_listener_rule.sandbox_allow", "aws_lb_listener_rule.sandbox_redirect");
 
   private final SandboxRepository repository;
   private final TerraformCli terraform;
@@ -420,6 +432,112 @@ public class TerraformSandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Boolean> disableExpiredSandbox(String id, Instant expiredBefore) {
+    Optional<SandboxInstance> maybeSandbox = repository.findById(id);
+    if (maybeSandbox.isEmpty()
+        || !isEligibleForExpiredDisabling(maybeSandbox.get(), expiredBefore)) {
+      maybeSandbox.ifPresent(
+          sb ->
+              log.info(
+                  "[{}] Skipping expired-sandbox disable: status={}, expiresAt={}, cutoff={}",
+                  id,
+                  sb.getStatus(),
+                  sb.getExpiresAt(),
+                  expiredBefore));
+      return CompletableFuture.completedFuture(false);
+    }
+
+    AtomicBoolean disabled = new AtomicBoolean(false);
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<Thread> workerThread = new AtomicReference<>();
+    CompletableFuture<Boolean> result =
+        enqueueForSandbox(
+                id,
+                () -> {
+                  if (cancelled.get()) {
+                    return;
+                  }
+                  workerThread.set(Thread.currentThread());
+                  try {
+                    if (cancelled.get() || Thread.currentThread().isInterrupted()) {
+                      return;
+                    }
+                    // Re-read inside the serialized per-sandbox queue in case the sandbox was
+                    // extended, re-provisioned, or manually deleted while waiting for a prior task.
+                    Optional<SandboxInstance> latest = repository.findById(id);
+                    if (latest.isEmpty()
+                        || !isEligibleForExpiredDisabling(latest.get(), expiredBefore)) {
+                      latest.ifPresent(
+                          sb ->
+                              log.info(
+                                  "[{}] Skipping expired-sandbox disable after queue wait:"
+                                      + " status={}, expiresAt={}, cutoff={}",
+                                  id,
+                                  sb.getStatus(),
+                                  sb.getExpiresAt(),
+                                  expiredBefore));
+                      return;
+                    }
+                    disableExpired(latest.get());
+                    disabled.set(true);
+                  } finally {
+                    workerThread.set(null);
+                    Thread.interrupted();
+                  }
+                })
+            .thenApply(ignored -> disabled.get());
+    result.whenComplete(
+        (ignored, ex) -> {
+          if (ex instanceof CancellationException) {
+            cancelled.set(true);
+            Thread running = workerThread.get();
+            if (running != null) {
+              running.interrupt();
+            }
+          }
+        });
+    return result;
+  }
+
+  private static boolean isEligibleForExpiredDisabling(
+      SandboxInstance sandbox, Instant expiredBefore) {
+    return sandbox.getStatus() == SandboxStatus.RUNNING
+        && sandbox.getExpiresAt() != null
+        && sandbox.getExpiresAt().isBefore(expiredBefore);
+  }
+
+  /**
+   * Synchronous disable path for {@link #disableExpiredSandbox(String, Instant)}. Runs on {@link
+   * #provisioningPool}, serialized through {@link #inFlight}. Destroys only the per-sandbox ALB
+   * listener rules via targeted {@code terraform destroy} and marks the sandbox {@link
+   * SandboxStatus#STOPPED} on success. On failure, leaves the row {@link SandboxStatus#RUNNING} and
+   * propagates the exception so the next daily run retries automatically.
+   */
+  private void disableExpired(SandboxInstance sandbox) {
+    String id = sandbox.getId();
+    Path workDir = null;
+
+    try {
+      log.info("[{}] Scheduled expired-sandbox disable started", id);
+      workDir = createWorkspace(id);
+      Path varFile = workDir.resolve("sandbox.tfvars.json");
+      writeTfVars(varFile, sandbox, sandbox.getDatabaseName(), DESTROY_PLACEHOLDER_PASSWORD);
+
+      terraform.init(workDir, stateBucket, stateKey(id), awsRegion);
+      terraform.destroyTargets(
+          workDir, varFile, ALB_LISTENER_RULE_TARGETS, line -> log.debug("[{}] {}", id, line));
+      log.info("[{}] ALB listener rules removed", id);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Terraform disable failed for sandbox " + id + ": " + e.getMessage(), e);
+    } finally {
+      deleteRecursively(workDir);
+    }
+
+    repository.markStopped(id);
+  }
+
+  @Override
   public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
     Optional<SandboxInstance> maybeSandbox = repository.findById(id);
     if (maybeSandbox.isEmpty()
@@ -435,12 +553,9 @@ public class TerraformSandboxService implements SandboxService {
       return CompletableFuture.completedFuture(false);
     }
 
-    java.util.concurrent.atomic.AtomicBoolean destroyed =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicBoolean cancelled =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-    java.util.concurrent.atomic.AtomicReference<Thread> workerThread =
-        new java.util.concurrent.atomic.AtomicReference<>();
+    AtomicBoolean destroyed = new AtomicBoolean(false);
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+    AtomicReference<Thread> workerThread = new AtomicReference<>();
     CompletableFuture<Boolean> result =
         enqueueForSandbox(
                 id,
@@ -480,7 +595,7 @@ public class TerraformSandboxService implements SandboxService {
             .thenApply(ignored -> destroyed.get());
     result.whenComplete(
         (ignored, ex) -> {
-          if (ex instanceof java.util.concurrent.CancellationException) {
+          if (ex instanceof CancellationException) {
             cancelled.set(true);
             Thread running = workerThread.get();
             if (running != null) {
@@ -494,6 +609,7 @@ public class TerraformSandboxService implements SandboxService {
   private static boolean isEligibleForExpiredDestruction(
       SandboxInstance sandbox, Instant expiredBefore) {
     return (sandbox.getStatus() == SandboxStatus.RUNNING
+            || sandbox.getStatus() == SandboxStatus.STOPPED
             || sandbox.getStatus() == SandboxStatus.FAILED
             || sandbox.getStatus() == SandboxStatus.DELETE_FAILED)
         && sandbox.getExpiresAt() != null
@@ -682,9 +798,10 @@ public class TerraformSandboxService implements SandboxService {
           }
           SandboxInstance sandbox = maybeSandbox.get();
 
-          // An expired or torn-down sandbox must not be reachable even with the right PIN.
+          // An expired, disabled, or torn-down sandbox must not be reachable even with the right PIN.
           if (sandbox.getStatus() == SandboxStatus.DELETED
               || sandbox.getStatus() == SandboxStatus.DELETING
+              || sandbox.getStatus() == SandboxStatus.STOPPED
               || sandbox.getExpiresAt().isBefore(clock.instant())) {
             return Optional.<SandboxInstance>empty();
           }

@@ -60,7 +60,7 @@ validation, enforced at the ALB level (not in CiviForm application code).
 cf-sandbox-builder/
 ├── Dockerfile                  # Development container image
 ├── prod.Dockerfile             # Production multi-stage release image (JDK build + JRE + Terraform)
-├── docker-compose.yml          # Postgres 16 + builder service (ports 9001, 5174)
+├── docker-compose.yml          # Postgres 16 + builder service (ports 9001, 9002, 5174)
 ├── docker-compose.dev.yml      # Dev overrides (volume mounts, hot reload)
 ├── init_postgres.sql           # DB init: sandbox_instances table + sequences
 ├── migrations/                 # One-time SQL for upgrading pre-existing environments
@@ -307,6 +307,19 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 ./bin/sbt test                    # Unit tests (164+ tests, no Docker/AWS needed)
 ./bin/run-browser-tests           # Playwright E2E tests
 ```
+
+`./bin/run-browser-tests` automatically launches an isolated test server on port `9002` with `SANDBOX_RUNTIME=inmemory`, a frozen `Clock` (`FIXED_CLOCK_INSTANT`), and a clean `sandbox_builder_test` database, leaving the running dev server (`9001`) and dev database (`sandbox_builder`) untouched.
+
+### Browser Test Environment Variables (`./bin/run-browser-tests`)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TEST_PORT` | `9002` | Port inside/outside the `builder` container for the isolated test server |
+| `TEST_DB_NAME` | `sandbox_builder_test` | Ephemeral PostgreSQL database created before tests and dropped on exit (must end in `_test`) |
+| `FIXED_CLOCK_INSTANT` | `2026-10-01T12:00:00Z` | ISO-8601 instant used to freeze both the server `Clock` and Playwright browser `Date` |
+| `BASE_URL` | `http://localhost:${TEST_PORT}` | Base URL targeted by Playwright (`browser-test/src/support/config.ts`) |
+| `DB_CONTAINER_NAME` | `cf-sandbox-builder-db-1` | Docker container name for PostgreSQL |
+| `BUILDER_CONTAINER_NAME` | `cf-sandbox-builder-builder-1` | Docker container name for the Play builder container |
 
 ### Test Coverage
 

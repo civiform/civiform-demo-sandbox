@@ -477,6 +477,45 @@ public class SandboxRepositoryTest {
   }
 
   @Test
+  public void markStopped_setsStatusStoppedAndClearsListenerRuleArn() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    when(conn.prepareStatement(
+            "UPDATE sandbox_instances SET status = ?, listener_rule_arn = NULL WHERE id = ?"))
+        .thenReturn(ps);
+
+    repository.markStopped("sb-1");
+
+    verify(ps).setString(1, "STOPPED");
+    verify(ps).setString(2, "sb-1");
+    verify(ps).executeUpdate();
+  }
+
+  @Test
+  public void findExpiredForDisabling_bindsCutoffAndSelectsRunningOnly() throws Exception {
+    PreparedStatement ps = mock(PreparedStatement.class);
+    ResultSet rs = mock(ResultSet.class);
+    when(conn.prepareStatement(anyString())).thenReturn(ps);
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenReturn(true, false);
+    setupResultSetRow(rs, "sb-exp-run", SandboxStatus.RUNNING);
+
+    Instant cutoff = Instant.parse("2026-08-15T00:00:00Z");
+    ImmutableList<SandboxInstance> results = repository.findExpiredForDisabling(cutoff);
+
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+    verify(conn).prepareStatement(sqlCaptor.capture());
+    assertThat(sqlCaptor.getValue())
+        .contains("WHERE status = 'RUNNING'")
+        .contains("AND expires_at < ?")
+        .contains("ORDER BY expires_at ASC");
+    verify(ps).setTimestamp(1, Timestamp.from(cutoff));
+
+    assertThat(results).hasSize(1);
+    assertThat(results.get(0).getId()).isEqualTo("sb-exp-run");
+    assertThat(results.get(0).getStatus()).isEqualTo(SandboxStatus.RUNNING);
+  }
+
+  @Test
   public void findExpiredForDestruction_bindsCutoffAndMaxAttempts() throws Exception {
     PreparedStatement ps = mock(PreparedStatement.class);
     ResultSet rs = mock(ResultSet.class);
@@ -493,7 +532,7 @@ public class SandboxRepositoryTest {
     ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
     verify(conn).prepareStatement(sqlCaptor.capture());
     assertThat(sqlCaptor.getValue())
-        .contains("WHERE status IN ('RUNNING', 'FAILED', 'DELETE_FAILED')")
+        .contains("WHERE status IN ('RUNNING', 'STOPPED', 'FAILED', 'DELETE_FAILED')")
         .contains("AND expires_at < ?")
         .contains("AND destroy_attempts < ?");
     verify(ps).setTimestamp(1, Timestamp.from(cutoff));

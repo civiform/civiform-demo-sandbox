@@ -155,10 +155,26 @@ public class InMemorySandboxService implements SandboxService {
   }
 
   @Override
+  public CompletionStage<Boolean> disableExpiredSandbox(String id, Instant expiredBefore) {
+    SandboxInstance existing = sandboxes.get(id);
+    if (existing == null
+        || existing.getStatus() != SandboxStatus.RUNNING
+        || existing.getExpiresAt() == null
+        || !existing.getExpiresAt().isBefore(expiredBefore)) {
+      return CompletableFuture.completedFuture(false);
+    }
+    SandboxInstance stopped =
+        existing.toBuilder().status(SandboxStatus.STOPPED).listenerRuleArn(null).build();
+    sandboxes.put(id, stopped);
+    return CompletableFuture.completedFuture(true);
+  }
+
+  @Override
   public CompletionStage<Boolean> destroyExpiredSandbox(String id, Instant expiredBefore) {
     SandboxInstance existing = sandboxes.get(id);
     if (existing == null
         || (existing.getStatus() != SandboxStatus.RUNNING
+            && existing.getStatus() != SandboxStatus.STOPPED
             && existing.getStatus() != SandboxStatus.FAILED
             && existing.getStatus() != SandboxStatus.DELETE_FAILED)
         || existing.getExpiresAt() == null
@@ -227,7 +243,10 @@ public class InMemorySandboxService implements SandboxService {
     return CompletableFuture.completedFuture(
         Optional.ofNullable(sandboxes.get(sandboxId)).filter(sandbox -> {
           if (sandbox.getStatus() == SandboxStatus.DELETED
-              || sandbox.getStatus() == SandboxStatus.DELETING) {
+              || sandbox.getStatus() == SandboxStatus.DELETING
+              || sandbox.getStatus() == SandboxStatus.STOPPED
+              || (sandbox.getExpiresAt() != null
+                  && sandbox.getExpiresAt().isBefore(clock.instant()))) {
             return false;
           }
           // Constant-time comparison to prevent timing attacks
