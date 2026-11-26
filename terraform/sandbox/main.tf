@@ -228,7 +228,7 @@ module "civiform_app" {
 
     # CiviForm's program import page puts the full JSON in the URL query string
     # during the review redirect. Programs with many dropdown options (e.g.
-    # Montana IWT with 22 offices) exceed Pekko HTTP's default 8 KB max-uri-length
+    # a large program with many offices) exceed Pekko HTTP's default 8 KB max-uri-length
     # and return 414 Request-URI Too Large. Bump to 128 KB.
     JAVA_OPTS = "-Dpekko.http.server.parsing.max-uri-length=131072"
   }

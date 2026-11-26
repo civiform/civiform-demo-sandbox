@@ -96,6 +96,22 @@ public class TerraformCli {
         onLine);
   }
 
+  /** Destroys only the specified target resource addresses in this state. */
+  public void destroyTargets(
+      Path workDir, Path varFile, List<String> targets, Consumer<String> onLine) {
+    checkNotNull(targets);
+    List<String> args = new ArrayList<>();
+    args.add("destroy");
+    args.add("-input=false");
+    args.add("-no-color");
+    args.add("-auto-approve");
+    for (String target : targets) {
+      args.add("-target=" + target);
+    }
+    args.add("-var-file=" + varFile.toAbsolutePath());
+    run(workDir, args, onLine);
+  }
+
   /**
    * Reads the root module's outputs.
    *

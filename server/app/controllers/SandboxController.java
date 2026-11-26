@@ -240,6 +240,12 @@ public class SandboxController extends Controller {
       }
 
       SandboxInstance sandbox = maybeSandbox.get();
+      if (sandbox.getStatus() == models.SandboxStatus.DELETED
+          || sandbox.getStatus() == models.SandboxStatus.DELETING
+          || sandbox.getStatus() == models.SandboxStatus.STOPPED
+          || (sandbox.getExpiresAt() != null && sandbox.getExpiresAt().isBefore(clock.instant()))) {
+        return notFound("Sandbox not found or expired: " + id);
+      }
       if (hasAccessCookie(request, id, sandbox.getAccessToken())) {
         return redirect(sandbox.getUrl());
       }

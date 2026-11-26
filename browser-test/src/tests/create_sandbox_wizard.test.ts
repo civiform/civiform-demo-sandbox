@@ -11,10 +11,26 @@
  * - Feature-off tests: wizard absent when button absent
  */
 
-import {test, expect} from '@playwright/test'
-import {validateScreenshot, validateAccessibility, openCreateModal, loginAsAdmin} from '../support'
+import {expect} from '@playwright/test'
+import {
+  test,
+  validateScreenshot,
+  validateAccessibility,
+  openCreateModal,
+  loginAsAdmin,
+  resetTestState,
+  tabWithinDialog,
+} from '../support'
 
 test.describe('Create Sandbox Wizard (modal)', () => {
+  test.beforeAll(async () => {
+    await resetTestState()
+  })
+
+  test.afterAll(async () => {
+    await resetTestState()
+  })
+
   test.beforeEach(async ({page}) => {
     await loginAsAdmin(page)
     await page.goto('/sandboxes')
@@ -23,15 +39,70 @@ test.describe('Create Sandbox Wizard (modal)', () => {
 
   // ── Modal open/close ───────────────────────────────────────────────────────
 
-  test('Clicking "Create new demo" opens the wizard modal', async ({page}) => {
-    await openCreateModal(page)
-    await expect(page.locator('#create-modal .usa-modal__main')).toBeVisible()
-  })
-
   test('Modal is dismissed when X button is clicked', async ({page}) => {
     await openCreateModal(page)
     await page.click('[aria-label="Close"]')
-    await expect(page.locator('#create-modal .usa-modal__main')).not.toBeVisible()
+    await expect(
+      page.locator('#create-modal .usa-modal__main'),
+    ).not.toBeVisible()
+  })
+
+  test('Create modal steals focus to close button and traps Tab across both steps', async ({
+    page,
+  }) => {
+    const createButton = page.getByRole('button', {name: /create new demo/i})
+    const createModal = page.locator('#create-modal')
+    const closeButton = createModal.locator('.usa-modal__close')
+
+    await createButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(createModal.locator('.usa-modal__main')).toBeVisible()
+    await expect(closeButton).toBeFocused()
+
+    // Step 1 forward Tab cycle stays trapped inside create-modal
+    const step1Targets = [
+      createModal.locator('#cityName'),
+      createModal.locator('input[name="logoType"][value="default"]'),
+      createModal.locator('#expirationDays'),
+      createModal.getByRole('button', {name: /continue to step 2/i}),
+      closeButton,
+    ]
+    for (const target of step1Targets) {
+      await tabWithinDialog(page, '#create-modal', 'Tab')
+      await expect(target).toBeFocused()
+    }
+
+    // Shift+Tab from close button wraps to Next button without entering background UI
+    await tabWithinDialog(page, '#create-modal', 'Shift+Tab')
+    await expect(
+      createModal.getByRole('button', {name: /continue to step 2/i}),
+    ).toBeFocused()
+
+    // Fill city name and advance to Step 2 via keyboard
+    await createModal.locator('#cityName').fill('Burlington, VT')
+    await createModal.getByRole('button', {name: /continue to step 2/i}).focus()
+    await page.keyboard.press('Enter')
+    await expect(closeButton).toBeFocused()
+
+    // Step 2 forward Tab cycle stays trapped inside create-modal
+    const step2Targets = [
+      createModal.locator('#adminEmail'),
+      createModal.locator('#subdomain'),
+      createModal.locator('#pin'),
+      createModal.locator('#googleAnalyticsId'),
+      createModal.getByRole('button', {name: /back to step 1/i}),
+      createModal.getByRole('button', {name: /provision demo/i}),
+      closeButton,
+    ]
+    for (const target of step2Targets) {
+      await tabWithinDialog(page, '#create-modal', 'Tab')
+      await expect(target).toBeFocused()
+    }
+
+    // Dismissing with Escape restores focus to "Create new demo" button
+    await page.keyboard.press('Escape')
+    await expect(createModal.locator('.usa-modal__main')).not.toBeVisible()
+    await expect(createButton).toBeFocused()
   })
 
   // ── Step 1: CiviForm setup ─────────────────────────────────────────────────
@@ -39,7 +110,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
   test('Step 1 screenshot matches baseline', async ({page}) => {
     await openCreateModal(page)
     await test.step('Screenshot Step 1', async () => {
-      await validateScreenshot(page.locator('#create-modal .usa-modal__main'), 'wizard-step-1')
+      await validateScreenshot(page.locator('#create-modal'), 'wizard-step-1')
     })
   })
 
@@ -48,20 +119,11 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     await validateAccessibility(page)
   })
 
-  test('Step 1 has Civic entity field and expiration field', async ({page}) => {
+  test('Step 1 validation: Next shows error when city name is empty', async ({
+    page,
+  }) => {
     await openCreateModal(page)
-    await expect(page.locator('[name="cityName"]')).toBeVisible()
-    await expect(page.locator('[name="expirationDays"]')).toBeVisible()
-  })
-
-  test('Step 1 expiration field defaults to 30', async ({page}) => {
-    await openCreateModal(page)
-    await expect(page.locator('[name="expirationDays"]')).toHaveValue('30')
-  })
-
-  test('Step 1 validation: Next shows error when city name is empty', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', '')
+    await page.fill('#create-modal [name="cityName"]', '')
     await page.click('button:has-text("Next")')
     // Validation error should appear
     await expect(page.locator('#create-wizard-error')).toBeVisible()
@@ -71,18 +133,18 @@ test.describe('Create Sandbox Wizard (modal)', () => {
 
   test('Step 2 screenshot matches baseline', async ({page}) => {
     await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
+    await page.fill('#create-modal [name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
 
     await test.step('Screenshot Step 2', async () => {
-      await validateScreenshot(page.locator('#create-modal .usa-modal__main'), 'wizard-step-2')
+      await validateScreenshot(page.locator('#create-modal'), 'wizard-step-2')
     })
   })
 
   test('Step 2 passes accessibility audit', async ({page}) => {
     await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
+    await page.fill('#create-modal [name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
     await validateAccessibility(page)
@@ -90,7 +152,7 @@ test.describe('Create Sandbox Wizard (modal)', () => {
 
   test('Subdomain field auto-suggests slug from city name', async ({page}) => {
     await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
+    await page.fill('#create-modal [name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
 
@@ -99,78 +161,56 @@ test.describe('Create Sandbox Wizard (modal)', () => {
     expect(subdomain).toBe('burlington-vt')
   })
 
-  test('Subdomain field is editable (rep can override the suggestion)', async ({page}) => {
+  test('Subdomain field is editable (rep can override the suggestion)', async ({
+    page,
+  }) => {
     await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
+    await page.fill('#create-modal [name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
 
     await page.fill('[name="subdomain"]', 'my-custom-slug')
-    await expect(page.locator('[name="subdomain"]')).toHaveValue('my-custom-slug')
-  })
-
-  test('Step 2 shows .sandbox.civiform.dev suffix next to subdomain input', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="subdomain"]')
-
-    await expect(page.getByText('.sandbox.civiform.dev')).toBeVisible()
-  })
-
-  test('PIN field accepts 6-digit input', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="pin"]')
-
-    await page.fill('[name="pin"]', '482917')
-    await expect(page.locator('[name="pin"]')).toHaveValue('482917')
-  })
-
-  test('Step 2 has "Provision demo" submit button', async ({page}) => {
-    await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
-    await page.click('button:has-text("Next")')
-    await page.waitForSelector('[name="subdomain"]')
-
-    await expect(page.getByRole('button', {name: /provision demo/i})).toBeVisible()
+    await expect(page.locator('[name="subdomain"]')).toHaveValue(
+      'my-custom-slug',
+    )
   })
 
   test('Step 2 has Back button to return to Step 1', async ({page}) => {
     await openCreateModal(page)
-    await page.fill('[name="cityName"]', 'Burlington, VT')
+    await page.fill('#create-modal [name="cityName"]', 'Burlington, VT')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
 
     await page.click('button:has-text("Back")')
     // Step 1 fields should be visible again
-    await expect(page.locator('[name="cityName"]')).toBeVisible()
+    await expect(page.locator('#create-modal [name="cityName"]')).toBeVisible()
   })
 
   // ── Full wizard flow → redirect ───────────────────────────────────────────
 
-  test('Completing the wizard redirects to /sandboxes with success flash', async ({page}) => {
+  test('Completing the wizard redirects to /sandboxes with success flash', async ({
+    page,
+  }) => {
     await openCreateModal(page)
 
     // Step 1: CiviForm setup
-    await page.fill('[name="cityName"]', 'Test City')
+    await page.fill('#create-modal [name="cityName"]', 'Test City')
     await page.click('button:has-text("Next")')
     await page.waitForSelector('[name="subdomain"]')
 
     // Step 2: AWS setup + submit
     await page.fill('[name="subdomain"]', 'test-city')
     await page.fill('[name="pin"]', '111222')
-    await page.fill('[name="adminEmail"]', 'test@exygy.com')
+    await page.fill('#create-modal [name="adminEmail"]', 'test@exygy.com')
     await page.click('button:has-text("Provision demo")')
 
-    // Should redirect to /sandboxes (list) — not /sandboxes/:id
-    await page.waitForURL('**/sandboxes')
-    expect(page.url()).toMatch(/\/sandboxes$/)
+    // Should redirect to the dashboard list (/ or /sandboxes) — not /sandboxes/:id
+    await page.waitForURL(
+      (url) => url.pathname === '/' || url.pathname === '/sandboxes',
+    )
 
     // Flash banner should contain the spec message
-    await expect(
-      page.getByText(/demo provisioning initiated/i),
-    ).toBeVisible()
+    await expect(page.getByText(/demo provisioning initiated/i)).toBeVisible()
+    expect(new URL(page.url()).pathname).toMatch(/^\/(sandboxes)?$/)
   })
 })

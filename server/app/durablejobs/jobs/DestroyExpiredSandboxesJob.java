@@ -25,17 +25,29 @@ import services.SandboxService;
 import services.SlackAlertClient;
 
 /**
- * Daily {@link DurableJob} that finds all sandboxes past their post-expiration grace period ({@code
- * expires_at < startOfToday - autodeletionGraceDays}, default {@value
- * #DEFAULT_AUTODELETION_GRACE_DAYS} days), destroys their infrastructure and database via {@link
- * SandboxService#destroyExpiredSandbox(String, Instant)}, and marks their rows {@code DELETED}.
+ * Daily {@link DurableJob} that manages the two-stage post-expiration lifecycle for sandboxes:
+ *
+ * <ol>
+ *   <li><b>Destroy after grace period:</b> Finds all sandboxes past their post-expiration grace
+ *       period ({@code expires_at < startOfToday - autodeletionGraceDays}, default {@value
+ *       #DEFAULT_AUTODELETION_GRACE_DAYS} days), destroys their infrastructure and database via
+ *       {@link SandboxService#destroyExpiredSandbox(String, Instant)}, and marks their rows {@code
+ *       DELETED}.
+ *   <li><b>Disable on expiration date:</b> When {@code autodeletionGraceDays > 0}, finds all
+ *       remaining {@code RUNNING} sandboxes that have expired ({@code expires_at < startOfToday}),
+ *       disables external access (e.g. removing ALB listener rules via Terraform or stopping the
+ *       Docker container) via {@link SandboxService#disableExpiredSandbox(String, Instant)}, and
+ *       marks their rows {@code STOPPED}.
+ * </ol>
  *
  * <p>Per-sandbox failures and timeouts are isolated (Option A): if destroying one sandbox throws or
  * exceeds {@code perSandboxTimeout}, it is marked {@code DELETE_FAILED} with {@code
  * destroy_attempts} incremented so it will be retried on the next daily run without blocking
  * sibling teardowns or failing the overall {@link DurableJob}. Once a sandbox fails {@value
  * #MAX_DESTROY_ATTEMPTS} times, {@link SlackAlertClient} notifies Exygy's {@code
- * #civiform-sre-alerts} channel and automatic retries pause for that sandbox.
+ * #civiform-sre-alerts} channel and automatic retries pause for that sandbox. If disabling an
+ * expired sandbox fails, its status remains {@code RUNNING} and the error is logged so the next
+ * daily run retries automatically without consuming {@code destroy_attempts}.
  */
 public final class DestroyExpiredSandboxesJob extends DurableJob {
 
@@ -112,17 +124,26 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
 
   @Override
   public void run() {
-    Instant cutoff =
+    Instant startOfToday = LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
+    Instant destroyCutoff =
         LocalDate.now(clock)
             .minusDays(autodeletionGraceDays)
             .atStartOfDay(clock.getZone())
             .toInstant();
+
+    runDestroyPhase(destroyCutoff);
+    if (autodeletionGraceDays > 0) {
+      runDisablePhase(startOfToday);
+    }
+  }
+
+  private void runDestroyPhase(Instant cutoff) {
     ImmutableList<SandboxInstance> expired =
         sandboxRepository.findExpiredForDestruction(cutoff, MAX_DESTROY_ATTEMPTS);
 
     log.info(
-        "DestroyExpiredSandboxesJob starting: found {} expired sandbox(es) eligible for teardown"
-            + " (cutoff={}, graceDays={}, perSandboxTimeout={})",
+        "DestroyExpiredSandboxesJob starting destroy phase: found {} expired sandbox(es) eligible"
+            + " for teardown (cutoff={}, graceDays={}, perSandboxTimeout={})",
         expired.size(),
         cutoff,
         autodeletionGraceDays,
@@ -170,6 +191,71 @@ public final class DestroyExpiredSandboxesJob extends DurableJob {
                 ? cause.getMessage()
                 : ExceptionUtils.getStackTrace(cause);
         recordFailureAndAlertIfNeeded(sandbox, errorMessage, cause);
+      }
+    }
+  }
+
+  private void runDisablePhase(Instant cutoff) {
+    ImmutableList<SandboxInstance> toDisable =
+        sandboxRepository.findExpiredForDisabling(cutoff);
+
+    log.info(
+        "DestroyExpiredSandboxesJob starting disable phase: found {} expired sandbox(es) eligible"
+            + " for disabling (cutoff={}, perSandboxTimeout={})",
+        toDisable.size(),
+        cutoff,
+        perSandboxTimeout);
+
+    for (SandboxInstance sandbox : toDisable) {
+      CompletableFuture<Boolean> future = null;
+      try {
+        future =
+            sandboxService.disableExpiredSandbox(sandbox.getId(), cutoff).toCompletableFuture();
+        boolean disabled =
+            Boolean.TRUE.equals(future.get(perSandboxTimeout.toMillis(), TimeUnit.MILLISECONDS));
+        if (disabled) {
+          log.info(
+              "[{}] Expired sandbox disabled and marked STOPPED (expiredAt={})",
+              sandbox.getId(),
+              sandbox.getExpiresAt());
+        } else {
+          log.info(
+              "[{}] Skipped expired-sandbox disable (no longer eligible at execution time)",
+              sandbox.getId());
+        }
+      } catch (TimeoutException e) {
+        future.cancel(true);
+        String timeoutMsg =
+            String.format(
+                "Timed out after %ds waiting for expired-sandbox disable",
+                perSandboxTimeout.toSeconds());
+        log.error(
+            "[{}] Failed to disable expired sandbox (will retry on next run): {}",
+            sandbox.getId(),
+            timeoutMsg,
+            e);
+      } catch (InterruptedException e) {
+        if (future != null) {
+          future.cancel(true);
+        }
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(
+            "Interrupted while disabling expired sandbox " + sandbox.getId(), e);
+      } catch (Exception e) {
+        Throwable cause =
+            (e instanceof ExecutionException || e instanceof CompletionException)
+                    && e.getCause() != null
+                ? e.getCause()
+                : e;
+        String errorMessage =
+            cause.getMessage() != null && !cause.getMessage().isBlank()
+                ? cause.getMessage()
+                : ExceptionUtils.getStackTrace(cause);
+        log.error(
+            "[{}] Failed to disable expired sandbox (will retry on next run): {}",
+            sandbox.getId(),
+            errorMessage,
+            cause);
       }
     }
   }

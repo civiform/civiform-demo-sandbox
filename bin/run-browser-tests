@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # bin/run-browser-tests
-# Run Playwright browser tests against the local dev server.
+# Run Playwright browser tests against an isolated test server and clean database.
+# Leaves the local dev server (port 9001) and dev database (sandbox_builder) untouched.
+#
 # Usage:
-#   ./bin/run-browser-tests              # run all tests headless
-#   ./bin/run-browser-tests --headed     # show browser window
-#   ./bin/run-browser-tests --ui         # Playwright UI mode
+#   ./bin/run-browser-tests                     # run all tests headless
+#   ./bin/run-browser-tests --headed            # show browser window
+#   ./bin/run-browser-tests --ui                # Playwright UI mode
 #   ./bin/run-browser-tests --update-snapshots  # update screenshot baselines
+#
+# Environment variable overrides:
+#   TEST_PORT              (default: 9002)
+#   TEST_DB_NAME           (default: sandbox_builder_test — must end in _test)
+#   FIXED_CLOCK_INSTANT    (default: 2026-10-01T12:00:00Z)
+#   DB_CONTAINER_NAME      (default: cf-sandbox-builder-db-1)
+#   BUILDER_CONTAINER_NAME (default: cf-sandbox-builder-builder-1)
 
 set -euo pipefail
 
@@ -13,10 +22,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BROWSER_TEST_DIR="$REPO_ROOT/browser-test"
 
+cd "$REPO_ROOT"
+source "$SCRIPT_DIR/lib.sh"
+
+TEST_PORT="${TEST_PORT:-9002}"
+TEST_DB_NAME="${TEST_DB_NAME:-sandbox_builder_test}"
+FIXED_CLOCK_INSTANT="${FIXED_CLOCK_INSTANT:-2026-10-01T12:00:00Z}"
+DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-cf-sandbox-builder-db-1}"
+BUILDER_CONTAINER_NAME="${BUILDER_CONTAINER_NAME:-cf-sandbox-builder-builder-1}"
+
+if [[ "$TEST_DB_NAME" == "sandbox_builder" || "$TEST_DB_NAME" != *_test ]]; then
+  echo "❌ Refusing to run browser tests against non-test database: $TEST_DB_NAME"
+  exit 1
+fi
+
 echo "📸 cf-sandbox-builder browser tests"
+echo "   Test server port : $TEST_PORT"
+echo "   Test database    : $TEST_DB_NAME"
+echo "   Sandbox runtime  : inmemory"
+echo "   Frozen clock     : $FIXED_CLOCK_INSTANT"
 echo ""
 
-# Check that node is available
+# Check that node is available (check ~/.nvm in non-interactive shells)
+if ! command -v node &>/dev/null && [ -d "${HOME:-}/.nvm/versions/node" ]; then
+  LATEST_NVM_NODE="$(ls -d "$HOME"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -n 1 || true)"
+  if [[ -n "$LATEST_NVM_NODE" ]]; then
+    export PATH="$LATEST_NVM_NODE:$PATH"
+  fi
+fi
 if ! command -v node &>/dev/null; then
   echo "❌ node not found. Install Node.js >= 20 from https://nodejs.org"
   exit 1
@@ -30,18 +63,118 @@ if [ ! -d "$BROWSER_TEST_DIR/node_modules" ]; then
   echo ""
 fi
 
-# Verify server is reachable before running
-echo "🔍 Checking server health at http://localhost:9001/health ..."
-if ! curl -sf http://localhost:9001/health > /dev/null; then
+RELAY_PID=""
+SERVER_STARTED=false
+DB_CREATED=false
+
+cleanup() {
+  local exit_code=$?
   echo ""
-  echo "❌ Server is not running. Start it first:"
-  echo "   ./bin/run-dev"
-  echo ""
+  echo "🧹 Cleaning up isolated browser test environment..."
+  if [[ -n "$RELAY_PID" ]] && kill -0 "$RELAY_PID" 2>/dev/null; then
+    kill "$RELAY_PID" 2>/dev/null || true
+  fi
+  if [[ "$SERVER_STARTED" == "true" ]]; then
+    docker exec "$BUILDER_CONTAINER_NAME" pkill -f "[r]un ${TEST_PORT}" >/dev/null 2>&1 || true
+  fi
+  if [[ "$DB_CREATED" == "true" ]]; then
+    docker exec "$DB_CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -q -U postgres -d postgres \
+      -c "DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE);" >/dev/null 2>&1 || true
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+# Ensure db and builder containers are running without disrupting an active dev session
+if [[ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER_NAME" 2>/dev/null || echo false)" != "true" ]]; then
+  echo "🐘 Starting db container..."
+  docker::compose_dev up -d db
+fi
+
+if [[ "$(docker inspect -f '{{.State.Running}}' "$BUILDER_CONTAINER_NAME" 2>/dev/null || echo false)" != "true" ]]; then
+  echo "🏗️  Starting builder container..."
+  docker::compose_dev up -d --no-deps builder
+fi
+
+echo "⏳ Waiting for PostgreSQL to be ready..."
+for _ in $(seq 1 30); do
+  if docker exec "$DB_CONTAINER_NAME" pg_isready -U postgres >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# Ensure frontend assets exist
+if [ ! -f "$REPO_ROOT/server/public/dist/uswds.min.js" ]; then
+  echo "🎨 Building frontend assets..."
+  docker exec "$BUILDER_CONTAINER_NAME" sh -c "npm install && npm run build"
+fi
+
+# Create clean test database (schema required by Play db.default and durable jobs)
+echo "🗄️  Creating clean test database ($TEST_DB_NAME)..."
+docker exec "$DB_CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -q -U postgres -d postgres \
+  -c "DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE);" \
+  -c "CREATE DATABASE ${TEST_DB_NAME};"
+DB_CREATED=true
+
+docker exec -i "$DB_CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$TEST_DB_NAME" \
+  < "$REPO_ROOT/init_postgres.sql"
+
+# Stop any stale test server on TEST_PORT inside builder
+docker exec "$BUILDER_CONTAINER_NAME" pkill -f "[r]un ${TEST_PORT}" >/dev/null 2>&1 || true
+
+echo "🚀 Starting isolated test server on port $TEST_PORT..."
+docker exec -d \
+  -e DB_JDBC_URL="jdbc:postgresql://db:5432/${TEST_DB_NAME}" \
+  -e SANDBOX_RUNTIME="inmemory" \
+  -e FIXED_CLOCK_INSTANT="$FIXED_CLOCK_INSTANT" \
+  -e DEMO_PORTAL_PASSWORD="demo" \
+  -e PIN_GATE_MAX_ATTEMPTS="1000" \
+  -e DEV_TOOLS_ENABLED="true" \
+  -e AUTH0_DOMAIN="" \
+  -e AUTH0_CLIENT_ID="" \
+  -e AUTH0_CLIENT_SECRET="" \
+  -e AUTH0_CALLBACK_URL="" \
+  "$BUILDER_CONTAINER_NAME" \
+  sh -c "tail -f /dev/null | sbt -Dsbt.boot.lock=false 'run ${TEST_PORT}' > /tmp/browser-test-server.log 2>&1"
+SERVER_STARTED=true
+
+# Wait for the test server to listen inside the builder container
+echo "🔍 Waiting for test server health check..."
+SERVER_READY=false
+for _ in $(seq 1 90); do
+  if docker exec "$BUILDER_CONTAINER_NAME" curl -sf "http://127.0.0.1:${TEST_PORT}/health" >/dev/null 2>&1; then
+    SERVER_READY=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$SERVER_READY" != "true" ]]; then
+  echo "❌ Test server failed to start within 90s. Server logs:"
+  docker exec "$BUILDER_CONTAINER_NAME" tail -n 60 /tmp/browser-test-server.log || true
   exit 1
 fi
-echo "✅ Server is up"
+
+# If builder container was started before port 9002 was published on the host,
+# bridge localhost:TEST_PORT to the container IP via bin/tcp-relay.py.
+if ! curl -sf "http://127.0.0.1:${TEST_PORT}/health" >/dev/null 2>&1; then
+  BUILDER_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$BUILDER_CONTAINER_NAME")"
+  python3 "$SCRIPT_DIR/tcp-relay.py" 127.0.0.1 "$TEST_PORT" "$BUILDER_IP" "$TEST_PORT" &
+  RELAY_PID=$!
+  for _ in $(seq 1 10); do
+    if curl -sf "http://127.0.0.1:${TEST_PORT}/health" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.5
+  done
+fi
+
+echo "✅ Isolated test server is ready at http://localhost:${TEST_PORT}"
 echo ""
 
 # Run Playwright
 cd "$BROWSER_TEST_DIR"
+BASE_URL="http://localhost:${TEST_PORT}" \
+FIXED_CLOCK_INSTANT="$FIXED_CLOCK_INSTANT" \
 npm run test -- "$@"

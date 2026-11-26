@@ -8,10 +8,20 @@
  * - Clicking "Run job" executes the selected durable job immediately and displays a confirmation
  */
 
-import {test, expect} from '@playwright/test'
-import {validateAccessibility, loginAsAdmin, waitForPath} from '../support'
+import {expect} from '@playwright/test'
+import {
+  test,
+  validateAccessibility,
+  loginAsAdmin,
+  waitForPath,
+  resetTestState,
+} from '../support'
 
 test.describe('Dev Tools Auth', () => {
+  test.beforeAll(async () => {
+    await resetTestState()
+  })
+
   test('Unauthenticated access to /dev redirects to /login', async ({page}) => {
     await page.goto('/dev')
     await waitForPath(page, '/login')
