@@ -1082,10 +1082,16 @@ public class SandboxControllerTest extends WithApplication {
 
   @Test
   public void index_expiredRow_rendersConfiguredAutodeletionGraceDays() {
+    // Use a fixed clock so the day count is deterministic regardless of CI
+    // server timezone.  Noon UTC on May 1 is still May 1 in
+    // America/Los_Angeles, so the LA-based "today" matches the UTC date.
+    java.time.Clock fixedClock =
+        java.time.Clock.fixed(
+            Instant.parse("2030-05-01T12:00:00Z"), java.time.ZoneOffset.UTC);
     SandboxService customSandboxService = mock(SandboxService.class);
     SandboxInstance expiredThreeDaysAgo =
         makeSandbox("sb-exp1", SandboxStatus.RUNNING).toBuilder()
-            .expiresAt(Instant.now().minus(Duration.ofDays(3)).minus(Duration.ofHours(2)))
+            .expiresAt(Instant.parse("2030-04-28T10:00:00Z"))
             .build();
     when(customSandboxService.listSandboxes())
         .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(expiredThreeDaysAgo)));
@@ -1098,26 +1104,31 @@ public class SandboxControllerTest extends WithApplication {
                   @Override
                   protected void configure() {
                     bind(SandboxService.class).toInstance(customSandboxService);
+                    bind(java.time.Clock.class).toInstance(fixedClock);
                   }
                 })
             .build();
 
-    Helpers.running(
-        customApp,
-        () -> {
-          Http.RequestBuilder request =
-              Helpers.fakeRequest()
-                  .method("GET")
-                  .uri("/sandboxes")
-                  .session(AuthController.SESSION_KEY, "true");
+    try {
+      Helpers.running(
+          customApp,
+          () -> {
+            Http.RequestBuilder request =
+                Helpers.fakeRequest()
+                    .method("GET")
+                    .uri("/sandboxes")
+                    .session(AuthController.SESSION_KEY, "true");
 
-          Result result = Helpers.route(customApp, request);
+            Result result = Helpers.route(customApp, request);
 
-          assertThat(result.status()).isEqualTo(OK);
-          String body = contentAsString(result);
-          assertThat(body).contains("Autodeletion in 11 days");
-          assertThat(body).contains("automatically deleted 14 days after its expiration date");
-        });
+            assertThat(result.status()).isEqualTo(OK);
+            String body = contentAsString(result);
+            assertThat(body).contains("Autodeletion in 11 days");
+            assertThat(body).contains("automatically deleted 14 days after its expiration date");
+          });
+    } finally {
+      Helpers.stop(customApp);
+    }
   }
 
   @Test

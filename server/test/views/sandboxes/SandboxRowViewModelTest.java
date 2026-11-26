@@ -63,4 +63,23 @@ public class SandboxRowViewModelTest {
     assertThat(SandboxRowViewModel.of(expiredTenDaysAgo, 7L, NOW).getAutoDeletionDays())
         .isEqualTo(0L);
   }
+
+  /**
+   * Regression test for #101: at 6pm Pacific on Nov 19, it is already Nov 20 in UTC.
+   * CiviForm's demo banner counts in America/Los_Angeles, so it still shows 1 day
+   * remaining. The dashboard must agree, using Pacific time for "today".
+   */
+  @Test
+  public void of_eveningPacific_matchesCiviFormBannerDayCount() {
+    // 6pm Pacific on Nov 19 = 2:00 AM UTC on Nov 20
+    Instant eveningPacific = Instant.parse("2026-11-20T02:00:00Z");
+    // Sandbox expires on Nov 20 UTC
+    SandboxInstance sandbox = sandboxExpiringAt(Instant.parse("2026-11-20T23:59:59Z"));
+
+    SandboxRowViewModel row = SandboxRowViewModel.of(sandbox, 7L, eveningPacific);
+
+    // In UTC "today" would be Nov 20, so days = 0 (expired). But in Pacific time
+    // "today" is still Nov 19, so there is 1 day remaining — matching the banner.
+    assertThat(row.getDaysRemaining()).isEqualTo(1L);
+  }
 }
