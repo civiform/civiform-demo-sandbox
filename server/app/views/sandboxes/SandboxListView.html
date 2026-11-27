@@ -1,6 +1,8 @@
 <style>
   /* Remove default USWDS table top margin so it sits flush in the card */
-  .usa-table { margin-top: 0; }
+  .usa-table {
+    margin-top: 0;
+  }
 </style>
 <div th:fragment="content" class="grid-container py-8">
   <!-- Page Header -->
@@ -11,7 +13,11 @@
       <h1 class="text-3xl font-bold text-gray-900">CiviForm demo portal</h1>
     </div>
     <div class="flex items-center gap-3">
-      <button type="button" onclick="openModal('create-modal')" class="usa-button flex items-center gap-2 w-fit">
+      <button
+        type="button"
+        onclick="openModal('create-modal')"
+        class="usa-button flex items-center gap-2 w-fit"
+      >
         <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
           <use href="/assets/dist/img/sprite.svg#add_circle_outline"></use>
         </svg>
@@ -120,9 +126,9 @@
     >
       <thead>
         <tr>
-          <th data-sortable scope="col" role="columnheader">Civic entity<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
-          <th data-sortable scope="col" role="columnheader">Status<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
-          <th data-sortable scope="col" role="columnheader">Days Remaining<svg class="usa-icon inline-block ml-1 align-text-bottom" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#unfold_more"></use></svg></th>
+          <th data-sortable scope="col" role="columnheader">Civic entity</th>
+          <th data-sortable scope="col" role="columnheader">Status</th>
+          <th data-sortable scope="col" role="columnheader">Days Remaining</th>
           <th scope="col" role="columnheader">
             <span class="usa-sr-only">Actions</span>
           </th>
@@ -131,7 +137,7 @@
       <tbody>
         <tr
           th:each="sb : ${model.sandboxes}"
-          th:classappend="${sb.deleted} ? 'opacity-40' : (${sb.daysRemaining <= 0} ? 'opacity-60' : '')"
+          th:classappend="${sb.deleted} ? 'opacity-40' : ''"
           th:id="|sandbox-row-${sb.sandbox.id}|"
           th:attr="
             hx-get=${(sb.sandbox.status.name() == 'PROVISIONING' or sb.sandbox.status.name() == 'DELETING') ? '/sandboxes' : null},
@@ -153,6 +159,7 @@
           <!-- Status badge -->
           <td
             th:data-sort-value="${sb.sandbox.status.name() != 'RUNNING' ? sb.sandbox.status.name() : (sb.daysRemaining <= 0 ? 'EXPIRED' : (sb.daysRemaining <= 5 ? 'EXPIRING' : 'RUNNING'))}"
+            th:data-status="${sb.sandbox.status.name()}"
           >
             <span
               th:if="${sb.daysRemaining <= 0 and !sb.deleted}"
@@ -179,10 +186,7 @@
             >
               PROVISIONING
             </span>
-            <span
-              th:if="${sb.deleted}"
-              class="usa-tag bg-gray-400 text-white"
-            >
+            <span th:if="${sb.deleted}" class="usa-tag bg-gray-400 text-white">
               DELETED
             </span>
           </td>
@@ -201,33 +205,41 @@
               </div>
             </div>
             <div th:if="${sb.daysRemaining <= 0 and !sb.deleted}">
-              <span class="font-medium text-gray-400">0 days</span>
+              <span class="font-medium text-gray-700">0 days</span>
               <div
-                class="text-xs text-gray-400 mt-0.5"
+                class="text-xs text-gray-700 mt-0.5"
                 th:text="'Expired ' + ${sb.expiryFormatted}"
               >
                 Expired Aug 18, 2026
               </div>
-              <div class="text-xs text-red-600 font-medium mt-1"
-                   th:text="${sb.autoDeletionDays > 0} ? 'Autodeletion in ' + ${sb.autoDeletionDays} + ' days' : 'Autodeletion imminent'">
+              <div
+                class="text-xs text-red-600 font-medium mt-1"
+                th:text="${sb.autoDeletionDays > 0} ? 'Autodeletion in ' + ${sb.autoDeletionDays} + ' days' : 'Autodeletion imminent'"
+              >
                 Autodeletion in 7 days
               </div>
             </div>
             <div th:if="${sb.deleted}">
-              <span class="font-medium text-gray-400"
-                    th:text="'Deleted ' + ${sb.deletedFormatted}">Deleted Oct 1, 2026</span>
+              <span
+                class="font-medium text-gray-400"
+                th:text="'Deleted ' + ${sb.deletedFormatted}"
+                >Deleted Oct 1, 2026</span
+              >
             </div>
           </td>
 
           <!-- Action buttons -->
           <td>
-            <div th:if="${!sb.deleted}" class="flex items-center gap-2 flex-wrap">
-              <!-- Launch → opens CiviForm in new tab -->
+            <div
+              th:if="${!sb.deleted}"
+              class="flex items-center gap-2 flex-wrap"
+            >
+              <!-- Launch → opens CiviForm in new tab (link when launchable, disabled button otherwise) -->
               <a
-                th:href="${sb.sandbox.status.name() == 'RUNNING'} ? ${sb.sandbox.url} : '#'"
+                th:if="${sb.sandbox.status.name() == 'RUNNING' and sb.daysRemaining > 0}"
+                th:href="${sb.sandbox.url}"
                 target="_blank"
                 rel="noopener"
-                th:classappend="${sb.sandbox.status.name() != 'RUNNING'} ? 'pointer-events-none opacity-50' : ''"
                 class="usa-button inline-flex items-center gap-1 no-underline"
               >
                 Launch
@@ -240,6 +252,22 @@
                   <use href="/assets/dist/img/sprite.svg#launch"></use>
                 </svg>
               </a>
+              <button
+                th:if="${sb.sandbox.status.name() != 'RUNNING' or sb.daysRemaining <= 0}"
+                type="button"
+                disabled
+                class="usa-button inline-flex items-center gap-1"
+              >
+                Launch
+                <svg
+                  class="usa-icon"
+                  aria-hidden="true"
+                  focusable="false"
+                  role="img"
+                >
+                  <use href="/assets/dist/img/sprite.svg#launch"></use>
+                </svg>
+              </button>
 
               <!-- Details, Options, AWS button group -->
               <ul class="usa-button-group usa-button-group--segmented">
@@ -304,6 +332,7 @@
                 th:if="${sb.sandbox.status.name() != 'DELETED' and sb.sandbox.status.name() != 'DELETING'}"
                 th:data-id="${sb.sandbox.id}"
                 th:data-city-name="${sb.cityName}"
+                th:aria-label="|Delete demo for ${sb.cityName}|"
                 th:onclick="openDeleteModal(this.getAttribute('data-id'), this.getAttribute('data-city-name'))"
                 class="usa-button text-white bg-red-600 hover:bg-red-700 border border-red-600"
                 th:disabled="${sb.provisioning}"
@@ -319,902 +348,957 @@
                 </svg>
               </button>
             </div>
-            <span th:if="${sb.deleted}" class="text-xs text-gray-400 italic">—</span>
+            <span th:if="${sb.deleted}" class="text-xs text-gray-400 italic"
+              >—</span
+            >
           </td>
         </tr>
       </tbody>
     </table>
   </div>
 
-  <!-- ── Create Modal (3-step wizard) ──────────────────────────────────── -->
-  <div
+  <!-- ── Create Modal (2-step wizard) ──────────────────────────────────── -->
+  <dialog
     id="create-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
+    class="cf-modal cf-modal--wizard"
     aria-labelledby="create-modal-title"
+    onclick="if (event.target === this) closeModal('create-modal')"
   >
-    <div class="usa-modal-overlay" onclick="closeModal('create-modal')">
-      <div
-        class="bg-white rounded-xl shadow-xl max-w-lg relative inline-flex flex-col align-middle text-left"
-        style="max-height: 85vh; overflow-y: auto; width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
+    <div
+      class="bg-white rounded-xl shadow-xl relative flex flex-col text-left w-full"
+      style="max-height: 92vh; overflow-y: auto"
+    >
       <!-- Close X -->
       <button
+        type="button"
         onclick="closeModal('create-modal')"
         aria-label="Close"
-        class="usa-modal__close absolute top-4 right-4 text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
+        class="usa-modal__close text-gray-400 hover:text-gray-700 text-xl leading-none bg-transparent border-0 cursor-pointer"
+        autofocus
       >
         <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
           <use href="/assets/dist/img/sprite.svg#close"></use>
         </svg>
       </button>
 
-      <div class="usa-modal__main px-6 pt-6 pb-6">
-        <!-- Step Indicator -->
-        <div class="usa-step-indicator usa-step-indicator--counters-sm mb-5" aria-label="progress">
-          <ol class="usa-step-indicator__segments">
-            <li id="step-indicator-1" class="usa-step-indicator__segment usa-step-indicator__segment--current">
-              <span class="usa-step-indicator__segment-label">CiviForm setup</span>
-            </li>
-            <li id="step-indicator-2" class="usa-step-indicator__segment">
-              <span class="usa-step-indicator__segment-label">AWS setup <span class="usa-sr-only">not completed</span></span>
-            </li>
-          </ol>
-          <div class="usa-step-indicator__header">
-            <h4 class="usa-step-indicator__heading usa-modal__heading" id="create-modal-title">
-              <span class="usa-step-indicator__heading-counter">
-                <span class="usa-sr-only">Step</span>
-                <span id="step-indicator-current-step" class="usa-step-indicator__current-step">1</span>
-                <span class="usa-step-indicator__total-steps">of 2</span>
-              </span>
-              <span id="step-indicator-heading-text" class="usa-step-indicator__heading-text">CiviForm setup</span>
-            </h4>
-          </div>
-        </div>
-
-        <!-- Inline validation error -->
-        <div
-          id="create-wizard-error"
-          role="alert"
-          aria-live="polite"
-          class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
-        ></div>
-
-        <!-- Wizard Form -->
-        <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
-          <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-
-          <!-- Step 1: CiviForm setup -->
+      <div class="usa-modal__main px-6 pt-1 pb-6">
+          <!-- Step Indicator -->
           <div
-            id="create-step-panel-1"
-            class="wizard-panel"
+            class="usa-step-indicator usa-step-indicator--counters-sm mb-5"
+            aria-label="progress"
           >
-
-            <p class="text-sm text-gray-600 mb-5">
-              Configure general demo and banner information. This is visible to
-              all demo users.
-            </p>
-
-            <!-- Civic entity -->
-            <div class="mb-5" id="fg-cityName">
-              <label
-                for="cityName"
-                class="block text-sm font-bold text-gray-900 mb-1"
+            <ol class="usa-step-indicator__segments">
+              <li
+                id="step-indicator-1"
+                class="usa-step-indicator__segment usa-step-indicator__segment--current"
               >
-                Civic entity<span class="text-red-600" aria-hidden="true"
-                  >*</span
+                <span class="usa-step-indicator__segment-label"
+                  >CiviForm setup</span
                 >
-              </label>
-              <input
-                id="cityName"
-                name="cityName"
-                type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                placeholder="e.g. Bloomington"
-                autocomplete="off"
-                aria-required="true"
-              />
-            </div>
-
-            <!-- Logo / seal -->
-            <div class="mb-5">
-              <p class="text-sm font-bold text-gray-900 mb-2">
-                Logo / seal<span class="text-red-600" aria-hidden="true"
-                  >*</span
+              </li>
+              <li id="step-indicator-2" class="usa-step-indicator__segment">
+                <span class="usa-step-indicator__segment-label"
+                  >AWS setup
+                  <span class="usa-sr-only">not completed</span></span
                 >
-              </p>
-              <div class="flex flex-col gap-2">
-                <label
-                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="logoType"
-                    value="default"
-                    checked
-                    class="accent-blue-700"
-                  />
-                  Default (Preview:
+              </li>
+            </ol>
+            <div class="usa-step-indicator__header">
+              <h4
+                class="usa-step-indicator__heading usa-modal__heading"
+                id="create-modal-title"
+              >
+                <span class="usa-step-indicator__heading-counter">
+                  <span class="usa-sr-only">Step</span>
                   <span
-                    class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold"
-                    >C</span
-                  >)
-                </label>
-                <label
-                  class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
+                    id="step-indicator-current-step"
+                    class="usa-step-indicator__current-step"
+                    >1</span
+                  >
+                  <span class="usa-step-indicator__total-steps">of 2</span>
+                </span>
+                <span
+                  id="step-indicator-heading-text"
+                  class="usa-step-indicator__heading-text"
+                  >CiviForm setup</span
                 >
-                  <input
-                    type="radio"
-                    name="logoType"
-                    value="custom"
-                    class="accent-blue-700"
-                  />
-                  Custom
-                </label>
-              </div>
-            </div>
-
-            <!-- Expiration limit (days) -->
-            <div class="mb-6" id="fg-expirationDays">
-              <label
-                for="expirationDays"
-                class="block text-sm font-bold text-gray-900 mb-1"
-              >
-                Expiration limit (days)<span
-                  class="text-red-600"
-                  aria-hidden="true"
-                  >*</span
-                >
-              </label>
-              <input
-                id="expirationDays"
-                name="expirationDays"
-                type="number"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                value="30"
-                min="1"
-                max="365"
-                aria-label="Demo expiration in days"
-              />
-            </div>
-
-            <!-- Step 1 footer -->
-            <div class="flex items-center justify-end">
-              <button
-                type="button"
-                class="usa-button px-8"
-                onclick="wizardNext(1)"
-                aria-label="Continue to Step 2: AWS setup"
-              >
-                Next
-              </button>
+              </h4>
             </div>
           </div>
 
-          <!-- Step 2: AWS setup -->
+          <!-- Inline validation error -->
           <div
-            id="create-step-panel-2"
-            class="wizard-panel hidden"
-          >
+            id="create-wizard-error"
+            role="alert"
+            aria-live="polite"
+            class="hidden mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+          ></div>
 
-            <p class="text-sm text-gray-600 mb-5">
-              Configure setup details for the AWS deployment.
-            </p>
+          <!-- Wizard Form -->
+          <form id="sandbox-form" action="/sandboxes" method="POST" novalidate>
+            <input
+              type="hidden"
+              name="csrfToken"
+              th:value="${templateGlobals.csrfToken}"
+            />
 
-            <!-- Admin Notification Email -->
-            <div class="mb-5" id="fg-adminEmail">
-              <label
-                for="adminEmail"
-                class="block text-sm font-bold text-gray-900 mb-1"
-              >
-                Admin notification email<span
-                  class="text-red-600"
-                  aria-hidden="true"
-                  >*</span
-                >
-              </label>
-              <input
-                id="adminEmail"
-                name="adminEmail"
-                type="email"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                placeholder="e.g. civiform-dev@exygy.com"
-                autocomplete="email"
-                aria-required="true"
-              />
-            </div>
-
-            <!-- Subdomain -->
-            <div class="mb-5" id="fg-subdomain">
-              <label
-                for="subdomain"
-                class="block text-sm font-bold text-gray-900 mb-1"
-              >
-                Demo instance subdomain<span
-                  class="text-red-600"
-                  aria-hidden="true"
-                  >*</span
-                >
-              </label>
-              <p class="text-xs text-gray-500 mt-0.5 mb-1">
-                Auto-filled from city name — editable.
+            <!-- Step 1: CiviForm setup -->
+            <div id="create-step-panel-1" class="wizard-panel">
+              <p class="text-sm text-gray-600 mb-5">
+                Configure general demo and banner information. This is visible
+                to all demo users.
               </p>
-              <div class="flex items-center gap-0">
+
+              <!-- Civic entity -->
+              <div class="mb-5" id="fg-cityName">
+                <label
+                  for="cityName"
+                  class="block text-sm font-bold text-gray-900 mb-1"
+                >
+                  Civic entity<span class="text-red-600" aria-hidden="true"
+                    >*</span
+                  >
+                </label>
                 <input
-                  id="subdomain"
-                  name="subdomain"
+                  id="cityName"
+                  name="cityName"
                   type="text"
-                  class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm"
-                  placeholder="e.g. bloomington"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder="e.g. Bloomington"
                   autocomplete="off"
                   aria-required="true"
                 />
-                <span
-                  class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap"
-                  >.sandbox.civiform.dev</span
+              </div>
+
+              <!-- Logo / seal -->
+              <div class="mb-5">
+                <p class="text-sm font-bold text-gray-900 mb-2">
+                  Logo / seal<span class="text-red-600" aria-hidden="true"
+                    >*</span
+                  >
+                </p>
+                <div class="flex flex-col gap-2">
+                  <label
+                    class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="logoType"
+                      value="default"
+                      checked
+                      class="accent-blue-700"
+                    />
+                    Default (Preview:
+                    <span
+                      class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-700 text-white text-xs font-bold"
+                      >C</span
+                    >)
+                  </label>
+                  <label
+                    class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="logoType"
+                      value="custom"
+                      class="accent-blue-700"
+                    />
+                    Custom
+                  </label>
+                </div>
+              </div>
+
+              <!-- Expiration limit (days) -->
+              <div class="mb-6" id="fg-expirationDays">
+                <label
+                  for="expirationDays"
+                  class="block text-sm font-bold text-gray-900 mb-1"
                 >
+                  Expiration limit (days)<span
+                    class="text-red-600"
+                    aria-hidden="true"
+                    >*</span
+                  >
+                </label>
+                <input
+                  id="expirationDays"
+                  name="expirationDays"
+                  type="number"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  value="30"
+                  min="1"
+                  max="365"
+                  aria-label="Demo expiration in days"
+                />
+              </div>
+
+              <!-- Step 1 footer -->
+              <div class="flex items-center justify-end">
+                <button
+                  type="button"
+                  class="usa-button px-8"
+                  onclick="wizardNext(1)"
+                  aria-label="Continue to Step 2: AWS setup"
+                >
+                  Next
+                </button>
               </div>
             </div>
 
-            <!-- PIN -->
-            <div class="mb-5" id="fg-pin">
-              <label
-                for="pin"
-                class="block text-sm font-bold text-gray-900 mb-1"
-              >
-                Demo instance access PIN<span
-                  class="text-red-600"
-                  aria-hidden="true"
-                  >*</span
+            <!-- Step 2: AWS setup -->
+            <div id="create-step-panel-2" class="wizard-panel hidden">
+              <p class="text-sm text-gray-600 mb-5">
+                Configure setup details for the AWS deployment.
+              </p>
+
+              <!-- Admin Notification Email -->
+              <div class="mb-5" id="fg-adminEmail">
+                <label
+                  for="adminEmail"
+                  class="block text-sm font-bold text-gray-900 mb-1"
                 >
-              </label>
-              <input
-                id="pin"
-                name="pin"
-                type="text"
-                inputmode="numeric"
-                maxlength="6"
-                pattern="[0-9]{6}"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                placeholder="e.g. 123456"
-                autocomplete="off"
-                aria-required="true"
-              />
-            </div>
+                  Admin notification email<span
+                    class="text-red-600"
+                    aria-hidden="true"
+                    >*</span
+                  >
+                </label>
+                <input
+                  id="adminEmail"
+                  name="adminEmail"
+                  type="email"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder="e.g. civiform-dev@exygy.com"
+                  autocomplete="email"
+                  aria-required="true"
+                />
+              </div>
 
-            <!-- Google Analytics ID (optional) -->
-            <div class="mb-6" id="fg-googleAnalyticsId">
-              <label
-                for="googleAnalyticsId"
-                class="block text-sm font-bold text-gray-900 mb-1"
-              >
-                Google Analytics ID
-                <span class="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <input
-                id="googleAnalyticsId"
-                name="googleAnalyticsId"
-                type="text"
-                class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                placeholder="G-ABC123XYZ"
-                autocomplete="off"
-              />
-            </div>
+              <!-- Subdomain -->
+              <div class="mb-5" id="fg-subdomain">
+                <label
+                  for="subdomain"
+                  class="block text-sm font-bold text-gray-900 mb-1"
+                >
+                  Demo instance subdomain<span
+                    class="text-red-600"
+                    aria-hidden="true"
+                    >*</span
+                  >
+                </label>
+                <p class="text-xs text-gray-500 mt-0.5 mb-1">
+                  Auto-filled from city name — editable.
+                </p>
+                <div class="flex items-center gap-0">
+                  <input
+                    id="subdomain"
+                    name="subdomain"
+                    type="text"
+                    class="flex-1 border border-gray-300 rounded-l px-3 py-2 text-sm"
+                    placeholder="e.g. bloomington"
+                    autocomplete="off"
+                    aria-required="true"
+                  />
+                  <span
+                    class="inline-flex items-center px-3 py-2 border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm rounded-r whitespace-nowrap"
+                    >.sandbox.civiform.dev</span
+                  >
+                </div>
+              </div>
 
-            <!-- Step 2 footer -->
-            <div class="flex items-center justify-between gap-4">
-              <button
-                type="button"
-                class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
-                onclick="wizardBack(2)"
-                aria-label="Back to Step 1: CiviForm setup"
-              >
-                &#x2190; Back
-              </button>
-              <button
-                type="submit"
-                class="usa-button px-8"
-                aria-label="Provision demo"
-              >
-                Provision demo
-              </button>
+              <!-- PIN -->
+              <div class="mb-5" id="fg-pin">
+                <label
+                  for="pin"
+                  class="block text-sm font-bold text-gray-900 mb-1"
+                >
+                  Demo instance access PIN<span
+                    class="text-red-600"
+                    aria-hidden="true"
+                    >*</span
+                  >
+                </label>
+                <input
+                  id="pin"
+                  name="pin"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="6"
+                  pattern="[0-9]{6}"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder="e.g. 123456"
+                  autocomplete="off"
+                  aria-required="true"
+                />
+              </div>
+
+              <!-- Google Analytics ID (optional) -->
+              <div class="mb-6" id="fg-googleAnalyticsId">
+                <label
+                  for="googleAnalyticsId"
+                  class="block text-sm font-bold text-gray-900 mb-1"
+                >
+                  Google Analytics ID
+                  <span class="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="googleAnalyticsId"
+                  name="googleAnalyticsId"
+                  type="text"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  placeholder="G-ABC123XYZ"
+                  autocomplete="off"
+                />
+              </div>
+
+              <!-- Step 2 footer -->
+              <div class="flex items-center justify-between gap-4">
+                <button
+                  type="button"
+                  class="text-sm text-gray-600 hover:text-gray-900 font-medium bg-transparent border-0 cursor-pointer px-0"
+                  onclick="wizardBack(2)"
+                  aria-label="Back to Step 1: CiviForm setup"
+                >
+                  &#x2190; Back
+                </button>
+                <button
+                  type="submit"
+                  class="usa-button px-8"
+                  aria-label="Provision demo"
+                >
+                  Provision demo
+                </button>
+              </div>
             </div>
-          </div>
-        </form>
-      </div>
-      </div>
+          </form>
+        </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- ── Info Modal (USWDS Modal component) ──────────────────────────── -->
-  <div
+  <dialog
     id="info-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
+    class="cf-modal"
     aria-labelledby="info-modal-title"
+    onclick="if (event.target === this) closeModal('info-modal')"
   >
-    <div class="usa-modal-overlay" onclick="closeModal('info-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="info-modal-title">
-              Sandbox Details: <span id="info-city-name"></span>
-            </h2>
-            <div class="usa-prose">
-              <p>
-                View and copy the URL and credentials for this CiviForm sandbox demo.
-              </p>
-            </div>
+    <div class="bg-white rounded-lg shadow-lg padding-4 text-left w-full">
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('info-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
+          >
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="info-modal-title">
+            Sandbox Details: <span id="info-city-name"></span>
+          </h2>
+          <div class="usa-prose">
+            <p>
+              View and copy the URL and credentials for this CiviForm sandbox
+              demo.
+            </p>
+          </div>
 
-            <!-- Demo URL -->
-            <div class="mb-4">
-              <label class="block text-sm font-bold text-gray-900 mb-1"
-                >Demo URL</label
+          <!-- Demo URL -->
+          <div class="mb-4">
+            <label class="block text-sm font-bold text-gray-900 mb-1"
+              >Demo URL</label
+            >
+            <div class="flex gap-2">
+              <input
+                id="info-url"
+                type="text"
+                readonly
+                class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
+                aria-label="Demo URL"
+              />
+              <button
+                type="button"
+                onclick="copyField('info-url', this)"
+                class="usa-button usa-button--outline whitespace-nowrap"
               >
-              <div class="flex gap-2">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          <!-- Password (PIN) -->
+          <div class="mb-6">
+            <label class="block text-sm font-bold text-gray-900 mb-1"
+              >Password</label
+            >
+            <div class="flex gap-2">
+              <div class="relative flex-1">
                 <input
-                  id="info-url"
-                  type="text"
+                  id="info-pin"
+                  type="password"
+                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono"
                   readonly
-                  class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-                  aria-label="Demo URL"
+                  aria-label="Sandbox password (PIN)"
                 />
                 <button
-                  onclick="copyField('info-url', this)"
-                  class="usa-button usa-button--outline whitespace-nowrap"
+                  type="button"
+                  onclick="togglePinVisibility()"
+                  aria-label="Toggle password visibility"
+                  class="usa-button usa-button--unstyled absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
                 >
-                  Copy
-                </button>
-              </div>
-            </div>
-
-            <!-- Password (PIN) -->
-            <div class="mb-6">
-              <label class="block text-sm font-bold text-gray-900 mb-1"
-                >Password</label
-              >
-              <div class="flex gap-2">
-                <div class="relative flex-1">
-                  <input
-                    id="info-pin"
-                    type="password"
-                    class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono"
-                    readonly
-                    aria-label="Sandbox password (PIN)"
-                  />
-                  <button
-                    type="button"
-                    onclick="togglePinVisibility()"
-                    aria-label="Toggle password visibility"
-                    class="usa-button usa-button--unstyled absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
+                  <svg
+                    id="eye-icon"
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      id="eye-icon"
-                      class="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  onclick="copyField('info-pin', this)"
-                  class="usa-button usa-button--outline whitespace-nowrap"
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-
-            <!-- Google Analytics ID -->
-            <div class="mb-6">
-              <label class="block text-sm font-bold text-gray-900 mb-1">Google Analytics ID</label>
-              <div id="info-ga-section">
-                <!-- GA configured: show ID + View in GA button + Edit in AWS link -->
-                <div id="info-ga-configured" class="hidden">
-                  <div class="flex gap-2 mb-2">
-                    <input
-                      id="info-ga-id"
-                      type="text"
-                      readonly
-                      class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
-                      aria-label="Google Analytics tracking ID"
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
-                    <a
-                      id="info-ga-link"
-                      href="https://analytics.google.com/"
-                      target="_blank"
-                      rel="noopener"
-                      class="usa-button whitespace-nowrap inline-flex items-center gap-1"
-                    >
-                      View in GA
-                      <svg class="usa-icon" style="width:16px;height:16px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                    </a>
-                  </div>
-                  <a
-                    id="info-ga-aws-edit-link"
-                    href="#"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
-                  >
-                    Edit in AWS
-                    <svg class="usa-icon" style="width:14px;height:14px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                  </a>
-                </div>
-                <!-- GA not configured: show Add in AWS button -->
-                <div id="info-ga-not-configured">
-                  <a
-                    id="info-ga-aws-add-link"
-                    href="#"
-                    target="_blank"
-                    rel="noopener"
-                    class="usa-button inline-flex items-center gap-1"
-                  >
-                    Add in AWS
-                    <svg class="usa-icon" style="width:16px;height:16px" aria-hidden="true"><use href="/assets/dist/img/sprite.svg#launch"></use></svg>
-                  </a>
-                </div>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
+                  </svg>
+                </button>
               </div>
+              <button
+                type="button"
+                onclick="copyField('info-pin', this)"
+                class="usa-button usa-button--outline whitespace-nowrap"
+              >
+                Copy
+              </button>
             </div>
-
-            <!-- Copy All -->
-            <button id="copy-all-btn" onclick="copyAll()" class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-0 py-2">
-              Copy All
-            </button>
           </div>
+
+          <!-- Google Analytics ID -->
+          <div class="mb-6">
+            <label class="block text-sm font-bold text-gray-900 mb-1"
+              >Google Analytics ID</label
+            >
+            <input
+              id="info-ga-id"
+              type="text"
+              readonly
+              placeholder="Not configured"
+              class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 font-mono truncate"
+              aria-label="Google Analytics tracking ID"
+            />
+          </div>
+
+          <!-- Copy All -->
           <button
             type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('info-modal')"
+            id="copy-all-btn"
+            onclick="copyAll()"
+            class="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-0 py-2"
           >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
+            Copy All
           </button>
         </div>
       </div>
     </div>
-  </div>
+
+    <!-- ── Copy success alert (USWDS Alert component, success variant) ── -->
+    <div
+      id="copy-alert"
+      class="usa-alert usa-alert--success usa-alert--slim"
+      role="alert"
+      hidden
+      style="
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        min-width: 320px;
+        max-width: 480px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      "
+    >
+      <div class="usa-alert__body">
+        <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
+      </div>
+    </div>
+  </dialog>
 
   <!-- ── Extend Modal (USWDS Modal component) ───────────────────────── -->
-  <div
+  <dialog
     id="extend-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
+    class="cf-modal"
     aria-labelledby="extend-modal-title"
+    onclick="if (event.target === this) closeModal('extend-modal')"
   >
-    <div class="usa-modal-overlay" onclick="closeModal('extend-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="extend-modal-title">
-              Extend Demo: <span id="extend-city-name"></span>
-            </h2>
-            <div class="usa-prose">
-              <p>
-                Specify the number of days you want to extend this sandbox demo by.
-              </p>
-              <p class="text-xs text-gray-500">
-                Note: Extending a sandbox will make it unavailable for ~15 minutes.
-              </p>
-            </div>
-            <form id="extend-form" method="POST">
-              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-              <label class="usa-label" for="extend-days">Extend by (days)</label>
-              <input
-                id="extend-days"
-                name="days"
-                type="number"
-                value="30"
-                min="1"
-                max="90"
-                class="usa-input"
-                aria-label="Number of days to extend"
-              />
-              <ul class="usa-button-group margin-top-3">
-                <li class="usa-button-group__item">
-                  <button type="submit" class="usa-button">Extend Demo</button>
-                </li>
-                <li class="usa-button-group__item">
-                  <button
-                    type="button"
-                    onclick="closeModal('extend-modal')"
-                    class="usa-button usa-button--unstyled"
-                  >
-                    Cancel
-                  </button>
-                </li>
-              </ul>
-            </form>
-          </div>
-          <button
-            type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('extend-modal')"
+    <div class="bg-white rounded-lg shadow-lg padding-4 text-left w-full">
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('extend-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
           >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Delete Modal (USWDS Modal component) ────────────────────────── -->
-  <div
-    id="delete-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="delete-modal-title"
-  >
-    <div class="usa-modal-overlay" onclick="closeModal('delete-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="delete-modal-title">
-              Delete demo?
-            </h2>
-            <div class="usa-prose">
-              <p>
-                This will permanently delete the demo for
-                <strong id="delete-city-name"></strong> from AWS. This cannot be
-                undone.
-              </p>
-            </div>
-            <form id="delete-form" method="POST">
-              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-              <ul class="usa-button-group">
-                <li class="usa-button-group__item">
-                  <button
-                    type="submit"
-                    class="usa-button usa-button--secondary"
-                  >
-                    Delete demo
-                  </button>
-                </li>
-                <li class="usa-button-group__item">
-                  <button
-                    type="button"
-                    onclick="closeModal('delete-modal')"
-                    class="usa-button usa-button--unstyled"
-                  >
-                    Cancel
-                  </button>
-                </li>
-              </ul>
-            </form>
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="extend-modal-title">
+            Extend Demo: <span id="extend-city-name"></span>
+          </h2>
+          <div class="usa-prose">
+            <p>
+              Specify the number of days you want to extend this sandbox demo
+              by.
+            </p>
+            <p class="text-xs text-gray-500">
+              Note: Extending a sandbox will make it unavailable for ~15
+              minutes.
+            </p>
           </div>
-          <button
-            type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('delete-modal')"
-          >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Re-provision Modal (USWDS Modal component) ─────────────────── -->
-  <div
-    id="reprovision-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="reprovision-modal-title"
-  >
-    <div class="usa-modal-overlay" onclick="closeModal('reprovision-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="reprovision-modal-title">
-              Re-provision demo?
-            </h2>
-            <div class="usa-prose">
-              <p>
-                This will re-run Terraform to update the demo for
-                <strong id="reprovision-city-name"></strong> to the latest infrastructure configuration.
-                Existing programs and database data will not be affected.
-              </p>
-            </div>
-            <form id="reprovision-form" method="POST">
-              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-              <ul class="usa-button-group margin-top-3">
-                <li class="usa-button-group__item">
-                  <button type="submit" class="usa-button">Re-provision demo</button>
-                </li>
-                <li class="usa-button-group__item">
-                  <button
-                    type="button"
-                    onclick="closeModal('reprovision-modal')"
-                    class="usa-button usa-button--unstyled"
-                  >
-                    Cancel
-                  </button>
-                </li>
-              </ul>
-            </form>
-          </div>
-          <button
-            type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('reprovision-modal')"
-          >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Options Modal (USWDS Modal component) ──────────────────────── -->
-  <div
-    id="options-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="options-modal-title"
-  >
-    <div class="usa-modal-overlay" onclick="closeModal('options-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="options-modal-title">
-              Options: <span id="options-city-name"></span>
-            </h2>
-            <div class="usa-prose">
-              <p>
-                Choose an action to perform on this sandbox demo.
-              </p>
-            </div>
-            <div class="flex flex-col gap-3 margin-top-3">
-              <button
-                type="button"
-                onclick="selectOptionExtend()"
-                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
-              >
-                <span>Extend</span>
-              </button>
-              <button
-                type="button"
-                onclick="selectOptionReprovision()"
-                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
-              >
-                <span>Reprovision</span>
-              </button>
-              <button
-                type="button"
-                onclick="selectOptionEdit()"
-                class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
-              >
-                <span>Edit</span>
-              </button>
-            </div>
+          <form id="extend-form" method="POST">
+            <input
+              type="hidden"
+              name="csrfToken"
+              th:value="${templateGlobals.csrfToken}"
+            />
+            <label class="usa-label" for="extend-days"
+              >Extend by (days)</label
+            >
+            <input
+              id="extend-days"
+              name="days"
+              type="number"
+              value="30"
+              min="1"
+              max="90"
+              class="usa-input"
+              aria-label="Number of days to extend"
+            />
             <ul class="usa-button-group margin-top-3">
+              <li class="usa-button-group__item">
+                <button type="submit" class="usa-button">
+                  Extend &amp; Re-provision
+                </button>
+              </li>
               <li class="usa-button-group__item">
                 <button
                   type="button"
-                  onclick="closeModal('options-modal')"
+                  onclick="closeModal('extend-modal')"
                   class="usa-button usa-button--unstyled"
                 >
                   Cancel
                 </button>
               </li>
             </ul>
-          </div>
-          <button
-            type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('options-modal')"
-          >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
-          </button>
+          </form>
         </div>
       </div>
     </div>
-  </div>
+  </dialog>
+
+  <!-- ── Delete Modal (USWDS Modal component) ────────────────────────── -->
+  <dialog
+    id="delete-modal"
+    class="cf-modal"
+    aria-labelledby="delete-modal-title"
+    onclick="if (event.target === this) closeModal('delete-modal')"
+  >
+    <div class="bg-white rounded-lg shadow-lg padding-4 text-left w-full">
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('delete-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
+          >
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="delete-modal-title">
+            Delete demo?
+          </h2>
+          <div class="usa-prose">
+            <p>
+              This will permanently delete the demo for
+              <strong id="delete-city-name"></strong> from AWS. This cannot be
+              undone.
+            </p>
+          </div>
+          <form id="delete-form" method="POST">
+            <input
+              type="hidden"
+              name="csrfToken"
+              th:value="${templateGlobals.csrfToken}"
+            />
+            <ul class="usa-button-group">
+              <li class="usa-button-group__item">
+                <button
+                  type="submit"
+                  class="usa-button usa-button--secondary"
+                >
+                  Delete demo
+                </button>
+              </li>
+              <li class="usa-button-group__item">
+                <button
+                  type="button"
+                  onclick="closeModal('delete-modal')"
+                  class="usa-button usa-button--unstyled"
+                >
+                  Cancel
+                </button>
+              </li>
+            </ul>
+          </form>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ── Re-provision Modal (USWDS Modal component) ─────────────────── -->
+  <dialog
+    id="reprovision-modal"
+    class="cf-modal"
+    aria-labelledby="reprovision-modal-title"
+    onclick="if (event.target === this) closeModal('reprovision-modal')"
+  >
+    <div class="bg-white rounded-lg shadow-lg padding-4 text-left w-full">
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('reprovision-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
+          >
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="reprovision-modal-title">
+            Re-provision demo?
+          </h2>
+          <div class="usa-prose">
+            <p>
+              This will re-run Terraform to update the demo for
+              <strong id="reprovision-city-name"></strong> to the latest
+              infrastructure configuration. Existing programs and database
+              data will not be affected.
+            </p>
+          </div>
+          <form id="reprovision-form" method="POST">
+            <input
+              type="hidden"
+              name="csrfToken"
+              th:value="${templateGlobals.csrfToken}"
+            />
+            <ul class="usa-button-group margin-top-3">
+              <li class="usa-button-group__item">
+                <button type="submit" class="usa-button">
+                  Re-provision demo
+                </button>
+              </li>
+              <li class="usa-button-group__item">
+                <button
+                  type="button"
+                  onclick="closeModal('reprovision-modal')"
+                  class="usa-button usa-button--unstyled"
+                >
+                  Cancel
+                </button>
+              </li>
+            </ul>
+          </form>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ── Options Modal (USWDS Modal component) ──────────────────────── -->
+  <dialog
+    id="options-modal"
+    class="cf-modal"
+    aria-labelledby="options-modal-title"
+    onclick="if (event.target === this) closeModal('options-modal')"
+  >
+    <div class="bg-white rounded-lg shadow-lg padding-4 text-left w-full">
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('options-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
+          >
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="options-modal-title">
+            Options: <span id="options-city-name"></span>
+          </h2>
+          <div class="usa-prose">
+            <p>Choose an action to perform on this sandbox demo.</p>
+          </div>
+          <div class="flex flex-col gap-3 margin-top-3">
+            <button
+              type="button"
+              onclick="selectOptionExtend()"
+              class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+            >
+              <span>Extend</span>
+            </button>
+            <button
+              type="button"
+              onclick="selectOptionReprovision()"
+              class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+            >
+              <span>Re-provision</span>
+            </button>
+            <button
+              type="button"
+              onclick="selectOptionEdit()"
+              class="usa-button usa-button--outline w-full text-left flex items-center justify-between"
+            >
+              <span>Edit</span>
+            </button>
+          </div>
+          <ul class="usa-button-group margin-top-3">
+            <li class="usa-button-group__item">
+              <button
+                type="button"
+                onclick="closeModal('options-modal')"
+                class="usa-button usa-button--unstyled"
+              >
+                Cancel
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <!-- ── Edit Modal (USWDS Modal component) ─────────────────────────── -->
-  <div
+  <dialog
     id="edit-modal"
-    class="usa-modal-wrapper is-hidden"
-    role="dialog"
-    aria-modal="true"
+    class="cf-modal"
     aria-labelledby="edit-modal-title"
+    onclick="if (event.target === this) closeModal('edit-modal')"
   >
-    <div class="usa-modal-overlay" onclick="closeModal('edit-modal')">
-      <div
-        class="bg-white rounded-lg shadow-lg maxw-mobile-lg padding-4 inline-block align-middle text-left"
-        style="max-height: 85vh; overflow-y: auto; width: calc(100% - 0.5rem)"
-        onclick="event.stopPropagation()"
-      >
-        <div class="usa-modal__content">
-          <div class="usa-modal__main">
-            <h2 class="usa-modal__heading" id="edit-modal-title">
-              Edit Demo: <span id="edit-title-city-name"></span>
-            </h2>
-            <div class="usa-prose">
-              <p>
-                Modify settings for this sandbox demo.
-              </p>
-              <p class="text-xs text-gray-500">
-                Note: Updating settings will trigger a sandbox re-provisioning and make it unavailable for ~15 minutes.
-              </p>
+    <div
+      class="bg-white rounded-lg shadow-lg padding-4 text-left w-full"
+      style="max-height: 85vh; overflow-y: auto"
+    >
+      <div class="usa-modal__content">
+        <button
+          type="button"
+          class="usa-button usa-modal__close"
+          aria-label="Close this window"
+          onclick="closeModal('edit-modal')"
+          autofocus
+        >
+          <svg
+            class="usa-icon"
+            aria-hidden="true"
+            focusable="false"
+            role="img"
+          >
+            <use href="/assets/dist/img/sprite.svg#close"></use>
+          </svg>
+        </button>
+        <div class="usa-modal__main">
+          <h2 class="usa-modal__heading" id="edit-modal-title">
+            Edit Demo: <span id="edit-title-city-name"></span>
+          </h2>
+          <div class="usa-prose">
+            <p>Modify settings for this sandbox demo.</p>
+            <p class="text-xs text-gray-500">
+              Note: Updating settings will trigger a sandbox re-provisioning
+              and make it unavailable for ~15 minutes.
+            </p>
+          </div>
+
+          <div
+            id="edit-modal-error"
+            role="alert"
+            aria-live="polite"
+            class="hidden mt-3 mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
+          ></div>
+
+          <form id="edit-form" method="POST" novalidate>
+            <input
+              type="hidden"
+              name="csrfToken"
+              th:value="${templateGlobals.csrfToken}"
+            />
+
+            <label class="usa-label" for="edit-cityName">
+              Name of civic entity<span
+                class="text-red-600"
+                aria-hidden="true"
+                >*</span
+              >
+            </label>
+            <input
+              id="edit-cityName"
+              name="cityName"
+              type="text"
+              class="usa-input"
+              autocomplete="off"
+              aria-required="true"
+            />
+
+            <label class="usa-label" for="edit-googleAnalyticsId">
+              Google analytics ID
+              <span class="text-gray-600 font-normal">(optional)</span>
+            </label>
+            <input
+              id="edit-googleAnalyticsId"
+              name="googleAnalyticsId"
+              type="text"
+              class="usa-input"
+              placeholder="G-ABC123XYZ"
+              autocomplete="off"
+            />
+
+            <label class="usa-label" for="edit-expirationDate">
+              Expiration date<span class="text-red-600" aria-hidden="true"
+                >*</span
+              >
+            </label>
+            <input
+              id="edit-expirationDate"
+              name="expirationDate"
+              type="date"
+              class="usa-input"
+              aria-required="true"
+            />
+            <div
+              id="edit-past-expiration-warning"
+              role="status"
+              aria-live="polite"
+              class="hidden mt-2 mb-1 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900"
+              th:text="#{sandboxes.edit.pastExpirationWarning(${model.autodeletionGraceDays})}"
+            >
+              Warning: This expiration date is in the past. Saving will mark
+              the sandbox as expired, and it will be automatically deleted 7
+              days after its expiration date.
             </div>
 
-            <div
-              id="edit-modal-error"
-              role="alert"
-              aria-live="polite"
-              class="hidden mt-3 mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded text-sm text-red-700"
-            ></div>
-
-            <form id="edit-form" method="POST" novalidate>
-              <input type="hidden" name="csrfToken" th:value="${templateGlobals.csrfToken}" />
-
-              <label class="usa-label" for="edit-cityName">
-                Name of civic entity<span class="text-red-600" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="edit-cityName"
-                name="cityName"
-                type="text"
-                class="usa-input"
-                autocomplete="off"
-                aria-required="true"
-              />
-
-              <label class="usa-label" for="edit-googleAnalyticsId">
-                Google analytics ID <span class="text-gray-600 font-normal">(optional)</span>
-              </label>
-              <input
-                id="edit-googleAnalyticsId"
-                name="googleAnalyticsId"
-                type="text"
-                class="usa-input"
-                placeholder="G-ABC123XYZ"
-                autocomplete="off"
-              />
-
-              <label class="usa-label" for="edit-expirationDate">
-                Expiration date<span class="text-red-600" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="edit-expirationDate"
-                name="expirationDate"
-                type="date"
-                class="usa-input"
-                aria-required="true"
-              />
-              <div
-                id="edit-past-expiration-warning"
-                role="status"
-                aria-live="polite"
-                class="hidden mt-2 mb-1 px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900"
+            <label class="usa-label" for="edit-adminEmail">
+              Admin notification email<span
+                class="text-red-600"
+                aria-hidden="true"
+                >*</span
               >
-                Warning: This expiration date is in the past. Saving will mark the sandbox as expired and eligible for automatic deletion.
-              </div>
+            </label>
+            <input
+              id="edit-adminEmail"
+              name="adminEmail"
+              type="email"
+              class="usa-input"
+              autocomplete="email"
+              aria-required="true"
+            />
 
-              <label class="usa-label" for="edit-adminEmail">
-                Admin notification email<span class="text-red-600" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="edit-adminEmail"
-                name="adminEmail"
-                type="email"
-                class="usa-input"
-                autocomplete="email"
-                aria-required="true"
-              />
+            <label class="usa-label" for="edit-civiformVersion">
+              CiviForm version<span class="text-red-600" aria-hidden="true"
+                >*</span
+              >
+            </label>
+            <div
+              id="edit-civiformVersion-hint"
+              class="usa-hint text-xs text-gray-600 mt-1"
+            >
+              <span th:text="#{sandbox.edit.versionHint.prefix}"
+                >Enter a version number from the</span
+              >
+              <a
+                href="https://github.com/civiform/civiform/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="usa-link text-blue-600 hover:underline"
+                th:text="#{sandbox.edit.versionHint.releasesLink}"
+                >CiviForm releases list</a
+              >
+              <span th:text="#{sandbox.edit.versionHint.suffix}"
+                >or use "latest".</span
+              >
+            </div>
+            <input
+              id="edit-civiformVersion"
+              name="civiformVersion"
+              type="text"
+              class="usa-input"
+              placeholder="e.g. latest or v2.22.0"
+              autocomplete="off"
+              aria-required="true"
+              aria-describedby="edit-civiformVersion-hint"
+            />
 
-              <label class="usa-label" for="edit-civiformVersion">
-                CiviForm version<span class="text-red-600" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="edit-civiformVersion"
-                name="civiformVersion"
-                type="text"
-                class="usa-input"
-                placeholder="e.g. latest or v2.22.0"
-                autocomplete="off"
-                aria-required="true"
-              />
-
-              <ul class="usa-button-group margin-top-3">
-                <li class="usa-button-group__item">
-                  <button type="submit" class="usa-button">Save &amp; Re-provision</button>
-                </li>
-                <li class="usa-button-group__item">
-                  <button
-                    type="button"
-                    onclick="closeModal('edit-modal')"
-                    class="usa-button usa-button--unstyled"
-                  >
-                    Cancel
-                  </button>
-                </li>
-              </ul>
-            </form>
-          </div>
-          <button
-            type="button"
-            class="usa-button usa-modal__close"
-            aria-label="Close this window"
-            onclick="closeModal('edit-modal')"
-          >
-            <svg class="usa-icon" aria-hidden="true" focusable="false" role="img">
-              <use href="/assets/dist/img/sprite.svg#close"></use>
-            </svg>
-          </button>
+            <ul class="usa-button-group margin-top-3">
+              <li class="usa-button-group__item">
+                <button type="submit" class="usa-button">
+                  Save &amp; Re-provision
+                </button>
+              </li>
+              <li class="usa-button-group__item">
+                <button
+                  type="button"
+                  onclick="closeModal('edit-modal')"
+                  class="usa-button usa-button--unstyled"
+                >
+                  Cancel
+                </button>
+              </li>
+            </ul>
+          </form>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- ── Copy success alert (USWDS Alert component, success variant) ──── -->
-  <div
-    id="copy-alert"
-    class="usa-alert usa-alert--success usa-alert--slim"
-    role="alert"
-    hidden
-    style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
-  >
-    <div class="usa-alert__body">
-      <p class="usa-alert__text" id="copy-alert-text">Copied to clipboard</p>
-    </div>
-  </div>
+  </dialog>
 
   <!-- ── Modal JS ───────────────────────────────────────────────────────── -->
   <script>
@@ -1225,7 +1309,9 @@
       var text = document.getElementById('copy-alert-text')
       text.textContent = message || 'Copied to clipboard'
       alert.hidden = false
-      setTimeout(function () { alert.hidden = true }, 2000)
+      setTimeout(function () {
+        alert.hidden = true
+      }, 2000)
     }
 
     function openDetailsModal(id, cityName, url, pin, gaId) {
@@ -1233,29 +1319,8 @@
       document.getElementById('info-url').value = url
       document.getElementById('info-pin').value = pin
       document.getElementById('info-pin').type = 'password'
-      
-      // AWS ECS console link for this sandbox's environment variables
-      var awsUrl = 'https://console.aws.amazon.com/ecs/v2/clusters'
-
-      // Google Analytics section
-      var gaConfigured = document.getElementById('info-ga-configured')
-      var gaNotConfigured = document.getElementById('info-ga-not-configured')
-      var gaInput = document.getElementById('info-ga-id')
-      if (gaId && gaId.trim() !== '') {
-        gaInput.value = gaId
-        gaConfigured.classList.remove('hidden')
-        gaNotConfigured.classList.add('hidden')
-        // Set View in GA link
-        document.getElementById('info-ga-link').href =
-          'https://analytics.google.com/analytics/web/#/?params=' + encodeURIComponent(gaId)
-        // Set Edit in AWS link
-        document.getElementById('info-ga-aws-edit-link').href = awsUrl
-      } else {
-        gaConfigured.classList.add('hidden')
-        gaNotConfigured.classList.remove('hidden')
-        // Set Add in AWS link
-        document.getElementById('info-ga-aws-add-link').href = awsUrl
-      }
+      document.getElementById('info-ga-id').value =
+        gaId && gaId.trim() !== '' ? gaId : ''
 
       openModal('info-modal')
     }
@@ -1313,7 +1378,8 @@
         sandboxData.cityName
       document.getElementById('edit-form').action =
         '/sandboxes/' + sandboxData.id + '/edit'
-      document.getElementById('edit-cityName').value = sandboxData.cityName || ''
+      document.getElementById('edit-cityName').value =
+        sandboxData.cityName || ''
       document.getElementById('edit-googleAnalyticsId').value =
         sandboxData.gaId || ''
       document.getElementById('edit-expirationDate').value =
@@ -1417,25 +1483,20 @@
 
     function openModal(id) {
       const modal = document.getElementById(id)
-      modal.classList.remove('is-hidden')
-      modal.classList.add('is-visible')
-      // close on Escape
-      document.addEventListener('keydown', function onEsc(e) {
-        if (e.key === 'Escape') {
-          closeModal(id)
-          document.removeEventListener('keydown', onEsc)
-        }
-      })
-      // reset wizard when opening create-modal
+      if (!modal) return
       if (id === 'create-modal') {
         createWizardReset()
+      }
+      if (!modal.open) {
+        modal.showModal()
       }
     }
 
     function closeModal(id) {
       const modal = document.getElementById(id)
-      modal.classList.remove('is-visible')
-      modal.classList.add('is-hidden')
+      if (modal && modal.open) {
+        modal.close()
+      }
     }
 
     function togglePinVisibility() {
@@ -1458,36 +1519,6 @@
         showCopyAlert('URL and password copied to clipboard')
       })
     }
-
-    // ── Column sort ──────────────────────────────────────────────────
-    ;(function () {
-      var table = document.querySelector('table.usa-table')
-      if (!table) return
-      var headers = table.querySelectorAll('th[data-sortable]')
-      headers.forEach(function (th, colIdx) {
-        th.style.cursor = 'pointer'
-        th.setAttribute('aria-sort', 'none')
-        th.addEventListener('click', function () {
-          var tbody = table.querySelector('tbody')
-          var rows = Array.from(tbody.querySelectorAll('tr'))
-          var asc = th.getAttribute('aria-sort') !== 'ascending'
-          // Reset all headers
-          headers.forEach(function (h) { h.setAttribute('aria-sort', 'none') })
-          th.setAttribute('aria-sort', asc ? 'ascending' : 'descending')
-          rows.sort(function (a, b) {
-            var aVal = a.children[colIdx].getAttribute('data-sort-value') || a.children[colIdx].textContent.trim()
-            var bVal = b.children[colIdx].getAttribute('data-sort-value') || b.children[colIdx].textContent.trim()
-            // Try numeric comparison
-            var aNum = parseFloat(aVal), bNum = parseFloat(bVal)
-            if (!isNaN(aNum) && !isNaN(bNum)) {
-              return asc ? aNum - bNum : bNum - aNum
-            }
-            return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-          })
-          rows.forEach(function (row) { tbody.appendChild(row) })
-        })
-      })
-    })()
   </script>
 
   <!-- ── Create Wizard JS ────────────────────────────────────────────────── -->
@@ -1562,27 +1593,38 @@
           // Update step indicator
           var segment = document.getElementById('step-indicator-' + i)
           if (segment) {
-            var label = segment.querySelector('.usa-step-indicator__segment-label')
+            var label = segment.querySelector(
+              '.usa-step-indicator__segment-label',
+            )
             var text = i === 1 ? 'CiviForm setup' : 'AWS setup'
             if (i < targetStep) {
-              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--complete'
-              label.innerHTML = text + ' <span class="usa-sr-only">completed</span>'
+              segment.className =
+                'usa-step-indicator__segment usa-step-indicator__segment--complete'
+              label.innerHTML =
+                text + ' <span class="usa-sr-only">completed</span>'
             } else if (i === targetStep) {
-              segment.className = 'usa-step-indicator__segment usa-step-indicator__segment--current'
+              segment.className =
+                'usa-step-indicator__segment usa-step-indicator__segment--current'
               label.innerHTML = text
             } else {
               segment.className = 'usa-step-indicator__segment'
-              label.innerHTML = text + ' <span class="usa-sr-only">not completed</span>'
+              label.innerHTML =
+                text + ' <span class="usa-sr-only">not completed</span>'
             }
           }
         }
-        
-        var currentStepEl = document.getElementById('step-indicator-current-step')
+
+        var currentStepEl = document.getElementById(
+          'step-indicator-current-step',
+        )
         if (currentStepEl) currentStepEl.textContent = targetStep
-        
-        var headingTextEl = document.getElementById('step-indicator-heading-text')
+
+        var headingTextEl = document.getElementById(
+          'step-indicator-heading-text',
+        )
         if (headingTextEl) {
-          headingTextEl.textContent = targetStep === 1 ? 'CiviForm setup' : 'AWS setup'
+          headingTextEl.textContent =
+            targetStep === 1 ? 'CiviForm setup' : 'AWS setup'
         }
       }
 
@@ -1696,6 +1738,8 @@
         setStepInputsDisabled(currentStep, true)
         setStepInputsDisabled(nextStep, false)
         showStep(nextStep)
+        var closeBtn = document.querySelector('#create-modal .usa-modal__close')
+        if (closeBtn) closeBtn.focus()
       }
 
       window.wizardBack = function (currentStep) {
@@ -1705,6 +1749,8 @@
         setStepInputsDisabled(prevStep, false)
         setStepInputsDisabled(currentStep, true)
         showStep(prevStep)
+        var closeBtn = document.querySelector('#create-modal .usa-modal__close')
+        if (closeBtn) closeBtn.focus()
       }
 
       // Reset wizard to step 1 (called whenever the create-modal opens)

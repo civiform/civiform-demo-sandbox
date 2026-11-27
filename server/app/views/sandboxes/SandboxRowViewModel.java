@@ -1,6 +1,7 @@
 package views.sandboxes;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -22,9 +23,6 @@ public class SandboxRowViewModel {
 
   private static final DateTimeFormatter ISO_DATE_FMT =
       DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneOffset.UTC);
-
-  /** Days after expiry before autodeletion runs. */
-  private static final long AUTODELETION_GRACE_DAYS = 7;
 
   /** The underlying sandbox. */
   SandboxInstance sandbox;
@@ -53,16 +51,24 @@ public class SandboxRowViewModel {
   /** Days until autodeletion (only meaningful when expired). 0 = imminent. */
   long autoDeletionDays;
 
-  public static SandboxRowViewModel of(SandboxInstance sandbox) {
-    long days = ChronoUnit.DAYS.between(Instant.now(), sandbox.getExpiresAt());
+  public static SandboxRowViewModel of(
+      SandboxInstance sandbox, long autodeletionGraceDays, Instant now) {
+    long clampedGraceDays = Math.max(0L, autodeletionGraceDays);
+    // Use America/Los_Angeles for "today" to match CiviForm's demo banner, which
+    // calls LocalDate.now(clock) using civiform_time_zone_id (defaults to
+    // America/Los_Angeles). The expiry date stays in UTC because the builder
+    // formats DEMO_BANNER_EXPIRATION_DATE as a UTC date string.
+    LocalDate today = now.atZone(ZoneId.of("America/Los_Angeles")).toLocalDate();
+    LocalDate expiryDate = sandbox.getExpiresAt().atZone(ZoneOffset.UTC).toLocalDate();
+    long days = ChronoUnit.DAYS.between(today, expiryDate);
     boolean isDeleted = sandbox.getStatus() == SandboxStatus.DELETED;
     String deletedFmt = isDeleted && sandbox.getDeletedAt() != null
         ? DISPLAY_FMT.format(sandbox.getDeletedAt())
         : null;
     boolean isProv = sandbox.getStatus() == SandboxStatus.PROVISIONING;
     long autoDeleteDays = days < 0
-        ? Math.max(0, AUTODELETION_GRACE_DAYS + days)
-        : AUTODELETION_GRACE_DAYS;
+        ? Math.max(0L, clampedGraceDays + days)
+        : clampedGraceDays;
     return new SandboxRowViewModel(
         sandbox,
         Math.max(days, 0),

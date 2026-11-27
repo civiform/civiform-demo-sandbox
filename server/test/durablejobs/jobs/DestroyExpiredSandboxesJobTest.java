@@ -1,6 +1,7 @@
 package durablejobs.jobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.CompletableFuture;
@@ -29,11 +31,14 @@ import services.SlackAlertClient;
 /** Unit tests for {@link DestroyExpiredSandboxesJob}. */
 public class DestroyExpiredSandboxesJobTest {
 
-  // Today is 2026-08-15 UTC; startOfToday cutoff must be 2026-08-15T00:00:00Z so any sandbox
-  // that expired yesterday (2026-08-14) or earlier is selected.
+  // Today is 2026-08-15 UTC; with the default 7-day grace period, destroy cutoff must be
+  // 2026-08-08T00:00:00Z so only sandboxes that expired on 2026-08-07 or earlier are destroyed,
+  // and disable cutoff must be 2026-08-15T00:00:00Z so sandboxes that expired on 2026-08-14 or
+  // earlier are disabled.
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-08-15T02:00:00Z"), ZoneOffset.UTC);
-  private static final Instant EXPECTED_CUTOFF = Instant.parse("2026-08-15T00:00:00Z");
+  private static final Instant EXPECTED_CUTOFF = Instant.parse("2026-08-08T00:00:00Z");
+  private static final Instant EXPECTED_DISABLE_CUTOFF = Instant.parse("2026-08-15T00:00:00Z");
 
   private SandboxRepository sandboxRepository;
   private SandboxService sandboxService;
@@ -45,6 +50,9 @@ public class DestroyExpiredSandboxesJobTest {
     sandboxRepository = mock(SandboxRepository.class);
     sandboxService = mock(SandboxService.class);
     slackAlertClient = mock(SlackAlertClient.class);
+    when(sandboxRepository.findExpiredForDestruction(any(), anyInt()))
+        .thenReturn(ImmutableList.of());
+    when(sandboxRepository.findExpiredForDisabling(any())).thenReturn(ImmutableList.of());
     jobModel =
         new PersistedDurableJobModel(
             "DESTROY_EXPIRED_SANDBOXES", JobType.RECURRING, FIXED_CLOCK.instant());
@@ -62,24 +70,72 @@ public class DestroyExpiredSandboxesJobTest {
         .subdomain("burlington-" + id)
         .databaseName("sb_" + id.replace("-", "_"))
         .status(status)
-        .expiresAt(Instant.parse("2026-08-14T18:00:00Z"))
+        .expiresAt(Instant.parse("2026-08-07T18:00:00Z"))
         .destroyAttempts(attempts)
         .build();
   }
 
   @Test
-  public void run_usesStartOfTodayCutoffAndMaxThreeAttempts() {
-    when(sandboxRepository.findExpiredForDestruction(any(), anyInt()))
-        .thenReturn(ImmutableList.of());
-
+  public void run_usesDefaultSevenDayGraceCutoffAndMaxThreeAttempts() {
     newJob().run();
 
     verify(sandboxRepository)
         .findExpiredForDestruction(
             EXPECTED_CUTOFF, DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+    verify(sandboxRepository).findExpiredForDisabling(EXPECTED_DISABLE_CUTOFF);
     verify(sandboxService, never()).destroyExpiredSandbox(anyString(), any());
+    verify(sandboxService, never()).disableExpiredSandbox(anyString(), any());
     verify(slackAlertClient, never())
         .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
+  }
+
+  @Test
+  public void run_respectsCustomAutodeletionGraceDays() {
+    DestroyExpiredSandboxesJob zeroDayGraceJob =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT,
+            0L);
+    zeroDayGraceJob.run();
+    verify(sandboxRepository)
+        .findExpiredForDestruction(
+            Instant.parse("2026-08-15T00:00:00Z"), DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+    verify(sandboxRepository, never()).findExpiredForDisabling(any());
+
+    DestroyExpiredSandboxesJob fourteenDayGraceJob =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            DestroyExpiredSandboxesJob.DEFAULT_PER_SANDBOX_TIMEOUT,
+            14L);
+    fourteenDayGraceJob.run();
+    verify(sandboxRepository)
+        .findExpiredForDestruction(
+            Instant.parse("2026-08-01T00:00:00Z"), DestroyExpiredSandboxesJob.MAX_DESTROY_ATTEMPTS);
+    verify(sandboxRepository).findExpiredForDisabling(EXPECTED_DISABLE_CUTOFF);
+  }
+
+  @Test
+  public void constructor_rejectsNegativeAutodeletionGraceDays() {
+    assertThatThrownBy(
+            () ->
+                new DestroyExpiredSandboxesJob(
+                    FIXED_CLOCK,
+                    sandboxRepository,
+                    sandboxService,
+                    slackAlertClient,
+                    jobModel,
+                    Duration.ofMinutes(20),
+                    -1L))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("autodeletionGraceDays");
   }
 
   @Test
@@ -184,7 +240,7 @@ public class DestroyExpiredSandboxesJobTest {
             sandboxService,
             slackAlertClient,
             jobModel,
-            java.time.Duration.ofMillis(40));
+            Duration.ofMillis(40));
 
     jobWithShortTimeout.run();
 
@@ -196,6 +252,59 @@ public class DestroyExpiredSandboxesJobTest {
         .sendSandboxDestroyFailureAlert(
             eq(hung), eq(3), eq("Timed out after 0s waiting for expired-sandbox teardown"));
     verify(sandboxService).destroyExpiredSandbox("sb-next", EXPECTED_CUTOFF);
+  }
+
+  @Test
+  public void run_disablesExpiredSandboxesAndIsolatesDisableFailuresAndTimeoutsWithoutBurningDestroyAttempts() {
+    SandboxInstance sbDisableOk =
+        expiredSandbox("sb-dis-1", SandboxStatus.RUNNING, 0).toBuilder()
+            .expiresAt(Instant.parse("2026-08-14T18:00:00Z"))
+            .build();
+    SandboxInstance sbDisableSkip =
+        expiredSandbox("sb-dis-2", SandboxStatus.RUNNING, 0).toBuilder()
+            .expiresAt(Instant.parse("2026-08-14T19:00:00Z"))
+            .build();
+    SandboxInstance sbDisableFail =
+        expiredSandbox("sb-dis-3", SandboxStatus.RUNNING, 0).toBuilder()
+            .expiresAt(Instant.parse("2026-08-14T20:00:00Z"))
+            .build();
+    SandboxInstance sbDisableHung =
+        expiredSandbox("sb-dis-4", SandboxStatus.RUNNING, 0).toBuilder()
+            .expiresAt(Instant.parse("2026-08-14T21:00:00Z"))
+            .build();
+    CompletableFuture<Boolean> neverCompletes = new CompletableFuture<>();
+
+    when(sandboxRepository.findExpiredForDisabling(EXPECTED_DISABLE_CUTOFF))
+        .thenReturn(
+            ImmutableList.of(sbDisableOk, sbDisableSkip, sbDisableFail, sbDisableHung));
+    when(sandboxService.disableExpiredSandbox("sb-dis-1", EXPECTED_DISABLE_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(true));
+    when(sandboxService.disableExpiredSandbox("sb-dis-2", EXPECTED_DISABLE_CUTOFF))
+        .thenReturn(CompletableFuture.completedFuture(false));
+    when(sandboxService.disableExpiredSandbox("sb-dis-3", EXPECTED_DISABLE_CUTOFF))
+        .thenReturn(CompletableFuture.failedFuture(new RuntimeException("S3 lock busy")));
+    when(sandboxService.disableExpiredSandbox("sb-dis-4", EXPECTED_DISABLE_CUTOFF))
+        .thenReturn(neverCompletes);
+
+    DestroyExpiredSandboxesJob jobWithShortTimeout =
+        new DestroyExpiredSandboxesJob(
+            FIXED_CLOCK,
+            sandboxRepository,
+            sandboxService,
+            slackAlertClient,
+            jobModel,
+            Duration.ofMillis(40));
+
+    jobWithShortTimeout.run();
+
+    verify(sandboxService).disableExpiredSandbox("sb-dis-1", EXPECTED_DISABLE_CUTOFF);
+    verify(sandboxService).disableExpiredSandbox("sb-dis-2", EXPECTED_DISABLE_CUTOFF);
+    verify(sandboxService).disableExpiredSandbox("sb-dis-3", EXPECTED_DISABLE_CUTOFF);
+    verify(sandboxService).disableExpiredSandbox("sb-dis-4", EXPECTED_DISABLE_CUTOFF);
+    assertThat(neverCompletes.isCancelled()).isTrue();
+    verify(sandboxRepository, never()).recordDestroyFailure(anyString(), anyString());
+    verify(slackAlertClient, never())
+        .sendSandboxDestroyFailureAlert(any(), anyInt(), anyString());
   }
 
   @Test

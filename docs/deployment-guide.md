@@ -425,12 +425,14 @@ A healthy rollout shows:
 | `DB_USER` | `postgres` | **Yes** | Builder DB user |
 | `DB_PASSWORD` | `example` | **Yes** | Builder DB password |
 | `DEV_TOOLS_ENABLED` | *(empty)* | No | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
-| `SANDBOX_RUNTIME` | `docker` | **Yes (prod)** | `docker` (local) or `terraform` (AWS) |
+| `SANDBOX_RUNTIME` | `docker` | **Yes (prod)** | `docker` (local), `terraform` (AWS), or `inmemory` (in-memory only, non-production) |
+| `FIXED_CLOCK_INSTANT` | *(empty)* | No | ISO-8601 instant to freeze the application `Clock` in non-production modes (`clock.fixedInstant`) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | No | Base domain for sandboxes |
 | `AUTH0_DOMAIN` | *(empty)* | For prod | Auth0 tenant domain |
 | `AUTH0_CLIENT_ID` | *(empty)* | For prod | Auth0 client ID |
 | `AUTH0_CLIENT_SECRET` | *(empty)* | For prod | Auth0 client secret |
 | `PIN_GATE_MAX_ATTEMPTS` | `5` | No | Failed PIN attempts before rate limit |
+| `AUTODELETION_GRACE_DAYS` | `7` | No | Grace period (in days) after expiration before `DestroyExpiredSandboxesJob` automatically deletes a sandbox (`sandbox.autodeletionGraceDays`) |
 
 ### Terraform Runtime (only when `SANDBOX_RUNTIME=terraform`)
 
@@ -504,6 +506,19 @@ POST /sandboxes/:id/delete
    b. DROP DATABASE IF EXISTS <db> WITH (FORCE)
    c. DROP USER IF EXISTS <db>
    d. softDelete(): status = DELETED, scrub PIN + accessToken + adminEmail
+```
+
+### Automatic Expiration & Grace-Period Deletion
+
+```
+Daily 02:00 UTC — DestroyExpiredSandboxesJob
+    │
+    ▼
+1. Compute cutoff = startOfToday - AUTODELETION_GRACE_DAYS (default: 7 days)
+2. Find RUNNING / FAILED / DELETE_FAILED sandboxes where expires_at < cutoff
+   and destroy_attempts < 3
+3. Destroy infrastructure + drop DB + mark DELETED (scrubbing PIN/token/email)
+4. On failure, mark DELETE_FAILED and alert #civiform-sre-alerts on attempt 3
 ```
 
 ### Re-Provisioning Flow
@@ -668,8 +683,8 @@ export RDS_ADMIN_PORT=15432
 ### Running Tests
 
 ```bash
-./bin/sbt test              # 36+ unit tests (no Docker/AWS needed)
-./bin/run-browser-tests     # Playwright E2E tests
+./bin/sbt test              # Unit tests (no Docker/AWS needed)
+./bin/run-browser-tests     # Playwright E2E tests (isolated server on TEST_PORT=9002, TEST_DB_NAME=sandbox_builder_test, SANDBOX_RUNTIME=inmemory, FIXED_CLOCK_INSTANT=2026-10-01T12:00:00Z)
 ```
 
 ### CI

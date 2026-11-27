@@ -590,51 +590,6 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
 
-  // ── GET /sandboxes/:id — detail page ─────────────────────────────────────
-
-  @Test
-  public void show_withoutAuth_redirectsToLogin() {
-    Http.RequestBuilder request = Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-show1");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(SEE_OTHER);
-    assertThat(result.redirectLocation()).contains("/login");
-  }
-
-  @Test
-  public void show_existingSandbox_returns200WithHtml() {
-    SandboxInstance sandbox = makeSandbox("sb-show1", SandboxStatus.RUNNING);
-    when(sandboxService.getSandbox("sb-show1"))
-        .thenReturn(CompletableFuture.completedFuture(Optional.of(sandbox)));
-
-    Http.RequestBuilder request =
-        Helpers.fakeRequest()
-            .method("GET")
-            .uri("/sandboxes/sb-show1")
-            .session(AuthController.SESSION_KEY, "true");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(OK);
-  }
-
-  @Test
-  public void show_missingSandbox_returns404() {
-    when(sandboxService.getSandbox("nope"))
-        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-
-    Http.RequestBuilder request =
-        Helpers.fakeRequest()
-            .method("GET")
-            .uri("/sandboxes/nope")
-            .session(AuthController.SESSION_KEY, "true");
-
-    Result result = Helpers.route(app, request);
-
-    assertThat(result.status()).isEqualTo(NOT_FOUND);
-  }
-
   // ── POST /sandboxes/:id/delete & extend ───────────────────────────────────
 
   @Test
@@ -960,6 +915,29 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(result.status()).isEqualTo(NOT_FOUND);
   }
 
+  @Test
+  public void pinGate_stoppedOrExpiredSandbox_returns404() {
+    SandboxInstance stopped = makeSandbox("sb-stopped", SandboxStatus.STOPPED);
+    when(sandboxService.getSandbox("sb-stopped"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(stopped)));
+
+    Result stoppedResult =
+        Helpers.route(
+            app, Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-stopped/access"));
+    assertThat(stoppedResult.status()).isEqualTo(NOT_FOUND);
+
+    SandboxInstance expired =
+        makeSandbox("sb-exp", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.now().minus(Duration.ofDays(1)))
+            .build();
+    when(sandboxService.getSandbox("sb-exp"))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(expired)));
+
+    Result expiredResult =
+        Helpers.route(app, Helpers.fakeRequest().method("GET").uri("/sandboxes/sb-exp/access"));
+    assertThat(expiredResult.status()).isEqualTo(NOT_FOUND);
+  }
+
   // ── GET /sandboxes — list ─────────────────────────────────────────────────
 
   @Test
@@ -1074,6 +1052,10 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).contains("id=\"edit-modal\"");
     assertThat(body).contains("id=\"edit-form\"");
     assertThat(body).contains("id=\"edit-past-expiration-warning\"");
+    assertThat(body).contains("id=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("aria-describedby=\"edit-civiformVersion-hint\"");
+    assertThat(body).contains("https://github.com/civiform/civiform/releases");
+    assertThat(body).contains("or use &quot;latest&quot;.");
   }
 
   @Test
@@ -1096,6 +1078,144 @@ public class SandboxControllerTest extends WithApplication {
     assertThat(body).contains("id=\"sandbox-row-sb-fail1\"");
     assertThat(body).contains("id=\"sandbox-row-sb-delfail1\"");
     assertThat(body).doesNotContain("hx-trigger=\"every 3s\"");
+  }
+
+  @Test
+  public void index_expiredRow_rendersConfiguredAutodeletionGraceDays() {
+    // Use a fixed clock so the day count is deterministic regardless of CI
+    // server timezone.  Noon UTC on May 1 is still May 1 in
+    // America/Los_Angeles, so the LA-based "today" matches the UTC date.
+    java.time.Clock fixedClock =
+        java.time.Clock.fixed(
+            Instant.parse("2030-05-01T12:00:00Z"), java.time.ZoneOffset.UTC);
+    SandboxService customSandboxService = mock(SandboxService.class);
+    SandboxInstance expiredThreeDaysAgo =
+        makeSandbox("sb-exp1", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.parse("2030-04-28T10:00:00Z"))
+            .build();
+    when(customSandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(expiredThreeDaysAgo)));
+
+    Application customApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", 14)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(customSandboxService);
+                    bind(java.time.Clock.class).toInstance(fixedClock);
+                  }
+                })
+            .build();
+
+    try {
+      Helpers.running(
+          customApp,
+          () -> {
+            Http.RequestBuilder request =
+                Helpers.fakeRequest()
+                    .method("GET")
+                    .uri("/sandboxes")
+                    .session(AuthController.SESSION_KEY, "true");
+
+            Result result = Helpers.route(customApp, request);
+
+            assertThat(result.status()).isEqualTo(OK);
+            String body = contentAsString(result);
+            assertThat(body).contains("Autodeletion in 11 days");
+            assertThat(body).contains("automatically deleted 14 days after its expiration date");
+          });
+    } finally {
+      Helpers.stop(customApp);
+    }
+  }
+
+  @Test
+  public void index_editWarning_usesDefaultGracePeriod() {
+    SandboxInstance running = makeSandbox("sb-run1", SandboxStatus.RUNNING);
+    when(sandboxService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(running)));
+
+    Result result =
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("GET")
+                .uri("/sandboxes")
+                .session(AuthController.SESSION_KEY, "true"));
+
+    assertThat(contentAsString(result))
+        .contains("automatically deleted 7 days after its expiration date");
+  }
+
+  @Test
+  public void index_computesDaysRemainingUsingInjectedClock() {
+    java.time.Clock fixedClock =
+        java.time.Clock.fixed(
+            Instant.parse("2030-05-01T12:00:00Z"), java.time.ZoneOffset.UTC);
+    SandboxService mockService = mock(SandboxService.class);
+    SandboxInstance sandbox =
+        makeSandbox("sb-clock001", SandboxStatus.RUNNING).toBuilder()
+            .expiresAt(Instant.parse("2030-05-13T12:00:00Z"))
+            .build();
+    when(mockService.listSandboxes())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(sandbox)));
+
+    Application clockApp =
+        new GuiceApplicationBuilder()
+            .configure("durable_jobs.enabled", false)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(mockService);
+                    bind(java.time.Clock.class).toInstance(fixedClock);
+                  }
+                })
+            .build();
+
+    try {
+      Result result =
+          Helpers.route(
+              clockApp,
+              Helpers.fakeRequest()
+                  .method("GET")
+                  .uri("/sandboxes")
+                  .session(AuthController.SESSION_KEY, "true"));
+
+      assertThat(result.status()).isEqualTo(OK);
+      assertThat(contentAsString(result))
+          .contains("data-sort-value=\"12\"")
+          .contains(">12 days<");
+    } finally {
+      Helpers.stop(clockApp);
+    }
+  }
+
+  @Test
+  public void negativeAutodeletionGraceDays_failsApplicationStartup() {
+    // Mock SandboxService like the rest of this class: the real DockerSandboxService is an eager
+    // singleton that connects to Postgres, which would fail first in CI (no database) and mask
+    // the config validation this test is about.
+    SandboxService mockService = mock(SandboxService.class);
+    Application badApp =
+        new GuiceApplicationBuilder()
+            .configure("sandbox.autodeletionGraceDays", -3)
+            .overrides(
+                new AbstractModule() {
+                  @Override
+                  protected void configure() {
+                    bind(SandboxService.class).toInstance(mockService);
+                  }
+                })
+            .build();
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            // Constructing the controller requires SandboxLifecycleConfig, which validates.
+            () -> badApp.injector().instanceOf(SandboxController.class))
+        .hasRootCauseInstanceOf(com.typesafe.config.ConfigException.BadValue.class)
+        .hasStackTraceContaining("sandbox.autodeletionGraceDays");
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────

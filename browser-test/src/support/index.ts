@@ -9,9 +9,64 @@
  *   import { validateScreenshot, validateAccessibility } from '../support'
  */
 
-import {expect, Page} from '@playwright/test'
+import {test as base, expect, Page, request} from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import {PORTAL_EMAIL, PORTAL_PASSWORD} from './config'
+import {
+  BASE_URL,
+  FIXED_CLOCK_INSTANT,
+  PORTAL_EMAIL,
+  PORTAL_PASSWORD,
+} from './config'
+
+/**
+ * Shared Playwright test fixture that freezes the browser's `Date` clock to
+ * `FIXED_CLOCK_INSTANT` (matching the server's injected `java.time.Clock`)
+ * without pausing timers.
+ */
+export const test = base.extend<{frozenBrowserClock: void}>({
+  frozenBrowserClock: [
+    async ({context}, use) => {
+      await context.clock.setFixedTime(new Date(FIXED_CLOCK_INSTANT))
+      await use()
+    },
+    {auto: true},
+  ],
+})
+
+function extractCsrfToken(html: string): string {
+  const match = html.match(/name="csrfToken"\s+value="([^"]+)"/)
+  if (!match) {
+    throw new Error('Could not find csrfToken input in HTML response')
+  }
+  return match[1]
+}
+
+/**
+ * Restores the server's in-memory sandboxes to their seeded baseline state via
+ * `POST /dev/resetInMemorySandboxes`.
+ */
+export async function resetTestState(): Promise<void> {
+  const ctx = await request.newContext({baseURL: BASE_URL})
+  try {
+    const loginPage = await ctx.get('/login')
+    const login = await ctx.post('/login', {
+      form: {
+        csrfToken: extractCsrfToken(await loginPage.text()),
+        email: PORTAL_EMAIL,
+        password: PORTAL_PASSWORD,
+      },
+    })
+    expect(login.ok(), 'portal login for state reset').toBeTruthy()
+
+    const devPage = await ctx.get('/dev')
+    const reset = await ctx.post('/dev/resetInMemorySandboxes', {
+      form: {csrfToken: extractCsrfToken(await devPage.text())},
+    })
+    expect(reset.status(), 'reset in-memory sandboxes').toBe(200)
+  } finally {
+    await ctx.dispose()
+  }
+}
 
 /**
  * Takes a screenshot of the full page (or a specific locator) and compares it
@@ -111,5 +166,42 @@ export async function fillCreateWizard(
  */
 export async function openCreateModal(page: Page): Promise<void> {
   await page.click('button:has-text("Create new demo")')
-  await page.waitForSelector('#create-modal.is-visible .usa-modal__main')
+  await page.waitForSelector('#create-modal[open] .usa-modal__main')
+}
+
+/**
+ * Advances keyboard focus by one step within a native <dialog>.
+ * When Tab/Shift+Tab crosses the dialog boundary in Chromium, focus briefly
+ * steps to the browser chrome slot (document.body) without ever entering the
+ * inert background document; one additional press re-enters the dialog.
+ */
+export async function tabWithinDialog(
+  page: Page,
+  modalSelector: string,
+  key: 'Tab' | 'Shift+Tab' = 'Tab',
+): Promise<void> {
+  await page.keyboard.press(key)
+  const landedOnBody = await page.evaluate((sel) => {
+    const modal = document.querySelector(sel)
+    const active = document.activeElement
+    if (modal && active && modal.contains(active)) {
+      return false
+    }
+    if (active === document.body || active === null) {
+      return true
+    }
+    throw new Error(
+      `Focus escaped modal to background element: ${active.outerHTML}`,
+    )
+  }, modalSelector)
+  if (landedOnBody) {
+    await page.keyboard.press(key)
+  }
+  const inside = await page.evaluate((sel) => {
+    const modal = document.querySelector(sel)
+    return Boolean(
+      modal && document.activeElement && modal.contains(document.activeElement),
+    )
+  }, modalSelector)
+  expect(inside).toBe(true)
 }

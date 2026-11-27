@@ -23,6 +23,7 @@ services:
     tty: true
     ports:
       - "9001:9000"   # host:container — avoids conflict with civiform-civiform-1 on 9000
+      - "9002:9002"   # host:container — dedicated browser test server instance
       - "5174:5173"   # host:container — avoids conflict with civiform-civiform-1 on 5173
     environment:
       - DB_JDBC_URL=jdbc:postgresql://db:5432/sandbox_builder
@@ -45,6 +46,8 @@ services:
       - SLACK_SRE_ALERTS_WEBHOOK_URL
       - SLACK_SRE_ALERTS_CHANNEL
       - DEV_TOOLS_ENABLED
+      - AUTODELETION_GRACE_DAYS
+      - FIXED_CLOCK_INSTANT
       # ── Terraform runtime — only read when SANDBOX_RUNTIME=terraform ─────────
       # In AWS these are set on the ECS task definition, with the RDS admin
       # password sourced from Secrets Manager rather than plain env.

@@ -60,7 +60,7 @@ validation, enforced at the ALB level (not in CiviForm application code).
 cf-sandbox-builder/
 ├── Dockerfile                  # Development container image
 ├── prod.Dockerfile             # Production multi-stage release image (JDK build + JRE + Terraform)
-├── docker-compose.yml          # Postgres 16 + builder service (ports 9001, 5174)
+├── docker-compose.yml          # Postgres 16 + builder service (ports 9001, 9002, 5174)
 ├── docker-compose.dev.yml      # Dev overrides (volume mounts, hot reload)
 ├── init_postgres.sql           # DB init: sandbox_instances table + sequences
 ├── migrations/                 # One-time SQL for upgrading pre-existing environments
@@ -112,7 +112,7 @@ cf-sandbox-builder/
     │   └── views/              # Thymeleaf HTML templates + Java view models
     │       ├── layout/         # MainLayout, LoginLayout, Header, Footer
     │       ├── auth/           # LoginView
-    │       └── sandboxes/      # SandboxListView, SandboxDetailsView, PinGateView
+    │       └── sandboxes/      # SandboxListView, PinGateView
     └── test/
         ├── services/           # DockerSandboxServiceTest (25), TerraformSandboxServiceTest (37),
         │                       # SandboxRepositoryTest (21), SandboxRepositoryIntegrationTest (18),
@@ -180,7 +180,6 @@ GET  /logout                     AuthController.logout         (clear session �
 GET  /                           SandboxController.index       (redirects to /sandboxes)
 GET  /sandboxes                  SandboxController.index       (dashboard — sandbox list)
 POST /sandboxes                  SandboxController.create      (form POST → 303 to dashboard)
-GET  /sandboxes/:id              SandboxController.show        (sandbox detail page)
 GET  /sandboxes/:id/status       SandboxController.statusFragment  (HTMX polling fragment)
 POST /sandboxes/:id/delete       SandboxController.delete
 POST /sandboxes/:id/extend       SandboxController.extend      (extend expiry by N days)
@@ -191,6 +190,10 @@ POST /sandboxes/:id/access       SandboxController.validateAccess  (PIN → cook
 
 GET  /health                     HealthCheckController.health
 GET  /ready                      HealthCheckController.ready
+
+GET  /dev                        DevToolsController.index          (dev tools — when DEV_TOOLS_ENABLED=true)
+POST /dev/runDurableJob          DevToolsController.runDurableJob
+POST /dev/resetInMemorySandboxes DevToolsController.resetInMemorySandboxes (inmemory runtime only)
 ```
 
 ---
@@ -257,10 +260,12 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 | `DB_USER` | `postgres` | Builder DB user |
 | `DB_PASSWORD` | `example` | Builder DB password |
 | `DEV_TOOLS_ENABLED` | *(empty)* | Adds a dev tools link to the header, it allows running persistent jobs on demand. |
-| `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local) or `terraform` (AWS) |
+| `SANDBOX_RUNTIME` | `docker` | Runtime engine: `docker` (local), `terraform` (AWS), or `inmemory` (in-memory only, non-production) |
+| `FIXED_CLOCK_INSTANT` | *(empty)* | ISO-8601 instant to freeze the application `Clock` in non-production modes (`clock.fixedInstant`, e.g. `2026-10-01T12:00:00Z` for deterministic test dates) |
 | `SANDBOX_DOMAIN` | `sandbox.civiform.dev` | Base domain for sandbox subdomains and cookie scoping |
 | `DEMO_PORTAL_PASSWORD` | `demo` (in `docker-compose.yml`) | Local fallback password for `admin@civiform.dev` |
 | `PIN_GATE_MAX_ATTEMPTS` | `5` | Max failed PIN guesses before rate limiting (10-min window) |
+| `AUTODELETION_GRACE_DAYS` | `7` | Grace period (in days) after sandbox expiration before `DestroyExpiredSandboxesJob` automatically deletes it (`sandbox.autodeletionGraceDays`) |
 | `AUTH0_DOMAIN` | *(empty)* | Auth0 tenant domain (e.g. `civiform-sandbox-builder.us.auth0.com`) |
 | `AUTH0_CLIENT_ID` | *(empty)* | Auth0 application Client ID |
 | `AUTH0_CLIENT_SECRET` | *(empty)* | Auth0 application Client Secret |
@@ -303,18 +308,32 @@ Rate limiting: After `PIN_GATE_MAX_ATTEMPTS` (default: 5) failed guesses within 
 ./bin/run-browser-tests           # Playwright E2E tests
 ```
 
+`./bin/run-browser-tests` automatically launches an isolated test server on port `9002` with `SANDBOX_RUNTIME=inmemory`, a frozen `Clock` (`FIXED_CLOCK_INSTANT`), and a clean `sandbox_builder_test` database, leaving the running dev server (`9001`) and dev database (`sandbox_builder`) untouched.
+
+### Browser Test Environment Variables (`./bin/run-browser-tests`)
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TEST_PORT` | `9002` | Port inside/outside the `builder` container for the isolated test server |
+| `TEST_DB_NAME` | `sandbox_builder_test` | Ephemeral PostgreSQL database created before tests and dropped on exit (must end in `_test`) |
+| `FIXED_CLOCK_INSTANT` | `2026-10-01T12:00:00Z` | ISO-8601 instant used to freeze both the server `Clock` and Playwright browser `Date` |
+| `BASE_URL` | `http://localhost:${TEST_PORT}` | Base URL targeted by Playwright (`browser-test/src/support/config.ts`) |
+| `DB_CONTAINER_NAME` | `cf-sandbox-builder-db-1` | Docker container name for PostgreSQL |
+| `BUILDER_CONTAINER_NAME` | `cf-sandbox-builder-builder-1` | Docker container name for the Play builder container |
+
 ### Test Coverage
 
 | Test Class | Count | Notes |
 |---|---|---|
-| `SandboxControllerTest` | 40 | All controller actions, validation, auth |
-| `TerraformSandboxServiceTest` | 37 | Terraform provisioning, deletion, readiness |
-| `DockerSandboxServiceTest` | 25 | Docker socket provisioning |
+| `SandboxControllerTest` | 41 | All controller actions, validation, auth, clock injection |
+| `TerraformSandboxServiceTest` | 38 | Terraform provisioning, deletion, readiness |
+| `DockerSandboxServiceTest` | 26 | Docker socket provisioning |
 | `AuthControllerTest` | 22 | Auth0 OIDC + password fallback |
 | `SandboxRepositoryTest` | 21 | DB CRUD, stale state reconciliation |
 | `SandboxRepositoryIntegrationTest` | 18 | Real Postgres via `docker compose` (`bin/run-dev`); excluded from default `sbt test` |
-| `PinAttemptLimiterTest` | 8 | Rate limiting logic |
-| `InMemorySandboxServiceTest` | 6 | In-memory stub |
+| `PinAttemptLimiterTest` | 9 | Rate limiting logic |
+| `InMemorySandboxServiceTest` | 9 | In-memory runtime, sorting, clock timestamps, seed reset |
+| `MainModuleTest` | 7 | Runtime selector, fixed clock binding, prod guards |
 | `AuthFilterTest` | 5 | Route protection |
 
 Unit tests use a testable subclass of `DockerSandboxService` that injects a Mockito mock —

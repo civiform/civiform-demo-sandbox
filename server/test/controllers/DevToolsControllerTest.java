@@ -712,6 +712,109 @@ public class DevToolsControllerTest extends WithApplication {
   }
 
   @Test
+  public void resetInMemorySandboxes_withoutAuth_redirectsToLogin() {
+    Result result =
+        Helpers.route(
+            app, Helpers.fakeRequest().method("POST").uri("/dev/resetInMemorySandboxes"));
+
+    assertThat(result.status()).isEqualTo(SEE_OTHER);
+    assertThat(result.redirectLocation()).contains("/login");
+  }
+
+  @Test
+  public void resetInMemorySandboxes_whenNonInMemoryRuntimeBound_returnsNotFound() {
+    Result result =
+        Helpers.route(
+            app,
+            Helpers.fakeRequest()
+                .method("POST")
+                .uri("/dev/resetInMemorySandboxes")
+                .session(AuthController.SESSION_KEY, "true"));
+
+    assertThat(result.status()).isEqualTo(NOT_FOUND);
+  }
+
+  @Test
+  public void resetInMemorySandboxes_whenInMemoryRuntimeBound_resetsSeedStateAndReturnsOk()
+      throws Exception {
+    services.InMemorySandboxService inMemoryService =
+        new services.InMemorySandboxService(FIXED_CLOCK);
+    Application inMemoryApp =
+        new GuiceApplicationBuilder()
+            .configure("durable_jobs.enabled", false)
+            .overrides(
+                new TestOverridesModule(
+                    inMemoryService, persistedDurableJobRepository, recurringDurableJobRunner))
+            .build();
+
+    try {
+      inMemoryService
+          .createSandbox(
+              services.CreateSandboxRequest.builder()
+                  .cityName("Mutated City")
+                  .subdomain("mutated-city")
+                  .pin("111111")
+                  .adminEmail("test@civiform.dev")
+                  .expirationDays(30)
+                  .build())
+          .toCompletableFuture()
+          .get();
+      inMemoryService.deleteSandbox("sb-demo0001").toCompletableFuture().get();
+      assertThat(inMemoryService.listSandboxes().toCompletableFuture().get()).hasSize(3);
+
+      Result result =
+          Helpers.route(
+              inMemoryApp,
+              Helpers.fakeRequest()
+                  .method("POST")
+                  .uri("/dev/resetInMemorySandboxes")
+                  .session(AuthController.SESSION_KEY, "true"));
+
+      assertThat(result.status()).isEqualTo(OK);
+      assertThat(contentAsString(result)).contains("\"status\":\"RESET\"");
+      assertThat(inMemoryService.listSandboxes().toCompletableFuture().get()).hasSize(2);
+      assertThat(
+              inMemoryService
+                  .getSandbox("sb-demo0001")
+                  .toCompletableFuture()
+                  .get()
+                  .orElseThrow()
+                  .getStatus())
+          .isEqualTo(models.SandboxStatus.RUNNING);
+    } finally {
+      Helpers.stop(inMemoryApp);
+    }
+  }
+
+  @Test
+  public void resetInMemorySandboxes_inProdWhenDevToolsDisabled_returnsNotFound() {
+    services.InMemorySandboxService inMemoryService =
+        new services.InMemorySandboxService(FIXED_CLOCK);
+    Application prodApp =
+        new GuiceApplicationBuilder()
+            .in(new Environment(app.path(), app.classloader(), Mode.PROD))
+            .configure("play.http.secret.key", TEST_PROD_SECRET)
+            .configure("durable_jobs.enabled", false)
+            .overrides(
+                new TestOverridesModule(
+                    inMemoryService, persistedDurableJobRepository, recurringDurableJobRunner))
+            .build();
+
+    try {
+      Result result =
+          Helpers.route(
+              prodApp,
+              Helpers.fakeRequest()
+                  .method("POST")
+                  .uri("/dev/resetInMemorySandboxes")
+                  .session(AuthController.SESSION_KEY, "true"));
+      assertThat(result.status()).isEqualTo(NOT_FOUND);
+    } finally {
+      Helpers.stop(prodApp);
+    }
+  }
+
+  @Test
   public void csrfAnnotations_presentOnDevToolsEndpoints() throws NoSuchMethodException {
     assertThat(
             DevToolsController.class
@@ -721,6 +824,11 @@ public class DevToolsControllerTest extends WithApplication {
     assertThat(
             DevToolsController.class
                 .getMethod("runDurableJob", Http.Request.class)
+                .isAnnotationPresent(RequireCSRFCheck.class))
+        .isTrue();
+    assertThat(
+            DevToolsController.class
+                .getMethod("resetInMemorySandboxes", Http.Request.class)
                 .isAnnotationPresent(RequireCSRFCheck.class))
         .isTrue();
   }

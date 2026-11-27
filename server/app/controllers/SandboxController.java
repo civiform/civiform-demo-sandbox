@@ -5,6 +5,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
 import com.typesafe.config.Config;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,12 +25,11 @@ import play.filters.csrf.AddCSRFToken;
 import play.filters.csrf.RequireCSRFCheck;
 import services.CreateSandboxRequest;
 import services.PinAttemptLimiter;
+import services.SandboxLifecycleConfig;
 import services.SandboxService;
 import services.UpdateSandboxRequest;
 import views.sandboxes.PinGateView;
 import views.sandboxes.PinGateViewModel;
-import views.sandboxes.SandboxDetailsView;
-import views.sandboxes.SandboxDetailsViewModel;
 import views.sandboxes.SandboxListView;
 import views.sandboxes.SandboxListViewModel;
 
@@ -37,29 +37,34 @@ public class SandboxController extends Controller {
 
   private final SandboxService sandboxService;
   private final SandboxListView listView;
-  private final SandboxDetailsView detailsView;
   private final PinGateView pinGateView;
   private final FormFactory formFactory;
   private final PinAttemptLimiter pinAttemptLimiter;
+  private final Clock clock;
   /** Base domain for cookie scoping, e.g. "sandbox.civiform.dev". */
   private final String sandboxBaseDomain;
+  /** Days after expiry before DestroyExpiredSandboxesJob automatically deletes a sandbox. */
+  private final long autodeletionGraceDays;
 
   @Inject
   public SandboxController(
       SandboxService sandboxService,
       SandboxListView listView,
-      SandboxDetailsView detailsView,
       PinGateView pinGateView,
       FormFactory formFactory,
       PinAttemptLimiter pinAttemptLimiter,
-      Config config) {
+      Clock clock,
+      Config config,
+      SandboxLifecycleConfig sandboxLifecycleConfig) {
     this.sandboxService = checkNotNull(sandboxService);
     this.listView = checkNotNull(listView);
-    this.detailsView = checkNotNull(detailsView);
     this.pinGateView = checkNotNull(pinGateView);
     this.formFactory = checkNotNull(formFactory);
     this.pinAttemptLimiter = checkNotNull(pinAttemptLimiter);
+    this.clock = checkNotNull(clock);
     this.sandboxBaseDomain = checkNotNull(config).getString("sandbox.domain");
+    this.autodeletionGraceDays =
+        checkNotNull(sandboxLifecycleConfig).getAutodeletionGraceDays();
   }
 
   /** GET /sandboxes — list all sandboxes (JSON or HTML). */
@@ -73,7 +78,8 @@ public class SandboxController extends Controller {
       if (isJsonRequest(request)) {
         return CompletableFuture.completedFuture(ok(Json.toJson(sandboxes)));
       }
-      SandboxListViewModel model = SandboxListViewModel.of(sandboxes);
+      SandboxListViewModel model =
+          SandboxListViewModel.of(sandboxes, autodeletionGraceDays, clock.instant());
       Result result = ok(listView.render(request, model)).as("text/html");
 
       if (readyId != null && !readyId.isEmpty()) {
@@ -182,30 +188,10 @@ public class SandboxController extends Controller {
         .build();
   }
 
-
-  /** GET /sandboxes/:id — detail page or JSON. */
-  @AddCSRFToken
-  public CompletionStage<Result> show(Http.Request request, String id) {
-    return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
-      if (maybeSandbox.isEmpty()) {
-        return notFound("Sandbox not found: " + id);
-      }
-      SandboxInstance sandbox = maybeSandbox.get();
-      if (isJsonRequest(request)) {
-        return ok(Json.toJson(sandbox));
-      }
-      SandboxDetailsViewModel model = SandboxDetailsViewModel.builder()
-          .sandbox(sandbox)
-          .expired(sandbox.getExpiresAt().isBefore(java.time.Instant.now()))
-          .build();
-      return ok(detailsView.render(request, model)).as("text/html");
-    });
-  }
-
   /**
    * GET /sandboxes/:id/status — HTMX partial: status badge only, no layout wrapper.
    * Returns bare HTML that HTMX swaps in. Stops self-polling once
-   * RUNNING or FAILED. Auto-navigates to detail page when RUNNING.
+   * RUNNING or FAILED. Auto-navigates to sandbox list when RUNNING.
    */
   public CompletionStage<Result> statusFragment(Http.Request request, String id) {
     return sandboxService.getSandbox(id).thenApply(maybeSandbox -> {
@@ -254,6 +240,12 @@ public class SandboxController extends Controller {
       }
 
       SandboxInstance sandbox = maybeSandbox.get();
+      if (sandbox.getStatus() == models.SandboxStatus.DELETED
+          || sandbox.getStatus() == models.SandboxStatus.DELETING
+          || sandbox.getStatus() == models.SandboxStatus.STOPPED
+          || (sandbox.getExpiresAt() != null && sandbox.getExpiresAt().isBefore(clock.instant()))) {
+        return notFound("Sandbox not found or expired: " + id);
+      }
       if (hasAccessCookie(request, id, sandbox.getAccessToken())) {
         return redirect(sandbox.getUrl());
       }

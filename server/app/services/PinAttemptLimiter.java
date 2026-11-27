@@ -38,11 +38,11 @@ public class PinAttemptLimiter {
       new ConcurrentHashMap<>();
 
   @Inject
-  public PinAttemptLimiter(Config config) {
+  public PinAttemptLimiter(Config config, Clock clock) {
     this(
         config.getInt("sandbox.pinGate.maxAttempts"),
         config.getDuration("sandbox.pinGate.window"),
-        Clock.systemUTC());
+        clock);
   }
 
   PinAttemptLimiter(int maxAttempts, Duration window, Clock clock) {
